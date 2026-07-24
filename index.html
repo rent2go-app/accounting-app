@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M9%2041c0-1%201-2%202-3l3-1%204-8c1-2%202-3%205-3h18c3%200%204%201%205%203l4%208%203%201c1%201%202%202%202%203v5c0%201-1%202-2%202h-3a5%205%200%200%201-10%200H23a5%205%200%200%201-10%200h-2c-1%200-2-1-2-2z%22%20fill%3D%22%230f8a4d%22/%3E%3Cpath%20d%3D%22M21%2027l-3%207h28l-3-7c-1-1-1-1-2-1H23c-1%200-1%200-2%201z%22%20fill%3D%22%23eafaf0%22/%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2246%22%20r%3D%224%22%20fill%3D%22%230b5f36%22/%3E%3Ccircle%20cx%3D%2242%22%20cy%3D%2246%22%20r%3D%224%22%20fill%3D%22%230b5f36%22/%3E%3C/svg%3E">
 <title>Rent 2 Go — Daily Sheet</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -19,6 +20,24 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .nav button{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--muted);font-weight:800}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
 .rangeLbl{font-size:12.5px;font-weight:700;color:var(--muted)}
+.qfilters{display:flex;gap:6px;flex-wrap:wrap;flex-basis:100%;align-items:center;margin-top:4px}
+.qlbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-right:2px}
+.qchip{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.qchip:hover{border-color:var(--brand);color:var(--brand)}.qchip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.glance{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:12px;margin-top:16px}@media(max-width:640px){.glance{grid-template-columns:1fr}}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.gcard.proj{background:color-mix(in srgb,#eab54e 8%,var(--surface))}
+.gcard.mid{border:2px solid var(--brand);box-shadow:0 8px 20px rgba(16,24,40,.14)}
+.gcard .gl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.gcard .gv{font-size:23px;font-weight:800;margin-top:5px}.gcard.mid .gv{font-size:32px}
+.gcard .gn{font-size:12px;margin-top:3px;font-weight:700}
+.sumwrap{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.sumcap{background:var(--brand);color:#fff;font-weight:800;padding:12px 16px;font-size:14px}
+.sumtab{width:100%;border-collapse:collapse;font-size:13.5px}
+.sumtab th,.sumtab td{text-align:right;padding:10px 14px;border-bottom:1px solid var(--line)}
+.sumtab th:first-child,.sumtab td:first-child{text-align:left;font-weight:700}
+.sumtab th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--surface-2)}
+.sumtab tbody tr:last-child td{border-bottom:none}.sumtab td:last-child{font-weight:800}
 .setpanel{max-width:940px;margin:12px auto 0;padding:14px 20px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow)}
 .setgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}@media(max-width:720px){.setgrid{grid-template-columns:1fr}}
 .setrow{display:flex;flex-direction:column;gap:5px}
@@ -38,8 +57,8 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .userrow input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px;width:150px}
 .userrow .badge{font-size:9px;font-weight:800;text-transform:uppercase;background:var(--brand);color:#fff;padding:2px 7px;border-radius:999px}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(4,1fr);margin-top:14px}@media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
-.label{color:var(--muted);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.value{font-size:20px;font-weight:800;margin-top:4px}.hint{color:var(--muted);font-size:11.5px;margin-top:3px}.pos{color:var(--in)}.neg{color:var(--out)}.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;padding:17px 18px;box-shadow:0 5px 14px rgba(16,24,40,.11),0 1px 3px rgba(16,24,40,.07)}
+.label{color:var(--muted);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.value{font-size:26px;font-weight:800;margin-top:5px;letter-spacing:-.01em}.hint{color:var(--muted);font-size:11.5px;margin-top:3px}.pos{color:var(--in)}.neg{color:var(--out)}.muted{color:var(--muted)}
 .stack{display:flex;flex-direction:column;gap:36px;margin-top:22px}
 .blk{background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:0 10px 26px rgba(16,24,40,.15),0 2px 5px rgba(16,24,40,.08);overflow:hidden}
 .blk.today{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 32%,transparent),0 10px 26px rgba(16,24,40,.15)}
@@ -139,8 +158,9 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 <div class="adminrow"><input type="email" id="nu_email" placeholder="new user email" autocomplete="off"><input type="password" id="nu_pass" placeholder="password (min 8)" autocomplete="new-password"><button class="btn" id="nu_btn">Create user</button></div>
 <div class="setmsg" id="nu_msg"></div>
 <div class="userlist" id="userlist"></div>
-</div></div>
-<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2026-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div></div><div class="kpis" id="kpis"></div><div class="stack" id="stack"></div><p class="hint">One unbroken chain: <b>Carried forward</b> of each day = <b>Starting balance</b> of the next, across every month. Edit deposits, income or expenses and it cascades down through every following day. Type over the <b>Running total</b> (or a Starting balance) to reconcile to the bank — it books a visible <b>Balance adjustment</b>, kept out of the income/expense totals. Expenses split into <b>Operating (blue) · Home (yellow) · MMF (grey) · Other (sky)</b>.</p></main></div>
+</div>
+<div class="setdiv"></div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" id="setDone" style="background:var(--brand);color:#fff;border-color:var(--brand)">Save &amp; close</button><span class="setmsg" id="set_saved" style="margin:0">Changes save automatically as you type.</span></div></div>
+<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2027-03-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button></div></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div><div class="stack" id="stack"></div><p class="hint">One unbroken chain: <b>Carried forward</b> of each day = <b>Starting balance</b> of the next, across every month. Edit deposits, income or expenses and it cascades down through every following day. Type over the <b>Running total</b> (or a Starting balance) to reconcile to the bank — it books a visible <b>Balance adjustment</b>, kept out of the income/expense totals. Expenses split into <b>Operating (blue) · Home (yellow) · MMF (grey) · Other (sky)</b>.</p></main></div>
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 function setStatus(s){var el=document.getElementById('savestate');if(!el)return;el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error — retrying…':'';el.className='savestate '+(s||'');}
@@ -213,7 +233,8 @@ const M={};
 function recompute(){let carried=OPEN;DK.forEach((d,idx)=>{const start=idx===0?OPEN:carried;const total=r2(start+incChain(d));const e=expsum(d);carried=r2(total-e);M[d]={start:r2(start),incReal:incReal(d),adj:r2(adjSum(d)),exp:e,total,carried,proj:d>TODAY}})}
 await load();recompute();
 let scope='day',anchor=TODAY;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=TODAY?d:a,DK[0]);
-function rangeFor(){const a=new Date(anchor+'T00:00:00');
+let customRange=null;
+function rangeFor(){if(customRange)return customRange;const a=new Date(anchor+'T00:00:00');
  if(scope==='day')return[anchor,anchor];
  if(scope==='week'){const s=addDays(anchor,-a.getDay());return[s,addDays(s,6)]}
  if(scope==='month')return[anchor.slice(0,7)+'-01',anchor.slice(0,7)+'-'+pad(new Date(a.getFullYear(),a.getMonth()+1,0).getDate())];
@@ -253,17 +274,19 @@ function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00'
   +'<div class="foot"><div class="f"><span class="k neg">Total out</span><b class="neg tnum">'+fmt(x.exp)+'</b></div><div class="f"><span class="k">Net day</span><b class="tnum '+((x.incReal-x.exp)>=0?'pos':'neg')+'">'+((x.incReal-x.exp)>=0?'+':'')+fmt(x.incReal-x.exp)+'</b></div><div class="f carry"><span class="k">Carried forward →</span><b class="tnum">'+fmt(x.carried)+'</b></div></div>'
   +'</div>';}
 function render(){const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg[1]);
- const inc=kpiDays.reduce((s,d)=>s+M[d].incReal,0),exp=kpiDays.reduce((s,d)=>s+M[d].exp,0);const bal=M[anchor]?M[anchor].total:0;
+ const inc=kpiDays.reduce((s,d)=>s+M[d].incReal,0),exp=kpiDays.reduce((s,d)=>s+M[d].exp,0);const closeDay=rg[1];const bal=customRange?(M[closeDay]?M[closeDay].carried:0):(M[anchor]?M[anchor].total:0);const balLbl=customRange?('Projected closing · '+rg[1]):('Running total · '+anchor);
  document.getElementById('rangeLbl').textContent=(rg[0]===rg[1]?rg[0]:rg[0]+' → '+rg[1])+' · '+kpiDays.length+' day'+(kpiDays.length>1?'s':'');
  const cap=({day:'Day',week:'Week',month:'Month',quarter:'Quarter'})[scope];
  document.getElementById('kpis').innerHTML=[
-  ['Running total · '+anchor,fmt(bal),'','≈ R'+(bal*CFG.zar).toLocaleString('en',{maximumFractionDigits:0})+' · AED '+(bal*CFG.aed).toLocaleString('en',{maximumFractionDigits:0})],
+  [balLbl,fmt(bal),'','≈ R'+(bal*CFG.zar).toLocaleString('en',{maximumFractionDigits:0})+' · AED '+(bal*CFG.aed).toLocaleString('en',{maximumFractionDigits:0})],
   [cap+' income',fmt(inc),'pos','real deposits & income'],[cap+' expenses',fmt(exp),'neg','money out'],['Net',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','']
  ].map(x=>'<div class="card"><div class="label">'+x[0]+'</div><div class="value tnum '+x[2]+'">'+x[1]+'</div>'+(x[3]?'<div class="hint tnum">'+x[3]+'</div>':'')+'</div>').join('');
- let list=kpiDays;if(scope==='day')list=[addDays(anchor,-1),anchor,addDays(anchor,1)].filter(d=>M[d]);
- document.getElementById('stack').innerHTML=list.map((d,ix)=>block(d,DK.indexOf(d))).join('')||'<div class="muted" style="padding:30px">No days in range.</div>';
- wire();}
+ var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
+ let list=kpiDays;if(!customRange&&scope==='day')list=[addDays(anchor,-1),anchor,addDays(anchor,1)].filter(d=>M[d]);
+ if(customRange&&kpiDays.length>45){document.getElementById('stack').innerHTML=summaryHTML(kpiDays);}
+ else{document.getElementById('stack').innerHTML=list.map((d,ix)=>block(d,DK.indexOf(d))).join('')||'<div class="muted" style="padding:30px">No days in range.</div>';wire();}}
 function refocus(sel){const b=document.querySelector(sel);if(b){b.focus();if(b.select)b.select();}}
+function summaryHTML(days){var by={};days.forEach(function(d){(by[d.slice(0,7)]=by[d.slice(0,7)]||[]).push(d);});var months=Object.keys(by).sort();var rows=months.map(function(m){var ds=by[m];var inc=0,exp=0;ds.forEach(function(d){inc+=M[d].incReal;exp+=M[d].exp;});var open=M[ds[0]].start,close=M[ds[ds.length-1]].carried,net=inc-exp;var nm=new Date(m+'-01T00:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});return '<tr><td>'+nm+'</td><td class="tnum">'+fmt(open)+'</td><td class="tnum pos">'+fmt(inc)+'</td><td class="tnum neg">'+fmt(exp)+'</td><td class="tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+'</td><td class="tnum">'+fmt(close)+'</td></tr>';}).join('');return '<div class="sumwrap"><div class="sumcap">Budget forecast · '+days[0]+' → '+days[days.length-1]+'</div><div style="overflow-x:auto"><table class="sumtab"><thead><tr><th>Month</th><th>Opening</th><th>Income</th><th>Expenses</th><th>Net</th><th>Closing</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';}
 function setDayAdj(d,delta){delta=r2(delta);let idx=MD[d].j.findIndex(isAdj);if(idx>=0){MD[d].j[idx][1]=r2(MD[d].j[idx][1]+delta);if(Math.abs(MD[d].j[idx][1])<0.005)MD[d].j.splice(idx,1);}else if(Math.abs(delta)>0.005){MD[d].j.push(['Balance adjustment (from sheet)',delta,'Adjustment',''])}}
 function wire(){
  document.querySelectorAll('.amt,.di,.cat').forEach(inp=>inp.onchange=()=>{snapshot();const d=inp.dataset.d,k=inp.dataset.k,f=inp.dataset.f,i=inp.dataset.i;
@@ -287,11 +310,14 @@ function wire(){
  document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{snapshot();const k=b.dataset.dk,d=b.dataset.dd,i=+b.dataset.di;MD[d][k].splice(i,1);save();recompute();render()});
  document.querySelectorAll('.swatch').forEach(s=>s.onclick=()=>{snapshot();const k=s.dataset.swk,d=s.dataset.swd,i=+s.dataset.swi;const ci=k==='e'?4:3;const a=MD[d][k][i];while(a.length<=ci)a.push('');a[ci]=PAL[(PAL.indexOf(a[ci]||'')+1)%PAL.length];save();render()});}
 document.getElementById('anchor').value=anchor;
-document.querySelectorAll('#scopeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#scopeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');scope=b.dataset.s;render();const t=document.getElementById('todayblk');if(t)t.scrollIntoView({block:'center'})});
-document.getElementById('anchor').onchange=e=>{anchor=e.target.value;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=e.target.value?d:a,DK[0]);render()};
-const step=n=>{const i=DK.indexOf(anchor);let ni=Math.max(0,Math.min(DK.length-1,i+n*(scope==='day'?1:scope==='week'?7:scope==='month'?30:91)));anchor=DK[ni];document.getElementById('anchor').value=anchor;render()};
+document.querySelectorAll('#scopeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#scopeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');scope=b.dataset.s;customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});render();const t=document.getElementById('todayblk');if(t)t.scrollIntoView({block:'center'})});
+document.getElementById('anchor').onchange=e=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});anchor=e.target.value;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=e.target.value?d:a,DK[0]);render()};
+const step=n=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});const i=DK.indexOf(anchor);let ni=Math.max(0,Math.min(DK.length-1,i+n*(scope==='day'?1:scope==='week'?7:scope==='month'?30:91)));anchor=DK[ni];document.getElementById('anchor').value=anchor;render()};
 document.getElementById('prev').onclick=()=>step(-1);document.getElementById('next').onclick=()=>step(1);
 document.getElementById('reset').onclick=async()=>{setStatus('saving');await load();recompute();render();setStatus('saved');};
+function setQuick(q){var t=TODAY,end=DK[DK.length-1];if(q==='today'){customRange=null;scope='day';anchor=t;}else if(q==='d7'){customRange=[t,addDays(t,7)];anchor=addDays(t,7);}else if(q==='w4'){customRange=[t,addDays(t,28)];anchor=addDays(t,28);}else if(q==='nm'){var a=new Date(t+'T00:00:00');customRange=[isod(new Date(a.getFullYear(),a.getMonth()+1,1)),isod(new Date(a.getFullYear(),a.getMonth()+2,0))];anchor=customRange[1];}else if(q==='nq'){customRange=[t,addDays(t,90)];anchor=addDays(t,90);}else if(q==='ya'){customRange=[t,end];anchor=end;}if(customRange&&customRange[1]>end)customRange[1]=end;if(anchor>end)anchor=end;document.getElementById('anchor').value=anchor;render();window.scrollTo({top:0,behavior:'smooth'});}
+document.querySelectorAll('.qchip').forEach(function(b){b.onclick=function(){document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});b.classList.add('on');setQuick(b.dataset.q);};});
+var sd=document.getElementById('setDone');if(sd)sd.onclick=async function(){var m=document.getElementById('set_saved');if(m)m.textContent='Saving…';try{await flush();if(m){m.textContent='Saved ✓';m.style.color='var(--in)';}}catch(e){if(m){m.textContent='Save error';m.style.color='var(--out)';}}setTimeout(function(){document.getElementById('settings').hidden=true;if(m){m.textContent='Changes save automatically as you type.';m.style.color='';}},700);};
 const setP=document.getElementById('settings');document.getElementById('setBtn').onclick=()=>{setP.hidden=!setP.hidden};
 document.getElementById('undoBtn').onclick=undo;updateUndo();
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});

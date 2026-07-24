@@ -7,7 +7,7 @@ const ADMIN_EMAILS = ["gorentaride@gmail.com"];
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info, x-supabase-api-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const j = (status: number, obj: unknown) =>
