@@ -9,3 +9,4 @@ ops-console-backup/
 *.xlsx
 *.csv
 seed-*.sql
+backups/
