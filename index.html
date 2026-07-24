@@ -117,6 +117,11 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .del:hover{border-color:var(--out);color:var(--out);background:color-mix(in srgb,var(--out) 10%,var(--surface))}
 .dep .del{width:16px;height:16px;font-size:12px;border:none;padding:0;margin-left:1px;background:transparent}
 .swatch{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line-strong);cursor:pointer;padding:0}
+.grip{flex:none;cursor:grab;color:var(--muted);font-size:13px;line-height:1;padding:0 1px;user-select:none}
+.eline.dragging{opacity:.4}
+.droptarget.dropover{outline:2px dashed var(--brand);outline-offset:2px;border-radius:8px}
+.rttoast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--surface);padding:9px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.3);opacity:0;transition:opacity .2s,transform .2s;z-index:60;pointer-events:none}
+.rttoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .di{border:1px solid transparent;border-radius:6px;padding:3px 6px;font-size:13.5px;background:transparent;color:var(--text);font-family:inherit;flex:1;min-width:60px}
 .di:hover{border-color:var(--line)}.di:focus{outline:none;border-color:var(--brand);background:var(--surface)}
 .cat{border:1px solid var(--line);border-radius:6px;padding:2px 4px;font-size:11px;background:var(--surface-2);color:var(--muted);font-family:inherit;max-width:150px}
@@ -243,15 +248,15 @@ const M={};
 function recompute(){let carried=OPEN;DK.forEach((d,idx)=>{const start=idx===0?OPEN:carried;const total=r2(start+incChain(d));const e=expsum(d);carried=r2(total-e);M[d]={start:r2(start),incReal:incReal(d),adj:r2(adjSum(d)),exp:e,total,carried,proj:d>TODAY}})}
 await load();recompute();
 let scope='day',anchor=TODAY;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=TODAY?d:a,DK[0]);
-let customRange=null;
+let customRange=null;let CUSTOMCATS=[];
 function rangeFor(){if(customRange)return customRange;const a=new Date(anchor+'T00:00:00');
  if(scope==='day')return[anchor,anchor];
  if(scope==='week'){const s=addDays(anchor,-a.getDay());return[s,addDays(s,6)]}
  if(scope==='month')return[anchor.slice(0,7)+'-01',anchor.slice(0,7)+'-'+pad(new Date(a.getFullYear(),a.getMonth()+1,0).getDate())];
  const q=Math.floor(a.getMonth()/3);return[isod(new Date(a.getFullYear(),q*3,1)),isod(new Date(a.getFullYear(),q*3+3,0))]}
-function catSel(kind,d,k,i,val){const list=kind==='e'?ECATS:ICATS;const has=list.includes(val);const opts=list.map(c=>'<option'+(c===val?' selected':'')+'>'+c+'</option>').join('');return '<select class="cat" data-d="'+d+'" data-k="'+k+'" data-f="c" data-i="'+i+'">'+opts+(has?'':'<option selected>'+esc(val)+'</option>')+'</select>'}
+function catSel(kind,d,k,i,val){const list=kind==='e'?ECATS.concat(CUSTOMCATS):ICATS;const has=list.includes(val);const opts=list.map(c=>'<option'+(c===val?' selected':'')+'>'+c+'</option>').join('');return '<select class="cat" data-d="'+d+'" data-k="'+k+'" data-f="c" data-i="'+i+'">'+opts+(has?'':'<option selected>'+esc(val)+'</option>')+(kind==='e'?'<option value="__add__">\uFF0B Add category\u2026</option>':'')+'</select>'}
 function eline(l,i,d){const v=+l[1]||0;const paid=!!l[3];const col=l[4]||'';const r=isSA(l[0])?saChip(v):'';
- return '<div class="eline'+(paid?' paid':'')+'"'+(col?' style="border-left:4px solid '+col+';padding-left:6px"':'')+'><button class="chk'+(paid?' on':'')+'" data-paid="'+d+'" data-i="'+i+'" title="'+(paid?'Paid — click to unmark':'Mark as paid')+'">'+(paid?'✓':'')+'</button><input class="di" data-d="'+d+'" data-k="e" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+catSel('e',d,'e',i,l[2]||'Other')+r+'<span class="wrapmoney"><span class="cur">$</span><input class="amt exp tnum" type="number" step="0.01" data-d="'+d+'" data-k="e" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="e" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="mv" data-mv="'+d+'" data-i="'+i+'" title="Move to next day">→</button><button class="del" data-dk="e" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
+ return '<div class="eline'+(paid?' paid':'')+'"'+(col?' style="border-left:4px solid '+col+';padding-left:6px"':'')+'><span class="grip" draggable="true" data-dgd="'+d+'" data-dgi="'+i+'" title="Drag to another category">\u283F</span><button class="chk'+(paid?' on':'')+'" data-paid="'+d+'" data-i="'+i+'" title="'+(paid?'Paid — click to unmark':'Mark as paid')+'">'+(paid?'✓':'')+'</button><input class="di" data-d="'+d+'" data-k="e" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+catSel('e',d,'e',i,l[2]||'Other')+r+'<span class="wrapmoney"><span class="cur">$</span><input class="amt exp tnum" type="number" step="0.01" data-d="'+d+'" data-k="e" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="e" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="mv" data-mv="'+d+'" data-i="'+i+'" title="Move to next day">→</button><button class="del" data-dk="e" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
 function iline(l,i,d){const v=+l[1]||0;const col=l[3]||'';const adj=isAdj(l);
  return '<div class="eline'+(adj?' adjline':'')+'"'+(col?' style="border-left:4px solid '+col+';padding-left:6px"':'')+'><input class="di" data-d="'+d+'" data-k="j" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+(adj?'<span class="linktag">reconciles to sheet</span>':catSel('j',d,'j',i,l[2]||'Other Income'))+'<span class="wrapmoney"><span class="cur">$</span><input class="amt '+(adj?'adj':'inc')+' tnum" type="number" step="0.01" data-d="'+d+'" data-k="j" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="j" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="del" data-dk="j" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
 function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00');const isT=d===anchor;const first=idx===0;const poscls=(scope==='day'&&!customRange)?(d===anchor?' poscur':(d<anchor?' posprev':' posnext')):'';
@@ -259,10 +264,10 @@ function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00'
  const injL=(o.j||[]).map((l,i)=>iline(l,i,d)).join('');
  const groups={};(o.e||[]).forEach((l,i)=>{const c=l[2]||'Other';(groups[c]=groups[c]||[]).push([l,i])});
  const grpHTML=c=>{const items=groups[c];const sub=items.reduce((s,p)=>s+(+p[0][1]||0),0);const col=CATCOL[c]||'#6b7280';
-   return '<div class="egrp"><div class="gh"><span class="gname"><i style="background:'+col+'"></i>'+esc(c)+'</span><span class="gsum tnum">'+fmt(sub)+'</span></div>'+items.map(p=>eline(p[0],p[1],d)).join('')+'</div>'};
+   return '<div class="egrp"><div class="gh droptarget" data-cat="'+esc(c)+'"><span class="gname"><i style="background:'+col+'"></i>'+esc(c)+'</span><span class="gsum tnum">'+fmt(sub)+'</span></div>'+items.map(p=>eline(p[0],p[1],d)).join('')+'</div>'};
  let exp='';SEGS.forEach(s=>{let cats=s.cats.filter(c=>groups[c]);if(s.k==='other')cats=cats.concat(Object.keys(groups).filter(c=>!KNOWN.has(c)));
    const sub=cats.reduce((a,c)=>a+groups[c].reduce((y,p)=>y+(+p[0][1]||0),0),0);
-   exp+='<div class="segbar '+s.k+'"><span class="segt">'+s.t+'</span><span class="segr"><span class="tnum">'+fmt(sub)+'</span><button class="addbtn" data-add="e" data-cat="'+s.add.replace(/&/g,'&amp;')+'" data-d="'+d+'">'+s.al+'</button></span></div>'
+   exp+='<div class="segbar droptarget '+s.k+'" data-cat="'+s.add.replace(/&/g,'&amp;')+'"><span class="segt">'+s.t+'</span><span class="segr"><span class="tnum">'+fmt(sub)+'</span><button class="addbtn" data-add="e" data-cat="'+s.add.replace(/&/g,'&amp;')+'" data-d="'+d+'">'+s.al+'</button></span></div>'
      +(cats.length?cats.map(grpHTML).join(''):'<div class="muted segempty">None yet.</div>')});
  const startCell=first
    ?'<span class="wrapmoney"><span class="cur">$</span><input class="amt big tnum" type="number" step="0.01" data-d="'+d+'" data-k="open" value="'+x.start.toFixed(2)+'"></span>'
@@ -283,7 +288,7 @@ function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00'
   +'<div class="expwrap">'+exp+'</div>'
   +'<div class="foot"><div class="f"><span class="k neg">Total out</span><b class="neg tnum">'+fmt(x.exp)+'</b></div><div class="f"><span class="k">Net day</span><b class="tnum '+((x.incReal-x.exp)>=0?'pos':'neg')+'">'+((x.incReal-x.exp)>=0?'+':'')+fmt(x.incReal-x.exp)+'</b></div><div class="f carry"><span class="k">Carried forward →</span><b class="tnum">'+fmt(x.carried)+'</b></div></div>'
   +'</div>';}
-function render(){const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg[1]);
+function render(){CUSTOMCATS=[];var _cseen={};DK.forEach(function(dd){(MD[dd].e||[]).forEach(function(l){var c=l[2];if(c&&ECATS.indexOf(c)<0&&c!=='Adjustment'&&!_cseen[c]){_cseen[c]=1;CUSTOMCATS.push(c);}})});const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg[1]);
  const inc=kpiDays.reduce((s,d)=>s+M[d].incReal,0),exp=kpiDays.reduce((s,d)=>s+M[d].exp,0);const closeDay=rg[1];const bal=customRange?(M[closeDay]?M[closeDay].carried:0):(M[anchor]?M[anchor].total:0);const balLbl=customRange?('Projected closing · '+rg[1]):('Running total · '+anchor);
  document.getElementById('rangeLbl').textContent=(rg[0]===rg[1]?rg[0]:rg[0]+' → '+rg[1])+' · '+kpiDays.length+' day'+(kpiDays.length>1?'s':'');
  const cap=({day:'Day',week:'Week',month:'Month',quarter:'Quarter'})[scope];
@@ -307,7 +312,7 @@ function wire(){
    else if(k==='tot'){const want=r2(inp.value);setDayAdj(d,want-M[d].total);}
    else if(k==='d'){MD[d].d[i]=r2(inp.value);}
    else if(f==='a'){MD[d][k][i][1]=r2(inp.value);}
-   else if(f==='c'){MD[d][k][i][2]=inp.value;}
+   else if(f==='c'){var _v=inp.value;if(_v==='__add__'){var _nm=prompt('New category name:','');_v=(_nm&&_nm.trim())?_nm.trim():MD[d][k][i][2];}MD[d][k][i][2]=_v;}
    else{MD[d][k][i][0]=inp.value;}
    save();recompute();render();
    if(f&&i!=null)refocus('[data-d="'+d+'"][data-k="'+k+'"][data-f="'+f+'"][data-i="'+i+'"]');});
@@ -320,7 +325,9 @@ function wire(){
  document.querySelectorAll('.chk').forEach(c=>c.onclick=()=>{snapshot();const d=c.dataset.paid,i=+c.dataset.i;MD[d].e[i][3]=!MD[d].e[i][3];save();recompute();render()});
  document.querySelectorAll('.mv').forEach(b=>b.onclick=()=>{snapshot();const d=b.dataset.mv,i=+b.dataset.i;const nd=addDays(d,1);if(!MD[nd]){alert('No next-day block.');return;}const ln=MD[d].e.splice(i,1)[0];if(ln.length<4)ln.push(false);ln[3]=false;MD[nd].e.push(ln);save();recompute();render()});
  document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{snapshot();const k=b.dataset.dk,d=b.dataset.dd,i=+b.dataset.di;MD[d][k].splice(i,1);save();recompute();render()});
- document.querySelectorAll('.swatch').forEach(s=>s.onclick=()=>{snapshot();const k=s.dataset.swk,d=s.dataset.swd,i=+s.dataset.swi;const ci=k==='e'?4:3;const a=MD[d][k][i];while(a.length<=ci)a.push('');a[ci]=PAL[(PAL.indexOf(a[ci]||'')+1)%PAL.length];save();render()});}
+ document.querySelectorAll('.swatch').forEach(s=>s.onclick=()=>{snapshot();const k=s.dataset.swk,d=s.dataset.swd,i=+s.dataset.swi;const ci=k==='e'?4:3;const a=MD[d][k][i];while(a.length<=ci)a.push('');a[ci]=PAL[(PAL.indexOf(a[ci]||'')+1)%PAL.length];save();render()});
+ document.querySelectorAll('.grip').forEach(function(el){el.ondragstart=function(e){e.dataTransfer.setData('text/plain',el.getAttribute('data-dgd')+'|'+el.getAttribute('data-dgi'));e.dataTransfer.effectAllowed='move';var ln=el.closest('.eline');if(ln)setTimeout(function(){ln.classList.add('dragging');},0);};el.ondragend=function(){var ln=el.closest('.eline');if(ln)ln.classList.remove('dragging');};});
+ document.querySelectorAll('.droptarget').forEach(function(t){t.ondragover=function(e){e.preventDefault();t.classList.add('dropover');};t.ondragleave=function(){t.classList.remove('dropover');};t.ondrop=function(e){e.preventDefault();t.classList.remove('dropover');var s=(e.dataTransfer.getData('text/plain')||'').split('|');var d=s[0],i=+s[1];if(!MD[d]||!MD[d].e||!MD[d].e[i])return;var cat=t.getAttribute('data-cat');if(!cat)return;snapshot();MD[d].e[i][2]=cat;save();recompute();render();};});}
 document.getElementById('anchor').value=anchor;
 document.querySelectorAll('#scopeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#scopeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');scope=b.dataset.s;customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});render();const t=document.getElementById('todayblk');if(t)t.scrollIntoView({block:'center'})});
 document.getElementById('anchor').onchange=e=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});anchor=e.target.value;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=e.target.value?d:a,DK[0]);render()};
@@ -353,6 +360,14 @@ if(CURU&&ADMINS.indexOf((CURU.email||'').toLowerCase())>=0){
 }
 render();
 const _t=document.getElementById('todayblk');if(_t)_t.scrollIntoView({block:'center'});
+var editingDay=null,pendingRemote={};
+document.addEventListener('focusin',function(e){var el=e.target&&e.target.closest?e.target.closest('[data-d]'):null;if(el)editingDay=el.getAttribute('data-d');});
+document.addEventListener('focusout',function(){setTimeout(function(){editingDay=null;var ks=Object.keys(pendingRemote);if(ks.length){ks.forEach(function(d){_applyRemote(d,pendingRemote[d]);});pendingRemote={};}},250);});
+function _norm(o){o.j=o.j||[];o.e=o.e||[];o.d=o.d||[];o.j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});o.e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(false);if(l.length<5)l.push('');});return o;}
+function _applyRemote(day,inc){MD[day]=_norm(inc);LASTSYNC[day]=JSON.stringify(MD[day]);if(DK.indexOf(day)<0){DK.push(day);DK.sort();}recompute();render();_toast('Updated by a teammate \u00b7 '+day);}
+function _toast(msg){var t=document.getElementById('rtToast');if(!t){t=document.createElement('div');t.id='rtToast';t.className='rttoast';document.body.appendChild(t);}t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},3000);}
+sb.channel('r2g-ledger').on('postgres_changes',{event:'*',schema:'public',table:'day_blocks'},function(payload){var nd=payload.new;if(!nd||!nd.day)return;var day=nd.day;var inc={d:(nd.deposits||[]).map(Number),j:nd.income||[],e:nd.expenses||[]};var incStr=JSON.stringify(_norm(JSON.parse(JSON.stringify(inc))));var mine=MD[day]?JSON.stringify(MD[day]):null;if(incStr===mine)return;if(LASTSYNC[day]===incStr)return;if(day===editingDay){pendingRemote[day]=inc;return;}_applyRemote(day,inc);}).subscribe();
+setInterval(function(){try{flush();}catch(e){}},30000);
 
 }
 boot();
