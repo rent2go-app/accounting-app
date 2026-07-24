@@ -279,7 +279,7 @@ function render(){const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg
  const cap=({day:'Day',week:'Week',month:'Month',quarter:'Quarter'})[scope];
  document.getElementById('kpis').innerHTML=[
   [balLbl,fmt(bal),'','≈ '+(CFG.sacur==='AED'?'AED ':'R')+(bal*saRate()).toLocaleString('en',{maximumFractionDigits:0})+' ('+CFG.sacur+')'],
-  [cap+' income',fmt(inc),'pos','real deposits & income'],[cap+' expenses',fmt(exp),'neg','money out'],['Net',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','']
+  [cap+' income',fmt(inc),'pos','total in for period'],[cap+' expenses',fmt(exp),'neg','total out for period'],['Net / Profit',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','income − expenses']
  ].map(x=>'<div class="card"><div class="label">'+x[0]+'</div><div class="value tnum '+x[2]+'">'+x[1]+'</div>'+(x[3]?'<div class="hint tnum">'+x[3]+'</div>':'')+'</div>').join('');
  var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
  let list=kpiDays;if(!customRange&&scope==='day')list=[addDays(anchor,-1),anchor,addDays(anchor,1)].filter(d=>M[d]);
