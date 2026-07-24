@@ -56,7 +56,7 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .userrow .em{font-weight:700;flex:1;min-width:170px;font-size:13px}
 .userrow input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px;width:150px}
 .userrow .badge{font-size:9px;font-weight:800;text-transform:uppercase;background:var(--brand);color:#fff;padding:2px 7px;border-radius:999px}
-.kpis{display:grid;gap:12px;grid-template-columns:repeat(4,1fr);margin-top:14px}@media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));margin-top:14px}@media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
 .card{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;padding:17px 18px;box-shadow:0 5px 14px rgba(16,24,40,.11),0 1px 3px rgba(16,24,40,.07)}
 .label{color:var(--muted);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.value{font-size:26px;font-weight:800;margin-top:5px;letter-spacing:-.01em}.hint{color:var(--muted);font-size:11.5px;margin-top:3px}.pos{color:var(--in)}.neg{color:var(--out)}.muted{color:var(--muted)}
 .stack{display:flex;flex-direction:column;gap:36px;margin-top:22px}
@@ -285,8 +285,10 @@ function render(){const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg
  const inc=kpiDays.reduce((s,d)=>s+M[d].incReal,0),exp=kpiDays.reduce((s,d)=>s+M[d].exp,0);const closeDay=rg[1];const bal=customRange?(M[closeDay]?M[closeDay].carried:0):(M[anchor]?M[anchor].total:0);const balLbl=customRange?('Projected closing · '+rg[1]):('Running total · '+anchor);
  document.getElementById('rangeLbl').textContent=(rg[0]===rg[1]?rg[0]:rg[0]+' → '+rg[1])+' · '+kpiDays.length+' day'+(kpiDays.length>1?'s':'');
  const cap=({day:'Day',week:'Week',month:'Month',quarter:'Quarter'})[scope];
+ var _mon=anchor.slice(0,7);var _md=DK.filter(function(d){return d.slice(0,7)===_mon;});var _me=_md.length?_md[_md.length-1]:anchor;var _mb=M[_me]?M[_me].carried:0;var _mn=new Date(_mon+'-01T00:00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'});
  document.getElementById('kpis').innerHTML=[
   [balLbl,fmt(bal),'','≈ '+(CFG.sacur==='AED'?'AED ':'R')+(bal*saRate()).toLocaleString('en',{maximumFractionDigits:0})+' ('+CFG.sacur+')'],
+  ['Month-end · '+_mn,fmt(_mb),_mb<0?'neg':'','carried fwd '+_me],
   [cap+' income',fmt(inc),'pos','total in for period'],[cap+' expenses',fmt(exp),'neg','total out for period'],['Net / Profit',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','income − expenses']
  ].map(x=>'<div class="card"><div class="label">'+x[0]+'</div><div class="value tnum '+x[2]+'">'+x[1]+'</div>'+(x[3]?'<div class="hint tnum">'+x[3]+'</div>':'')+'</div>').join('');
  var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
