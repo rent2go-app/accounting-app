@@ -24,6 +24,19 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .setrow{display:flex;flex-direction:column;gap:5px}
 .setrow label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .setrow input,.setrow select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+.btn.small{padding:4px 9px;font-size:12px;border-radius:7px}
+.setdiv{height:1px;background:var(--line);margin:16px 0}
+.seth{font-size:13px;font-weight:800;margin:0 0 10px}
+.whoami{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.pwrow,.adminrow{display:flex;gap:8px;flex-wrap:wrap;max-width:420px}
+.pwrow input,.adminrow input{flex:1;min-width:150px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+.adminrow{margin-bottom:4px}
+.setmsg{font-size:12px;margin-top:6px;min-height:15px;color:var(--muted)}
+.userlist{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.userrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
+.userrow .em{font-weight:700;flex:1;min-width:170px;font-size:13px}
+.userrow input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px;width:150px}
+.userrow .badge{font-size:9px;font-weight:800;text-transform:uppercase;background:var(--brand);color:#fff;padding:2px 7px;border-radius:999px}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(4,1fr);margin-top:14px}@media(max-width:820px){.kpis{grid-template-columns:1fr 1fr}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
 .label{color:var(--muted);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.value{font-size:20px;font-weight:800;margin-top:4px}.hint{color:var(--muted);font-size:11.5px;margin-top:3px}.pos{color:var(--in)}.neg{color:var(--out)}.muted{color:var(--muted)}
@@ -114,7 +127,19 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 <div id="loginwrap"><form class="logincard" id="li_form"><h1>Rent <span>2</span> Go</h1><p>Sign in to your accounting ledger.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="loginerr" id="li_err"></div></form></div>
 <div id="appwrap" style="display:none"><div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="legend"><span><span class="dot a"></span>Actual</span><span><span class="dot b"></span>Projected</span></div><div class="spacer"></div><span class="rangeLbl">USD · 2dp</span><span class="savestate" id="savestate"></span><button class="btn" id="undoBtn" disabled>↶ Undo</button><button class="btn" id="setBtn">⚙ Settings</button><button class="btn" id="reset">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
-<div id="settings" class="setpanel" hidden><div class="setgrid"><div class="setrow"><label>SA lines (Owner’s Draws) shown in</label><select id="setCur"><option value="ZAR">ZAR (Rand)</option><option value="AED">AED (Dirham)</option></select></div><div class="setrow"><label>ZAR per USD (today’s rate)</label><input type="number" step="0.01" id="setZar"></div><div class="setrow"><label>AED per USD (for the Dubai move)</label><input type="number" step="0.0001" id="setAed"></div></div><p class="hint" style="margin:8px 0 0">Applies to every Owner’s Draw / Home Expense line. USD stays the base currency.</p></div>
+<div id="settings" class="setpanel" hidden><div class="setgrid"><div class="setrow"><label>SA lines (Owner’s Draws) shown in</label><select id="setCur"><option value="ZAR">ZAR (Rand)</option><option value="AED">AED (Dirham)</option></select></div><div class="setrow"><label>ZAR per USD (today’s rate)</label><input type="number" step="0.01" id="setZar"></div><div class="setrow"><label>AED per USD (for the Dubai move)</label><input type="number" step="0.0001" id="setAed"></div></div><p class="hint" style="margin:8px 0 0">Applies to every Owner’s Draw / Home Expense line. USD stays the base currency.</p>
+<div class="setdiv"></div>
+<h3 class="seth">Your account</h3>
+<div class="whoami" id="whoami"></div>
+<div class="pwrow"><input type="password" id="mypw" placeholder="New password (min 8 chars)" autocomplete="new-password"><button class="btn" id="mypw_btn">Change my password</button></div>
+<div class="setmsg" id="mypw_msg"></div>
+<div id="adminsec" hidden>
+<div class="setdiv"></div>
+<h3 class="seth">Admin · manage users</h3>
+<div class="adminrow"><input type="email" id="nu_email" placeholder="new user email" autocomplete="off"><input type="password" id="nu_pass" placeholder="password (min 8)" autocomplete="new-password"><button class="btn" id="nu_btn">Create user</button></div>
+<div class="setmsg" id="nu_msg"></div>
+<div class="userlist" id="userlist"></div>
+</div></div>
 <main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2026-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div></div><div class="kpis" id="kpis"></div><div class="stack" id="stack"></div><p class="hint">One unbroken chain: <b>Carried forward</b> of each day = <b>Starting balance</b> of the next, across every month. Edit deposits, income or expenses and it cascades down through every following day. Type over the <b>Running total</b> (or a Starting balance) to reconcile to the bank — it books a visible <b>Balance adjustment</b>, kept out of the income/expense totals. Expenses split into <b>Operating (blue) · Home (yellow) · MMF (grey) · Other (sky)</b>.</p></main></div>
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
@@ -273,6 +298,21 @@ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLower
 const setCur=document.getElementById('setCur'),setZar=document.getElementById('setZar'),setAed=document.getElementById('setAed');
 setCur.value=CFG.sacur;setZar.value=CFG.zar;setAed.value=CFG.aed;
 setCur.onchange=()=>{CFG.sacur=setCur.value;saveCfg();render()};setZar.onchange=()=>{CFG.zar=+setZar.value||0;saveCfg();render()};setAed.onchange=()=>{CFG.aed=+setAed.value||0;saveCfg();render()};
+const ADMINS=['gorentaride@gmail.com'];
+const ADMFN=window.R2G_CONFIG.SUPABASE_URL+'/functions/v1/admin-users';
+async function admCall(p){var s=await sb.auth.getSession();var r=await fetch(ADMFN,{method:'POST',headers:{'Content-Type':'application/json','apikey':window.R2G_CONFIG.SUPABASE_ANON_KEY,'Authorization':'Bearer '+(s.data.session?s.data.session.access_token:'')},body:JSON.stringify(p)});var j=await r.json();if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
+var CURU=(await sb.auth.getUser()).data.user;
+var wa=document.getElementById('whoami');if(wa)wa.textContent='Signed in as '+(CURU?CURU.email:'—');
+var mb=document.getElementById('mypw_btn');if(mb)mb.onclick=async function(){var m=document.getElementById('mypw_msg');var pw=document.getElementById('mypw').value;if(pw.length<8){m.style.color='var(--out)';m.textContent='At least 8 characters.';return;}m.style.color='var(--muted)';m.textContent='Updating…';var r=await sb.auth.updateUser({password:pw});if(r.error){m.style.color='var(--out)';m.textContent=r.error.message;}else{m.style.color='var(--in)';m.textContent='Password changed ✓';document.getElementById('mypw').value='';}};
+if(CURU&&ADMINS.indexOf((CURU.email||'').toLowerCase())>=0){
+ var asec=document.getElementById('adminsec');if(asec)asec.hidden=false;
+ var admRender=async function(){var el=document.getElementById('userlist');if(!el)return;el.textContent='Loading…';try{var d=await admCall({action:'list'});el.innerHTML=d.users.map(function(u){return '<div class="userrow"><span class="em">'+u.email+(u.is_admin?' <span class="badge">admin</span>':'')+'</span><input type="password" placeholder="new password" data-uid="'+u.id+'"><button class="btn small" data-rp="'+u.id+'">Set password</button>'+(u.is_admin?'':' <button class="btn small" data-du="'+u.id+'" data-em="'+u.email+'">Delete</button>')+'</div>';}).join('');
+  el.querySelectorAll('[data-rp]').forEach(function(b){b.onclick=async function(){var uid=b.getAttribute('data-rp');var inp=el.querySelector('input[data-uid="'+uid+'"]');var pw=inp.value;if(pw.length<8){alert('Password must be at least 8 characters.');return;}var t=b.textContent;b.textContent='…';try{await admCall({action:'password',user_id:uid,password:pw});b.textContent='Done ✓';inp.value='';setTimeout(function(){b.textContent=t;},1500);}catch(e){alert(e.message);b.textContent=t;}};});
+  el.querySelectorAll('[data-du]').forEach(function(b){b.onclick=async function(){if(!confirm('Delete '+b.getAttribute('data-em')+'? This cannot be undone.'))return;try{await admCall({action:'delete',user_id:b.getAttribute('data-du')});admRender();}catch(e){alert(e.message);}};});
+ }catch(e){el.textContent=e.message;}};
+ var nb=document.getElementById('nu_btn');if(nb)nb.onclick=async function(){var m=document.getElementById('nu_msg');var em=document.getElementById('nu_email').value.trim();var pw=document.getElementById('nu_pass').value;m.style.color='var(--muted)';m.textContent='Creating…';try{await admCall({action:'create',email:em,password:pw});m.style.color='var(--in)';m.textContent='User '+em+' created ✓';document.getElementById('nu_email').value='';document.getElementById('nu_pass').value='';admRender();}catch(e){m.style.color='var(--out)';m.textContent=e.message;}};
+ admRender();
+}
 render();
 const _t=document.getElementById('todayblk');if(_t)_t.scrollIntoView({block:'center'});
 
