@@ -1,4 +1,11 @@
 assets/config.js
 .DS_Store
+**/.DS_Store
 node_modules/
 *.local
+# financial + internal data must NEVER enter this public repo
+data/
+ops-console-backup/
+*.xlsx
+*.csv
+seed-*.sql
