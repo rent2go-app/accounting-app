@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent 2 Go — Sign in</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="wrap" style="max-width:400px;margin-top:8vh">
+    <div class="brand" style="font-size:26px;margin-bottom:6px">Rent <span style="color:var(--brand)">2</span> Go</div>
+    <p class="sub">Business accounting — sign in</p>
+    <div id="notice"></div>
+    <div class="card">
+      <label>Email</label>
+      <input type="email" id="email" autocomplete="username">
+      <label>Password</label>
+      <input type="password" id="password" autocomplete="current-password">
+      <button class="btn primary" id="signin" style="width:100%;justify-content:center;margin-top:16px">Sign in</button>
+      <div class="hint" id="err" style="color:var(--out);margin-top:10px"></div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (async function () {
+    if (!DB.configured) {
+      document.getElementById('notice').innerHTML = UI.setupBanner();
+      return;
+    }
+    if (await DB.getUser()) { location.href = 'index.html'; return; }
+    async function go() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const { error } = await DB.signIn(email, password);
+      if (error) { document.getElementById('err').textContent = error.message; return; }
+      location.href = 'index.html';
+    }
+    document.getElementById('signin').onclick = go;
+    document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  })();
+  </script>
+</body>
+</html>

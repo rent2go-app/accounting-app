@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent 2 Go — Budget &amp; Projection</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="topbar"></div>
+  <main class="wrap">
+    <h1>Budget &amp; projection</h1>
+    <p class="sub">Expected future income &amp; expenses → projected running balance, forward from today.</p>
+    <div id="notice"></div>
+
+    <div class="grid cols-3" id="kpis" style="margin-bottom:8px"></div>
+
+    <h2 class="section-title">Monthly plan</h2>
+    <p class="hint" style="margin-bottom:10px">Type expected figures — projected closing balances update live and save to your database. This is your “possible future” view running on projected inputs.</p>
+    <div style="overflow-x:auto">
+      <table id="planTable">
+        <thead><tr><th>Month</th><th class="num">Opening</th><th class="num">Expected income</th>
+          <th class="num">Expected expenses</th><th class="num">Net</th><th class="num">Projected close</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <button class="btn" id="addMonth" style="margin-top:12px">+ Add next month</button>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/fx.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (async function () {
+    UI.mountTopbar('budget.html');
+    if (!DB.configured) { document.getElementById('notice').innerHTML = UI.setupBanner(); return; }
+    const user = await DB.requireAuth(); if (!user) return;
+
+    const ref = await DB.refData();
+    const opening = ref.accounts.reduce((s, a) => s + Number(a.opening_balance || 0), 0);
+    const tx = await DB.listTransactions({});
+    const balNow = opening + tx.reduce((s,t)=> s + (t.direction==='in'?1:t.direction==='out'?-1:0)*Number(t.base_amount||0), 0);
+
+    const firstOfMonth = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    let plan = await DB.listBudgetPlan();
+
+    // Seed the next 5 months (from next month) if the plan is empty
+    if (!plan.length) {
+      const now = new Date(); const rows = [];
+      for (let i = 1; i <= 5; i++) { const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+        rows.push({ period_month: firstOfMonth(d), expected_income: 0, expected_expense: 0 }); }
+      plan = rows;
+    }
+    plan.sort((a,b)=> a.period_month < b.period_month ? -1 : 1);
+
+    const monthName = iso => new Date(iso+'T00:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});
+
+    function render() {
+      let open = balNow; let firstClose=null, lastClose=balNow;
+      document.querySelector('#planTable tbody').innerHTML = plan.map((p, idx) => {
+        const inc = Number(p.expected_income||0), exp = Number(p.expected_expense||0), net = inc-exp, close = open+net;
+        if (idx===0) firstClose = close; lastClose = close;
+        const row = `<tr>
+          <td><b>${monthName(p.period_month)}</b></td>
+          <td class="num tnum">${FX.fmt(open,'USD')}</td>
+          <td class="num"><input type="number" step="1" data-i="${idx}" data-k="expected_income" value="${inc}" style="text-align:right;padding:6px 8px"></td>
+          <td class="num"><input type="number" step="1" data-i="${idx}" data-k="expected_expense" value="${exp}" style="text-align:right;padding:6px 8px"></td>
+          <td class="num ${net>=0?'pos':'neg'}">${(net>=0?'+':'')+FX.fmt(net,'USD')}</td>
+          <td class="num tnum"><strong>${FX.fmt(close,'USD')}</strong></td>
+          <td><button class="btn small" data-save="${idx}">Save</button></td></tr>`;
+        open = close; return row;
+      }).join('');
+      document.querySelectorAll('#planTable input').forEach(inp => inp.oninput = () => {
+        plan[Number(inp.dataset.i)][inp.dataset.k] = Number(inp.value||0); render();
+      });
+      document.querySelectorAll('#planTable [data-save]').forEach(b => b.onclick = async () => {
+        const p = plan[Number(b.dataset.save)];
+        b.textContent = 'Saving…';
+        try { await DB.saveBudgetPlan(p.period_month, Number(p.expected_income||0), Number(p.expected_expense||0));
+          b.textContent = 'Saved ✓'; setTimeout(()=>b.textContent='Save', 1200); }
+        catch(e){ b.textContent='Error'; alert(e.message); }
+      });
+      const runway = lastClose>=0 ? 'positive' : 'NEGATIVE — plan a top-up';
+      document.getElementById('kpis').innerHTML = [
+        ['Balance today', FX.fmt(balNow,'USD'), '', ''],
+        ['Projected · end '+ (plan[0]?monthName(plan[0].period_month):''), firstClose==null?'—':FX.fmt(firstClose,'USD'), firstClose>=balNow?'pos':'neg', 'on your inputs'],
+        ['Projected · end '+ (plan.length?monthName(plan[plan.length-1].period_month):''), FX.fmt(lastClose,'USD'), lastClose>=0?'pos':'neg', 'runway '+runway],
+      ].map(([l,v,c,h])=>`<div class="card"><div class="label">${l}</div><div class="value tnum ${c}">${v}</div>${h?`<div class="hint">${h}</div>`:''}</div>`).join('');
+    }
+
+    document.getElementById('addMonth').onclick = () => {
+      const last = plan.length ? new Date(plan[plan.length-1].period_month+'T00:00:00') : new Date();
+      const d = new Date(last.getFullYear(), last.getMonth()+1, 1);
+      plan.push({ period_month: firstOfMonth(d), expected_income: 0, expected_expense: 0 });
+      render();
+    };
+    render();
+  })();
+  </script>
+</body>
+</html>

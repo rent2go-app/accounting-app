@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent 2 Go — Dashboard</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="topbar"></div>
+  <main class="wrap">
+    <h1>Dashboard</h1>
+    <p class="sub">Running bank balance, carried forward day to day.</p>
+    <div id="notice"></div>
+
+    <!-- Running total + daily reconciliation -->
+    <div class="grid cols-2" style="margin-bottom:16px">
+      <div class="card" id="balanceCard">
+        <div class="label">Computed running total</div>
+        <div class="value tnum" id="bankTotal">—</div>
+        <div class="equiv" id="bankEquiv"></div>
+      </div>
+      <div class="card">
+        <div class="label">Enter today's actual bank balance</div>
+        <div class="row" style="grid-template-columns:1fr 1fr auto;align-items:end;margin-top:4px">
+          <div><label>Date</label><input type="date" id="bDate"></div>
+          <div><label>Balance (USD)</label><input type="number" id="bAmount" step="0.01" placeholder="0.00"></div>
+          <div><button class="btn primary" id="bSave" style="margin-top:5px">Save</button></div>
+        </div>
+        <div class="hint" id="reconStatus" style="margin-top:10px">—</div>
+      </div>
+    </div>
+
+    <!-- Period KPIs -->
+    <div class="grid cols-3" id="kpis"></div>
+
+    <!-- Entity split -->
+    <h2 class="section-title">This month by book</h2>
+    <div class="grid cols-3" id="entitySplit"></div>
+
+    <!-- Daily snapshot -->
+    <h2 class="section-title">Daily snapshot — closing balance carried forward</h2>
+    <div style="overflow-x:auto">
+      <table id="dailyTable">
+        <thead><tr>
+          <th>Date</th><th class="num">In</th><th class="num">Out</th>
+          <th class="num">Net</th><th class="num">Computed</th>
+          <th class="num">Actual</th><th class="num">Variance</th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="empty">No data yet.</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/fx.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (async function () {
+    UI.mountTopbar('index.html');
+
+    if (!DB.configured) {
+      document.getElementById('notice').innerHTML = UI.setupBanner();
+      return;
+    }
+    const user = await DB.requireAuth();
+    if (!user) return;
+
+    const ref = await DB.refData();
+    const rateMap = FX.buildRateMap(ref.rates);
+    const opening = ref.accounts.reduce((s, a) => s + Number(a.opening_balance || 0), 0);
+    const tx = await DB.listTransactions({});
+    let banks = await DB.listBankBalances();
+    let bankByDate = Object.fromEntries(banks.map(b => [b.as_of, Number(b.balance)]));
+
+    // Running bank total (base = USD)
+    const inSum  = tx.filter(t => t.direction === 'in').reduce((s,t)=>s+Number(t.base_amount||0),0);
+    const outSum = tx.filter(t => t.direction === 'out').reduce((s,t)=>s+Number(t.base_amount||0),0);
+    const bank = opening + inSum - outSum;
+    document.getElementById('bankTotal').textContent = FX.fmt(bank, 'USD');
+    document.getElementById('bankEquiv').innerHTML = ['ZAR','AED']
+      .map(c => `<div>≈ <strong>${FX.fmt(FX.convert(bank,'USD',c,rateMap), c)}</strong></div>`).join('');
+
+    // ---- Reconciliation entry (today's actual bank balance) -----------------
+    const todayIso = new Date().toISOString().slice(0,10);
+    const bDate = document.getElementById('bDate');
+    const bAmount = document.getElementById('bAmount');
+    bDate.value = todayIso;
+    function reflectRecon() {
+      const d = bDate.value;
+      if (bankByDate[d] != null) bAmount.value = bankByDate[d];
+      const status = document.getElementById('reconStatus');
+      if (bankByDate[d] == null) { status.textContent = 'No actual balance entered for ' + d + '.'; return; }
+      // computed closing for that date = opening + net of all tx up to and incl. d
+      const computed = opening + tx.filter(t => t.tx_date <= d)
+        .reduce((s,t)=> s + (t.direction==='in'?1:t.direction==='out'?-1:0)*Number(t.base_amount||0), 0);
+      const v = bankByDate[d] - computed;
+      status.innerHTML = Math.abs(v) < 0.005
+        ? `<span class="pos">✓ Reconciled</span> — actual matches computed (${FX.fmt(computed,'USD')}).`
+        : `<span class="neg">Δ ${FX.fmt(v,'USD')}</span> — actual ${FX.fmt(bankByDate[d],'USD')} vs computed ${FX.fmt(computed,'USD')}.`;
+    }
+    bDate.onchange = reflectRecon;
+    reflectRecon();
+    document.getElementById('bSave').onclick = async () => {
+      const d = bDate.value, amt = Number(bAmount.value);
+      if (!d || bAmount.value === '') { alert('Enter a date and balance.'); return; }
+      try {
+        await DB.setBankBalance(d, amt);
+        bankByDate[d] = amt;
+        reflectRecon(); renderDaily();
+      } catch (e) { alert('Save failed: ' + e.message); }
+    };
+
+    // Period helpers
+    const today = new Date();
+    const iso = d => d.toISOString().slice(0,10);
+    const weekAgo = new Date(today); weekAgo.setDate(today.getDate()-6);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const sumRange = (dir, from) => tx.filter(t => t.direction===dir && t.tx_date >= iso(from))
+      .reduce((s,t)=>s+Number(t.base_amount||0),0);
+
+    const wIn = sumRange('in', weekAgo),  wOut = sumRange('out', weekAgo);
+    const mIn = sumRange('in', monthStart), mOut = sumRange('out', monthStart);
+    document.getElementById('kpis').innerHTML = [
+      ['This week in',  FX.fmt(wIn,'USD'),  'pos'],
+      ['This week out', FX.fmt(wOut,'USD'), 'neg'],
+      ['This week net', FX.fmt(wIn-wOut,'USD'), (wIn-wOut)>=0?'pos':'neg'],
+      ['This month in',  FX.fmt(mIn,'USD'),  'pos'],
+      ['This month out', FX.fmt(mOut,'USD'), 'neg'],
+      ['This month net', FX.fmt(mIn-mOut,'USD'), (mIn-mOut)>=0?'pos':'neg'],
+    ].map(([l,v,c]) => `<div class="card"><div class="label">${l}</div>
+        <div class="value tnum ${c}">${v}</div></div>`).join('');
+
+    // Entity split (this month, net)
+    document.getElementById('entitySplit').innerHTML = ref.entities.map(e => {
+      const rows = tx.filter(t => t.entity_id===e.id && t.tx_date >= iso(monthStart));
+      const i = rows.filter(t=>t.direction==='in').reduce((s,t)=>s+Number(t.base_amount||0),0);
+      const o = rows.filter(t=>t.direction==='out').reduce((s,t)=>s+Number(t.base_amount||0),0);
+      const net = i - o;
+      return `<div class="card"><span class="chip ${e.code}">${e.name}</span>
+        <div class="value tnum ${net>=0?'pos':'neg'}" style="font-size:22px">${FX.fmt(net,'USD')}</div>
+        <div class="hint">in ${FX.fmt(i,'USD')} · out ${FX.fmt(o,'USD')}</div></div>`;
+    }).join('');
+
+    // Daily snapshot — closing balance carried forward + reconciliation
+    function renderDaily() {
+      const byDay = {};
+      tx.forEach(t => {
+        const d = t.tx_date; byDay[d] = byDay[d] || { in:0, out:0 };
+        if (t.direction==='in') byDay[d].in += Number(t.base_amount||0);
+        if (t.direction==='out') byDay[d].out += Number(t.base_amount||0);
+      });
+      const days = Object.keys(byDay).sort();  // ascending for cumulative
+      let run = opening; const rows = [];
+      days.forEach(d => {
+        const net = byDay[d].in - byDay[d].out; run += net;
+        const actual = bankByDate[d];
+        rows.push({ d, in: byDay[d].in, out: byDay[d].out, net, close: run,
+                    actual: actual == null ? null : actual,
+                    variance: actual == null ? null : actual - run });
+      });
+      rows.reverse(); // most recent first
+      const body = rows.slice(0, 60).map(r => `<tr>
+          <td>${r.d}</td>
+          <td class="num pos">${r.in ? FX.fmt(r.in,'USD') : '—'}</td>
+          <td class="num neg">${r.out ? FX.fmt(r.out,'USD') : '—'}</td>
+          <td class="num ${r.net>=0?'pos':'neg'}">${FX.fmt(r.net,'USD')}</td>
+          <td class="num tnum"><strong>${FX.fmt(r.close,'USD')}</strong></td>
+          <td class="num tnum">${r.actual==null ? '<span class="muted">—</span>' : FX.fmt(r.actual,'USD')}</td>
+          <td class="num tnum ${r.variance==null?'':(Math.abs(r.variance)<0.005?'pos':'neg')}">${
+            r.variance==null ? '—' : (Math.abs(r.variance)<0.005 ? '✓' : FX.fmt(r.variance,'USD'))}</td>
+        </tr>`).join('');
+      document.querySelector('#dailyTable tbody').innerHTML =
+        body || `<tr><td colspan="7" class="empty">No transactions yet — add some in the Ledger.</td></tr>`;
+    }
+    renderDaily();
+  })();
+  </script>
+</body>
+</html>

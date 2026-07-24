@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent 2 Go — Import from spreadsheet</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="topbar"></div>
+  <main class="wrap">
+    <h1>Import from spreadsheet</h1>
+    <p class="sub">Upload an <b>.xlsx</b> or <b>.csv</b> to load history. Two modes: daily running totals, or full transactions.</p>
+    <div id="notice"></div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label>1 · Choose file</label>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv">
+      <div class="row" style="margin-top:12px">
+        <div><label>Sheet / tab</label><select id="sheet" disabled></select></div>
+        <div><label>First row is a header</label><select id="hasHeader"><option value="1">Yes</option><option value="0">No</option></select></div>
+      </div>
+    </div>
+
+    <div class="card" id="mapCard" style="margin-bottom:16px;display:none">
+      <label>2 · What are you importing?</label>
+      <div class="seg" id="modeSeg" style="margin-bottom:8px">
+        <button type="button" data-mode="daily" class="on-in">Daily running totals</button>
+        <button type="button" data-mode="tx">Full transactions</button>
+      </div>
+      <p class="hint" id="modeHelp"></p>
+      <div id="mapFields" class="row" style="grid-template-columns:1fr 1fr"></div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Batch label <span class="muted">(re-import safe)</span></label><input id="batch" placeholder="e.g. sheet:2026"></div>
+        <div><label>Default currency</label><select id="defCur"><option>USD</option><option>ZAR</option><option>AED</option></select></div>
+      </div>
+      <button class="btn" id="preview" style="margin-top:14px">Preview</button>
+    </div>
+
+    <div id="previewWrap" style="display:none">
+      <h2 class="section-title">3 · Preview <span class="muted" id="pcount"></span></h2>
+      <div style="overflow-x:auto"><table id="pTable"><thead></thead><tbody></tbody></table></div>
+      <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+        <button class="btn primary" id="doImport">Import to database</button>
+        <span class="hint" id="importStatus"></span>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/fx.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (async function () {
+    UI.mountTopbar('import.html');
+    if (!DB.configured) { document.getElementById('notice').innerHTML = UI.setupBanner(); return; }
+    const user = await DB.requireAuth(); if (!user) return;
+    const ref = await DB.refData();
+    const rateMap = FX.buildRateMap(ref.rates);
+    const catByName = {}; ref.categories.forEach(c => catByName[c.name.toLowerCase()] = c.id);
+    const entByName = {}; ref.entities.forEach(e => { entByName[e.name.toLowerCase()] = e.id; entByName[e.code] = e.id; });
+    const uncat = ref.categories.find(c => c.name === 'Uncategorized');
+
+    let rows = [], headers = [], mode = 'daily', workbook = null;
+
+    const fileEl = document.getElementById('file');
+    const sheetSel = document.getElementById('sheet');
+    fileEl.onchange = async () => {
+      const f = fileEl.files[0]; if (!f) return;
+      const buf = await f.arrayBuffer();
+      workbook = XLSX.read(buf, { type: 'array' });
+      sheetSel.innerHTML = workbook.SheetNames.map(n => `<option>${UI.esc(n)}</option>`).join('');
+      sheetSel.disabled = false;
+      document.getElementById('batch').value = 'sheet:' + (f.name.replace(/\.[^.]+$/, '')).slice(0, 24);
+      loadSheet();
+    };
+    sheetSel.onchange = loadSheet;
+    document.getElementById('hasHeader').onchange = loadSheet;
+    function loadSheet() {
+      if (!workbook) return;
+      const ws = workbook.Sheets[sheetSel.value];
+      const arr = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+      const hasH = document.getElementById('hasHeader').value === '1';
+      headers = hasH ? (arr[0] || []).map((h, i) => String(h || ('Col ' + (i + 1)))) : (arr[0] || []).map((_, i) => 'Col ' + (i + 1));
+      rows = hasH ? arr.slice(1) : arr;
+      document.getElementById('mapCard').style.display = 'block';
+      buildMapping();
+    }
+
+    const FIELDS = {
+      daily: [['date', 'Date column', true], ['balance', 'Running total / balance column', true], ['note', 'Note column', false]],
+      tx: [['date','Date',true],['description','Description',true],['amount','Amount',true],
+           ['direction','Direction (in/out)',false],['currency','Currency',false],
+           ['category','Category name',false],['entity','Book / entity',false],['status','Status',false]],
+    };
+    const HELP = {
+      daily: 'Loads each day\'s closing balance into bank_balances (your reconciliation baseline). Map a Date and the running-total column.',
+      tx: 'Loads individual lines into transactions. Map at least Date, Description and Amount. Category/Book match by name; unknown → Uncategorized.',
+    };
+    document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => {
+      mode = b.dataset.mode;
+      document.querySelectorAll('#modeSeg button').forEach(x => x.className = '');
+      b.classList.add(mode === 'daily' ? 'on-in' : 'on-out');
+      buildMapping();
+    });
+    function guess(h, key) {
+      h = String(h).toLowerCase();
+      const m = { date:['date','day'], balance:['total','balance','running'], amount:['amount','value','$'],
+        description:['desc','item','detail','name'], direction:['dir','type','in/out'], currency:['cur','ccy'],
+        category:['categ','bucket'], entity:['book','entity','account'], status:['status','paid'], note:['note','memo'] };
+      return (m[key] || []).some(x => h.includes(x));
+    }
+    function colOptions(key) {
+      return `<option value="">— none —</option>` + headers.map((h, i) =>
+        `<option value="${i}" ${guess(h, key)?'selected':''}>${UI.esc(h)}</option>`).join('');
+    }
+    function buildMapping() {
+      document.getElementById('modeHelp').textContent = HELP[mode];
+      document.getElementById('mapFields').innerHTML = FIELDS[mode].map(([k, label, req]) =>
+        `<div><label>${label}${req?' *':''}</label><select data-field="${k}">${colOptions(k)}</select></div>`).join('');
+      document.getElementById('previewWrap').style.display = 'none';
+    }
+
+    function mapping() {
+      const o = {}; document.querySelectorAll('#mapFields select').forEach(s => o[s.dataset.field] = s.value === '' ? null : Number(s.value));
+      return o;
+    }
+    function toISO(v) {
+      if (v == null || v === '') return null;
+      if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+      const d = new Date(v); return isNaN(d) ? String(v) : d.toISOString().slice(0,10);
+    }
+    const num = v => { if (v == null) return 0; const n = Number(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+
+    let built = [];
+    document.getElementById('preview').onclick = () => {
+      const m = mapping(); built = [];
+      if (mode === 'daily') {
+        if (m.date == null || m.balance == null) { alert('Map a Date and a running-total column.'); return; }
+        rows.forEach(r => { const as_of = toISO(r[m.date]); const balance = num(r[m.balance]);
+          if (as_of && /^\d{4}-\d{2}-\d{2}$/.test(as_of)) built.push({ as_of, balance, note: m.note!=null ? String(r[m.note]||'') : null }); });
+        renderPreview(['Date','Balance (USD)','Note'], built.map(b => [b.as_of, FX.fmt(b.balance,'USD'), b.note||'']));
+      } else {
+        if (m.date == null || m.description == null || m.amount == null) { alert('Map at least Date, Description and Amount.'); return; }
+        const batch = document.getElementById('batch').value || 'sheet:import';
+        const defCur = document.getElementById('defCur').value;
+        rows.forEach((r, i) => {
+          const tx_date = toISO(r[m.date]); const description = String(r[m.description] || '').trim();
+          let amount = num(r[m.amount]); if (!tx_date || !description || !amount) return;
+          let direction = m.direction!=null ? String(r[m.direction]||'').toLowerCase() : (amount < 0 ? 'out' : 'in');
+          if (direction.includes('in')) direction = 'in'; else if (direction.includes('out') || direction.includes('exp')) direction = 'out';
+          else direction = amount < 0 ? 'out' : 'in';
+          amount = Math.abs(amount);
+          const cur0 = m.currency!=null ? String(r[m.currency]||defCur).toUpperCase().slice(0,3) : defCur;
+          const currency = FX.META[cur0] ? cur0 : defCur;
+          const fx_rate = FX.convert(1, currency, 'USD', rateMap);
+          const catName = m.category!=null ? String(r[m.category]||'').toLowerCase() : '';
+          const entName = m.entity!=null ? String(r[m.entity]||'').toLowerCase() : '';
+          built.push({ tx_date, description, amount, currency_code: currency,
+            base_amount: +(amount * fx_rate).toFixed(2), base_code: 'USD', fx_rate, direction,
+            category_id: catByName[catName] || (uncat ? uncat.id : null),
+            entity_id: entByName[entName] || null,
+            status: m.status!=null ? (String(r[m.status]||'actual').toLowerCase().includes('paid')?'paid':'actual') : 'actual',
+            source_ref: `${batch}:${i+1}` });
+        });
+        renderPreview(['Date','Description','Dir','Amount','USD','Category','Book'],
+          built.slice(0,50).map(b => [b.tx_date, b.description, b.direction, FX.fmt(b.amount,b.currency_code),
+            FX.fmt(b.base_amount,'USD'), (ref.categories.find(c=>c.id===b.category_id)||{}).name||'—',
+            (ref.entities.find(e=>e.id===b.entity_id)||{}).name||'—']));
+      }
+    };
+    function renderPreview(cols, data) {
+      document.getElementById('previewWrap').style.display = 'block';
+      document.getElementById('pcount').textContent = `· ${built.length} row(s) ready`;
+      document.querySelector('#pTable thead').innerHTML = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      document.querySelector('#pTable tbody').innerHTML = data.map(r => '<tr>' + r.map(c => `<td>${UI.esc(c)}</td>`).join('') + '</tr>').join('')
+        || '<tr><td class="empty">No valid rows found — check your column mapping.</td></tr>';
+    }
+
+    document.getElementById('doImport').onclick = async () => {
+      if (!built.length) { alert('Nothing to import — run Preview first.'); return; }
+      const st = document.getElementById('importStatus'); st.textContent = 'Importing…';
+      try {
+        if (mode === 'daily') { await DB.upsertBankBalances(built); st.innerHTML = `<span class="pos">✓ ${built.length} daily balances loaded.</span>`; }
+        else { const n = await DB.importTransactions(built, document.getElementById('batch').value); st.innerHTML = `<span class="pos">✓ ${n} transactions imported.</span>`; }
+      } catch (e) { st.innerHTML = `<span class="neg">Import failed: ${UI.esc(e.message)}</span>`; }
+    };
+  })();
+  </script>
+</body>
+</html>

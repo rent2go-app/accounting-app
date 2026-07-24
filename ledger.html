@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent 2 Go — Ledger</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="topbar"></div>
+  <main class="wrap">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1">
+        <h1>Ledger</h1>
+        <p class="sub">Daily entries — Stripe income in, expenses out by category.</p>
+      </div>
+      <button class="btn primary" id="addBtn">+ Add entry</button>
+    </div>
+    <div id="notice"></div>
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="row" style="grid-template-columns:1fr 1fr 1fr 2fr">
+        <div><label>Book</label><select id="fEntity"><option value="">All books</option></select></div>
+        <div><label>From</label><input type="date" id="fFrom"></div>
+        <div><label>To</label><input type="date" id="fTo"></div>
+        <div><label>Search</label><input type="text" id="fSearch" placeholder="description…"></div>
+      </div>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table id="txTable">
+        <thead><tr>
+          <th>Date</th><th>Description</th><th>Book</th><th>Category</th>
+          <th class="num">Amount</th><th>Status</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Entry modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <header><h2 id="modalTitle">Add entry</h2></header>
+      <div class="body">
+        <input type="hidden" id="txId">
+        <div class="seg" id="dirToggle" style="margin-top:14px">
+          <button type="button" data-dir="in">Money in</button>
+          <button type="button" data-dir="out">Money out</button>
+          <button type="button" data-dir="transfer">Transfer</button>
+        </div>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="mDate"></div>
+          <div><label>Status</label><select id="mStatus">
+            <option value="actual">Actual</option>
+            <option value="expected">Expected</option>
+            <option value="paid">Paid ✅</option>
+          </select></div>
+        </div>
+        <label>Description</label>
+        <input type="text" id="mDesc" placeholder="e.g. Stripe daily takings / 16 Optima brakes">
+        <div class="row">
+          <div><label>Amount</label><input type="number" id="mAmount" step="0.01" min="0" placeholder="0.00"></div>
+          <div><label>Currency</label><select id="mCurrency"></select></div>
+        </div>
+        <div class="equiv" id="mEquiv"></div>
+        <div class="row">
+          <div><label>Category</label><select id="mCategory"></select></div>
+          <div><label>Book</label><select id="mEntity"></select></div>
+        </div>
+        <label>Payee <span class="muted">(optional)</span></label>
+        <input type="text" id="mPayee" placeholder="e.g. Stripe, Terrence, Ndaba, Reddam">
+        <label>Notes <span class="muted">(optional)</span></label>
+        <textarea id="mNotes" rows="2"></textarea>
+      </div>
+      <footer>
+        <button class="btn danger" id="delBtn" style="margin-right:auto;display:none">Delete</button>
+        <button class="btn" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="saveBtn">Save</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/fx.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+  (async function () {
+    UI.mountTopbar('ledger.html');
+    if (!DB.configured) {
+      document.getElementById('notice').innerHTML = UI.setupBanner();
+      document.querySelector('#txTable tbody').innerHTML =
+        '<tr><td colspan="6" class="empty">Connect Supabase to start entering data.</td></tr>';
+      return;
+    }
+    const user = await DB.requireAuth();
+    if (!user) return;
+
+    const ref = await DB.refData();
+    const rateMap = FX.buildRateMap(ref.rates);
+    const entById = Object.fromEntries(ref.entities.map(e => [e.id, e]));
+    const catById = Object.fromEntries(ref.categories.map(c => [c.id, c]));
+    let dir = 'out';
+
+    // Populate selects
+    const fEntity = document.getElementById('fEntity');
+    ref.entities.forEach(e => fEntity.insertAdjacentHTML('beforeend', `<option value="${e.id}">${UI.esc(e.name)}</option>`));
+    const mEntity = document.getElementById('mEntity');
+    ref.entities.forEach(e => mEntity.insertAdjacentHTML('beforeend', `<option value="${e.id}">${UI.esc(e.name)}</option>`));
+    const mCurrency = document.getElementById('mCurrency');
+    (ref.currencies.length ? ref.currencies.map(c=>c.code) : FX.codes)
+      .forEach(code => mCurrency.insertAdjacentHTML('beforeend', `<option value="${code}">${code}</option>`));
+
+    // Categories grouped by bucket
+    const mCategory = document.getElementById('mCategory');
+    function fillCategories() {
+      const order = ['Income','Business','Maintenance','Home','Other'];
+      mCategory.innerHTML = '';
+      order.forEach(b => {
+        const items = ref.categories.filter(c => c.bucket === b);
+        if (!items.length) return;
+        const og = document.createElement('optgroup'); og.label = b;
+        items.forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; og.appendChild(o); });
+        mCategory.appendChild(og);
+      });
+    }
+    fillCategories();
+
+    // Direction toggle styling
+    const dirBtns = document.querySelectorAll('#dirToggle button');
+    function setDir(d) {
+      dir = d;
+      dirBtns.forEach(b => { b.className = ''; if (b.dataset.dir===d) b.classList.add('on-'+d); });
+    }
+    dirBtns.forEach(b => b.onclick = () => setDir(b.dataset.dir));
+
+    // Live equivalents in the form
+    function updEquiv() {
+      const amt = Number(document.getElementById('mAmount').value || 0);
+      const cur = mCurrency.value;
+      const el = document.getElementById('mEquiv');
+      if (!amt) { el.innerHTML = ''; return; }
+      el.innerHTML = FX.codes.filter(c => c!==cur)
+        .map(c => `<div>≈ <strong>${FX.fmt(FX.convert(amt,cur,c,rateMap), c)}</strong></div>`).join('');
+    }
+    document.getElementById('mAmount').oninput = updEquiv;
+    mCurrency.onchange = updEquiv;
+
+    // Modal open/close
+    const modalBg = document.getElementById('modalBg');
+    function openModal(tx) {
+      document.getElementById('modalTitle').textContent = tx ? 'Edit entry' : 'Add entry';
+      document.getElementById('txId').value = tx ? tx.id : '';
+      document.getElementById('mDate').value = tx ? tx.tx_date : new Date().toISOString().slice(0,10);
+      document.getElementById('mDesc').value = tx ? tx.description : '';
+      document.getElementById('mAmount').value = tx ? tx.amount : '';
+      mCurrency.value = tx ? tx.currency_code : 'USD';
+      document.getElementById('mStatus').value = tx ? tx.status : 'actual';
+      document.getElementById('mPayee').value = tx ? (tx.payee||'') : '';
+      document.getElementById('mNotes').value = tx ? (tx.notes||'') : '';
+      if (tx && tx.category_id) mCategory.value = tx.category_id;
+      if (tx && tx.entity_id) mEntity.value = tx.entity_id;
+      setDir(tx ? tx.direction : 'out');
+      document.getElementById('delBtn').style.display = tx ? 'inline-flex' : 'none';
+      updEquiv();
+      modalBg.classList.add('open');
+    }
+    function closeModal(){ modalBg.classList.remove('open'); }
+    document.getElementById('addBtn').onclick = () => openModal(null);
+    document.getElementById('cancelBtn').onclick = closeModal;
+    modalBg.onclick = (e) => { if (e.target === modalBg) closeModal(); };
+
+    // Save
+    document.getElementById('saveBtn').onclick = async () => {
+      const amount = Number(document.getElementById('mAmount').value || 0);
+      const currency = mCurrency.value;
+      const desc = document.getElementById('mDesc').value.trim();
+      if (!desc || !amount) { alert('Add a description and amount.'); return; }
+      const fx_rate = FX.convert(1, currency, 'USD', rateMap);   // native -> USD
+      const row = {
+        tx_date: document.getElementById('mDate').value,
+        description: desc,
+        payee: document.getElementById('mPayee').value.trim() || null,
+        direction: dir,
+        amount,
+        currency_code: currency,
+        base_amount: +(amount * fx_rate).toFixed(2),
+        base_code: 'USD',
+        fx_rate,
+        category_id: Number(mCategory.value) || null,
+        entity_id: Number(mEntity.value) || null,
+        status: document.getElementById('mStatus').value,
+        notes: document.getElementById('mNotes').value.trim() || null,
+      };
+      const id = document.getElementById('txId').value;
+      try {
+        if (id) await DB.updateTransaction(Number(id), row);
+        else await DB.addTransaction(row);
+        closeModal(); load();
+      } catch (e) { alert('Save failed: ' + e.message); }
+    };
+    document.getElementById('delBtn').onclick = async () => {
+      const id = document.getElementById('txId').value;
+      if (id && confirm('Delete this entry?')) {
+        try { await DB.deleteTransaction(Number(id)); closeModal(); load(); }
+        catch (e) { alert('Delete failed: ' + e.message); }
+      }
+    };
+
+    // List + filters
+    let current = [];
+    function chip(id){ return UI.entityChip(ref.entities, id); }
+    function render() {
+      const body = current.map(t => {
+        const sign = t.direction==='in' ? '' : (t.direction==='out' ? '-' : '');
+        const cls  = t.direction==='in' ? 'pos' : (t.direction==='out' ? 'neg' : 'muted');
+        const equiv = t.currency_code !== 'USD'
+          ? `<div class="hint">${FX.fmt(t.base_amount,'USD')}</div>` : '';
+        return `<tr class="clickable" data-id="${t.id}">
+          <td>${t.tx_date}</td>
+          <td>${UI.esc(t.description)}${t.payee?` <span class="muted">· ${UI.esc(t.payee)}</span>`:''}</td>
+          <td>${chip(t.entity_id)}</td>
+          <td>${catById[t.category_id] ? UI.esc(catById[t.category_id].name) : '—'}</td>
+          <td class="num ${cls}">${sign}${FX.fmt(t.amount, t.currency_code)}${equiv}</td>
+          <td>${t.status==='paid'?'Paid ✅':UI.esc(t.status)}</td>
+        </tr>`;
+      }).join('');
+      document.querySelector('#txTable tbody').innerHTML =
+        body || '<tr><td colspan="6" class="empty">No entries match. Add one with “+ Add entry”.</td></tr>';
+      document.querySelectorAll('#txTable tbody tr.clickable').forEach(tr =>
+        tr.onclick = () => openModal(current.find(x => x.id === Number(tr.dataset.id))));
+    }
+    async function load() {
+      const filters = {
+        entity_id: fEntity.value ? Number(fEntity.value) : undefined,
+        from: document.getElementById('fFrom').value || undefined,
+        to: document.getElementById('fTo').value || undefined,
+        search: document.getElementById('fSearch').value.trim() || undefined,
+        limit: 500,
+      };
+      try { current = await DB.listTransactions(filters); render(); }
+      catch (e) { document.querySelector('#txTable tbody').innerHTML =
+        `<tr><td colspan="6" class="empty">Load error: ${UI.esc(e.message)}</td></tr>`; }
+    }
+    ['fEntity','fFrom','fTo'].forEach(id => document.getElementById(id).onchange = load);
+    let deb; document.getElementById('fSearch').oninput = () => { clearTimeout(deb); deb=setTimeout(load,300); };
+    setDir('out');
+    load();
+  })();
+  </script>
+</body>
+</html>
