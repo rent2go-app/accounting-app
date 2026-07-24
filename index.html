@@ -67,6 +67,14 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .blk.budget .hleft{background:#eab54e;color:#3a2c00;box-shadow:inset 0 3px 0 rgba(255,255,255,.35)}
 .hleft .dt{font-size:27px;line-height:1;letter-spacing:.01em}.hleft .dt.d2{font-size:23px;opacity:.95}.hleft .tag{font-size:10px;font-weight:900;text-transform:uppercase;background:rgba(255,255,255,.3);padding:3px 10px;border-radius:999px;letter-spacing:.05em}
 .hright{flex:1;background:#eab54e;color:#3a2c00;font-weight:800;padding:16px 22px;font-size:13px;letter-spacing:.05em;display:flex;align-items:center;box-shadow:inset 0 3px 0 rgba(255,255,255,.35)}
+.blk.posprev .hleft{background:#0f8a4d;color:#fff}
+.blk.poscur .hleft{background:#4338ca;color:#fff}
+.blk.poscur .hright{background:#c7d2fe;color:#312e81;box-shadow:inset 0 3px 0 rgba(255,255,255,.5)}
+.blk.poscur{border-color:#4338ca}
+.blk.posnext .hleft{background:#eab54e;color:#3a2c00}
+.gcard.gprev{border-left:5px solid #0f8a4d}
+.gcard.gcur{border-left:5px solid #4338ca}
+.gcard.gnext{border-left:5px solid #eab54e}
 .bmain{display:grid;grid-template-columns:1fr 1fr}
 @media(max-width:640px){.bmain{grid-template-columns:1fr}}
 .lpanel{padding:10px 16px;border-right:2px solid var(--line-strong)}
@@ -244,7 +252,7 @@ function eline(l,i,d){const v=+l[1]||0;const paid=!!l[3];const col=l[4]||'';cons
  return '<div class="eline'+(paid?' paid':'')+'"'+(col?' style="border-left:4px solid '+col+';padding-left:6px"':'')+'><button class="chk'+(paid?' on':'')+'" data-paid="'+d+'" data-i="'+i+'" title="'+(paid?'Paid — click to unmark':'Mark as paid')+'">'+(paid?'✓':'')+'</button><input class="di" data-d="'+d+'" data-k="e" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+catSel('e',d,'e',i,l[2]||'Other')+r+'<span class="wrapmoney"><span class="cur">$</span><input class="amt exp tnum" type="number" step="0.01" data-d="'+d+'" data-k="e" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="e" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="mv" data-mv="'+d+'" data-i="'+i+'" title="Move to next day">→</button><button class="del" data-dk="e" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
 function iline(l,i,d){const v=+l[1]||0;const col=l[3]||'';const adj=isAdj(l);
  return '<div class="eline'+(adj?' adjline':'')+'"'+(col?' style="border-left:4px solid '+col+';padding-left:6px"':'')+'><input class="di" data-d="'+d+'" data-k="j" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+(adj?'<span class="linktag">reconciles to sheet</span>':catSel('j',d,'j',i,l[2]||'Other Income'))+'<span class="wrapmoney"><span class="cur">$</span><input class="amt '+(adj?'adj':'inc')+' tnum" type="number" step="0.01" data-d="'+d+'" data-k="j" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="j" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="del" data-dk="j" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
-function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00');const isT=d===anchor;const first=idx===0;
+function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00');const isT=d===anchor;const first=idx===0;const poscls=(scope==='day'&&!customRange)?(d===anchor?' poscur':(d<anchor?' posprev':' posnext')):'';
  const deps='<div class="deps">'+(o.d||[]).map((v,i)=>'<span class="dep"><span class="cur">$</span><input class="amt dep tnum" type="number" step="0.01" data-d="'+d+'" data-k="d" data-f="a" data-i="'+i+'" value="'+(+v||0).toFixed(2)+'"><button class="del" data-dk="d" data-dd="'+d+'" data-di="'+i+'" title="Delete deposit">×</button></span>').join('')+'<button class="addbtn" data-add="d" data-d="'+d+'">+ deposit</button></div>';
  const injL=(o.j||[]).map((l,i)=>iline(l,i,d)).join('');
  const groups={};(o.e||[]).forEach((l,i)=>{const c=l[2]||'Other';(groups[c]=groups[c]||[]).push([l,i])});
@@ -259,7 +267,7 @@ function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00'
    :'<span class="wrapmoney"><span class="cur">$</span><input class="amt big tnum" type="number" step="0.01" data-d="'+d+'" data-k="startedit" value="'+x.start.toFixed(2)+'"></span>';
  const startTag=first?'<span class="linktag">opening balance</span>':'<span class="linktag">= day before ↑</span>';
  const adjRow=Math.abs(x.adj)>0.005?'<div class="kv"><span class="k">Balance adjustment</span><b class="tnum muted">'+(x.adj>=0?'+':'')+fmt(x.adj)+'</b></div>':'';
- return '<div class="blk '+(x.proj?'budget':'actual')+(isT?' today':'')+'" '+(isT?'id="todayblk"':'')+'>'
+ return '<div class="blk '+(x.proj?'budget':'actual')+(isT?' today':'')+poscls+'" '+(isT?'id="todayblk"':'')+'>'
   +'<div class="bhead"><div class="hleft"><span class="dt">'+D3[dd.getDay()]+'</span><span class="dt d2">'+ORD(dd.getDate())+'</span><span class="tag">'+(x.proj?'Projected':'Actual')+'</span></div><div class="hright">CURRENT BANK DEPOSITS</div></div>'
   +'<div class="bmain"><div class="lpanel">'
     +'<div class="kv start"><span class="k">Starting Balance '+startTag+'</span>'+startCell+'</div>'
@@ -281,7 +289,7 @@ function render(){const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg
   [balLbl,fmt(bal),'','≈ '+(CFG.sacur==='AED'?'AED ':'R')+(bal*saRate()).toLocaleString('en',{maximumFractionDigits:0})+' ('+CFG.sacur+')'],
   [cap+' income',fmt(inc),'pos','total in for period'],[cap+' expenses',fmt(exp),'neg','total out for period'],['Net / Profit',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','income − expenses']
  ].map(x=>'<div class="card"><div class="label">'+x[0]+'</div><div class="value tnum '+x[2]+'">'+x[1]+'</div>'+(x[3]?'<div class="hint tnum">'+x[3]+'</div>':'')+'</div>').join('');
- var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
+ var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
  let list=kpiDays;if(!customRange&&scope==='day')list=[addDays(anchor,-1),anchor,addDays(anchor,1)].filter(d=>M[d]);
  if(customRange&&kpiDays.length>45){document.getElementById('stack').innerHTML=summaryHTML(kpiDays);}
  else{document.getElementById('stack').innerHTML=list.map((d,ix)=>block(d,DK.indexOf(d))).join('')||'<div class="muted" style="padding:30px">No days in range.</div>';wire();}}
