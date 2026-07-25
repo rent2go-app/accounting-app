@@ -252,7 +252,7 @@ async function flush(){try{
 }catch(e){console.error(e);setStatus('error');clearTimeout(flushTimer);flushTimer=setTimeout(flush,3000);}}
 
 let BASE={};let OPEN0=0;
-const TODAY='2026-07-24';
+const TODAY=(function(){var _n=new Date();return _n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');})();
 const CFG={zar:18.3,aed:3.6725,sacur:'ZAR'};
 const saveCfg=()=>{scheduleFlush();};
 const saRate=()=>CFG.sacur==='AED'?+CFG.aed:+CFG.zar;const saSym=()=>CFG.sacur==='AED'?'AED ':'R';
