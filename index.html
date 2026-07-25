@@ -29,6 +29,7 @@ input[type=date]{padding:7px 10px;border:1px solid var(--line);border-radius:9px
 .gcard.proj{background:color-mix(in srgb,#eab54e 8%,var(--surface))}
 .gcard.mid{border:2px solid var(--brand);box-shadow:0 8px 20px rgba(16,24,40,.14)}
 .gcard .gl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.gcard .gl2{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--in);margin-top:6px}
 .gcard .gv{font-size:23px;font-weight:800;margin-top:5px}.gcard.mid .gv{font-size:32px}
 .gcard .gn{font-size:12px;margin-top:3px;font-weight:700}
 .sumwrap{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -346,7 +347,7 @@ function render(){CUSTOMCATS=[];var _cseen={};DK.forEach(function(dd){(MD[dd].e|
   ['Month-end · '+_mn,fmt(_mb),_mb<0?'neg':'','carried fwd '+_me],
   [cap+' income',fmt(inc),'pos','total in for period'],[cap+' expenses',fmt(exp),'neg','total out for period'],['Net / Profit',(inc-exp>=0?'+':'')+fmt(inc-exp),inc-exp>=0?'pos':'neg','income − expenses']
  ].map(x=>'<div class="card"><div class="label">'+x[0]+'</div><div class="value tnum '+x[2]+'">'+x[1]+'</div>'+(x[3]?'<div class="hint tnum">'+x[3]+'</div>':'')+'</div>').join('');
- var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gv tnum">'+fmt(m.carried)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
+ var glc=[addDays(anchor,-1),anchor,addDays(anchor,1)];document.getElementById('glance').innerHTML=glc.map(function(d,ix){var m=M[d];var lbl=ix===0?'Day before':ix===1?'This day':'Day after';if(!m)return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+'"><div class="gl">'+lbl+'</div><div class="gv">—</div></div>';var dd=new Date(d+'T00:00:00');var net=m.incReal-m.exp;return '<div class="gcard'+(ix===1?' mid':'')+(ix===0?' gprev':ix===1?' gcur':' gnext')+(m.proj?' proj':'')+'"><div class="gl">'+lbl+' · '+D3[dd.getDay()].slice(0,3)+' '+ORD(dd.getDate())+'</div><div class="gl2">income this day</div><div class="gv tnum">'+fmt(m.incReal)+'</div><div class="gn tnum '+(net>=0?'pos':'neg')+'">'+(net>=0?'+':'')+fmt(net)+' net · bal '+fmt(m.carried)+' · '+(m.proj?'projected':'actual')+'</div></div>';}).join('');
  let list=kpiDays;if(!customRange&&scope==='day')list=[addDays(anchor,-1),anchor,addDays(anchor,1)].filter(d=>M[d]);
  if(customRange&&kpiDays.length>45){document.getElementById('stack').innerHTML=summaryHTML(kpiDays);}
  else{document.getElementById('stack').innerHTML=list.map((d,ix)=>block(d,DK.indexOf(d))).join('')||'<div class="muted" style="padding:30px">No days in range.</div>';wire();}}
