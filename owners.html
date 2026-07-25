@@ -25,7 +25,9 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .grand{margin-left:auto;text-align:right}.grand .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}.grand .v{font-size:24px;font-weight:800;color:var(--in);letter-spacing:-.01em}
 .owner{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-top:16px;overflow:hidden}
 .ohead{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(0deg,color-mix(in srgb,var(--brand) 6%,var(--surface)),var(--surface));border-bottom:1px solid var(--line);flex-wrap:wrap}
-.ohead .oname{font-weight:800;font-size:16px;border:1px solid transparent;background:transparent;color:var(--text);padding:4px 6px;border-radius:8px;min-width:160px}
+.ohead .oname{font-weight:800;font-size:16px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:6px 9px;border-radius:8px;min-width:180px}
+.disc{display:flex;flex-direction:column;gap:4px;min-width:158px}
+.disc select,.disc .ccustom{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px}
 .ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
 .pill{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .otot{margin-left:auto;text-align:right}.otot .l{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)}.otot .v{font-size:20px;font-weight:800;color:var(--in)}
@@ -140,9 +142,9 @@ function render(){
           +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove">×</button></div>';
       }
       var full=dim(YM),days=carDays(c,YM),fee=carFee(c,YM),pro=days<full;
-      var tiers=TIERS.map(t=>'<button class="'+(tierOf(c.rate)===t[0]?'on':'')+'" data-tier="'+oi+'|'+ci+'|'+t[2]+'">'+t[1].replace('Standard ','').replace('Preferred ','')+'</button>').join('');
+      var isCustom=[500,350,250].indexOf(+c.rate)<0;var disc='<div class="disc"><select class="cdisc" data-cdisc="'+oi+'|'+ci+'"><option value="500"'+(+c.rate===500?' selected':'')+'>No discount · $500</option><option value="350"'+(+c.rate===350?' selected':'')+'>Preferred −$150 · $350</option><option value="250"'+(+c.rate===250?' selected':'')+'>Preferred −$250 · $250</option><option value="custom"'+(isCustom?' selected':'')+'>Custom…</option></select>'+(isCustom?'<input class="ccustom tnum" type="number" min="0" step="1" data-ccustom="'+oi+'|'+ci+'" value="'+(+c.rate||0)+'" placeholder="$ / car" title="Amount they pay per car">':'')+'</div>';
       return '<div class="crow"><div class="cnamewrap"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car name"><div class="cids"><input class="cplate" data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate"><input class="cvin" data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN"></div></div>'
-        +'<div class="tiers">'+tiers+'</div>'
+        +disc
         +'<input class="days tnum" type="number" min="0" max="'+full+'" data-cd="'+oi+'|'+ci+'" value="'+days+'" title="Days available (of '+full+')">'
         +'<span class="pill">/ '+full+'d</span>'
         +'<span class="fee tnum'+(pro?' pro':'')+'" title="'+(pro?'Prorated '+days+'/'+full+' days':'Full month')+'">'+fmt(fee)+'</span>'
@@ -157,7 +159,7 @@ function render(){
       : '<div class="l">'+((o.cars||[]).length)+' car'+((o.cars||[]).length===1?'':'s')+' · month total</div><div class="v tnum">'+fmt(ot)+'</div>';
     var hdr=weekly
       ? '<div class="chdr wk"><span>Fleet / description</span><span>$ / month</span><span></span></div>'
-      : '<div class="chdr"><span>Car / plate</span><span>Rate</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
+      : '<div class="chdr"><span>Car / plate</span><span>Discount / pays</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
     return '<div class="owner"><div class="ohead">'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
       +cadSeg+whenCtl
@@ -186,7 +188,8 @@ function wire(){
   document.querySelectorAll('[data-cp]').forEach(el=>el.onchange=()=>{var p=el.dataset.cp.split('|');STATE[+p[0]].cars[+p[1]].plate=el.value;scheduleSave();});
   document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
   document.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{var p=el.dataset.cd.split('|');var c=STATE[+p[0]].cars[+p[1]];c.days=c.days||{};c.days[YM]=Math.max(0,Math.min(+el.value||0,dim(YM)));scheduleSave();render();});
-  document.querySelectorAll('[data-tier]').forEach(el=>el.onclick=()=>{var p=el.dataset.tier.split('|');STATE[+p[0]].cars[+p[1]].rate=+p[2];scheduleSave();render();});
+  document.querySelectorAll('[data-cdisc]').forEach(el=>el.onchange=()=>{var p=el.dataset.cdisc.split('|');var c=STATE[+p[0]].cars[+p[1]];if(el.value==='custom'){if([500,350,250].indexOf(+c.rate)>=0)c.rate=0;}else c.rate=+el.value;scheduleSave();render();});
+  document.querySelectorAll('[data-ccustom]').forEach(el=>el.onchange=()=>{var p=el.dataset.ccustom.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
   document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('c_'),name:'',plate:'',vin:'',rate:500,days:{}});scheduleSave();render();});
   document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
   document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
