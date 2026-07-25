@@ -1,0 +1,237 @@
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M32%2010L10%2028h6v22h12V36h8v14h12V28h6z%22%20fill%3D%22%230f8a4d%22/%3E%3C/svg%3E">
+<title>Home Budget — Rent 2 Go</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--gold:#eab54e;--band:#1f3a5f;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--gold:#e6c458;--band:#22344d}}
+:root[data-theme=light]{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--band:#1f3a5f}
+:root[data-theme=dark]{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--band:#22344d}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.4}
+.tnum{font-variant-numeric:tabular-nums}
+.topbar{display:flex;align-items:center;gap:14px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brand{font-weight:800;font-size:17px}.brand span{color:var(--brand)}
+.sub{font-size:12.5px;color:var(--muted);font-weight:700}.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.pri:hover{color:#fff;opacity:.92}
+.wrap{max-width:1400px;margin:0 auto;padding:14px 16px 60px}
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
+.ctl label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+input[type=month],input[type=number],input[type=text],input[type=date]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.sides{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.sides button{padding:9px 18px;border:none;background:var(--surface);color:var(--muted);font-weight:800;cursor:pointer;font-family:inherit;font-size:14px;border-left:1px solid var(--line)}
+.sides button:first-child{border-left:none}.sides button.on{background:var(--brand);color:#fff}
+.refbox{margin-left:auto;text-align:right}.refbox .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.refbox .v{font-size:16px;font-weight:800;color:var(--in)}
+.savestate{font-size:12px;font-weight:700;color:var(--muted)}
+.tablewrap{margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:var(--surface)}
+table.bud{border-collapse:collapse;width:100%;font-size:13px;min-width:900px}
+table.bud th,table.bud td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:5px 8px;white-space:nowrap}
+table.bud th{background:var(--surface-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;text-align:center}
+table.bud th.ln,table.bud td.ln{text-align:left;position:sticky;left:0;background:var(--surface);z-index:2;min-width:210px}
+table.bud th.wk{color:var(--text);background:color-mix(in srgb,var(--brand) 10%,var(--surface-2))}
+table.bud th.mtd{color:#fff;background:var(--band)}
+table.bud td.num{text-align:right}
+table.bud input.c{width:88px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;text-align:right;font-family:inherit;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+table.bud input.c:hover{border-color:var(--line)}table.bud input.c:focus{border-color:var(--brand);background:var(--surface);outline:none}
+table.bud input.c.p{color:var(--in)}
+table.bud .mtdcell{text-align:right;font-weight:800;background:color-mix(in srgb,var(--band) 8%,var(--surface));font-variant-numeric:tabular-nums}
+tr.sec td{background:var(--band);color:#fff;font-weight:800;text-transform:uppercase;letter-spacing:.03em;font-size:11.5px;padding:7px 8px;position:sticky;left:0}
+tr.sec td .addi{float:right;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer;font-family:inherit;font-weight:700;text-transform:none;letter-spacing:0}
+tr.tot td{font-weight:800;background:color-mix(in srgb,var(--brand) 7%,var(--surface))}
+tr.sum td{font-weight:800}
+tr.sum.inc td{background:color-mix(in srgb,var(--in) 9%,var(--surface))}
+tr.sum.exp td{background:color-mix(in srgb,var(--out) 9%,var(--surface))}
+tr.sum.bal td{background:color-mix(in srgb,var(--gold) 14%,var(--surface))}
+td.iname input,tr td.ln input.nm{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-size:13px;color:var(--text);padding:3px 4px;border-radius:6px}
+td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname input:focus,tr td.ln input.nm:focus{border-color:var(--brand);background:var(--surface);outline:none}
+.datechip{font-size:10px;color:var(--muted);font-weight:700}
+.delrow{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;font-weight:800;padding:0 4px}.delrow:hover{color:var(--out)}
+.hint{color:var(--muted);font-size:12px;margin-top:14px}
+.neg{color:var(--out)}.pos{color:var(--in)}
+.loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
+.logincard h1{margin:0 0 4px;font-size:22px}.logincard h1 span{color:var(--brand)}
+.logincard p{margin:0 0 16px;color:var(--muted);font-size:13px}
+.logincard label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.logincard input{width:100%}
+.logincard button{width:100%;margin-top:16px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+.err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:60}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><h1>Rent <span>2</span> Go</h1><p>Home Budget — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
+
+<div id="appwrap" style="display:none">
+<div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="sub">· Home Budget</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<main class="wrap">
+<div class="ctl">
+  <div class="sides" id="sides"><button data-side="sa" class="on">🇿🇦 SA · ZAR</button><button data-side="uae">🇦🇪 UAE · AED</button></div>
+  <label>Month</label><input type="month" id="ym">
+  <label>Weeks</label><input type="number" id="weeks" min="1" max="6" style="width:56px">
+  <label>Week 1 starts</label><input type="date" id="wstart">
+  <label>Start bal</label><input type="number" id="startbal" step="0.01" style="width:100px">
+  <div class="refbox"><div class="l">Funded by owner draws (ledger actual) · <span id="reflbl">—</span></div><div class="v tnum" id="refval">—</div></div>
+</div>
+<div class="tablewrap"><table class="bud" id="tbl"></table></div>
+<p class="hint">Two sides — <b>SA (ZAR)</b> and <b>UAE (AED)</b> — each a weekly home budget with <b>Budget</b> (plan) and <b>Paid</b> (actual) per week and an auto <b>Month-to-date</b>. The <b>INCOME</b> block is the money you draw from the business into home life; the reference above shows what the main ledger actually recorded as owner-draw / home outflow this month (USD → converted at your Settings FX). Amounts are yours to fill in — the structure mirrors your July sheet.</p>
+</main>
+</div>
+<div id="toastHost"></div>
+
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
+const pad=n=>String(n).padStart(2,'0');
+const r2=n=>Math.round((+n||0)*100)/100;
+const uid=p=>p+Math.random().toString(36).slice(2,9);
+function isod(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function addDays(s,n){var d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return isod(d);}
+function dim(ym){var p=ym.split('-');return new Date(+p[0],+p[1],0).getDate();}
+function firstFriday(ym){var y=+ym.split('-')[0],m=+ym.split('-')[1];for(var d=1;d<=7;d++){if(new Date(y,m-1,d).getDay()===5)return ym+'-'+pad(d);}return ym+'-01';}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtYM(ym){if(!ym)return '—';var p=ym.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en',{month:'long',year:'numeric'});}
+
+const WKDAYS=['Friday','Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'];
+const EXP_SECTIONS=['HOME EXPENSES','DAILY LIVING','GO RENT A RIDE & VEHICLES','Makhosi Michaela Foundation','MONTHLY SAVINGS','PERSONAL','ENTERTAINMENT','RENTAL EXPENSES','MISCELLANEOUS'];
+const SA_HOME=['House Rent','Rent Savings','Lawyers fees','Wood','Trackers for R2G','Printing','KK Surgery','Langa Basketball','KK Pottery','KK Tumbling Tigers','NT Visa','Water / Pikitup','Power','Natural Gas','Langa Lunch','Golf Cart (New Cart)','Reddam Fees 1','Reddam Fees 2','Reddam Fees 3','Mom & Dad Allowance','Spending','Grocery','Phones & Internet','Afriversal Phone','Petrol','Aunti Langa Salary','Cleaner Salary','Cleaner 2','Virgin Active','Vincent','Health Savings','Health Insurance','Discovery'];
+const HOME_CATS=['Owner Draw','SA Salaries','School & Education','Rent & Housing','Groceries & Household','Allowances','Utilities','Home & Personal','Savings & Moving'];
+
+let DATA={sa:{},uae:{}},SIDE='sa',YM='',SAVET=null;
+let CFG={zar:18.3,aed:3.6725},CATSEG={};
+
+function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
+function toast(m){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+m+'</div>';setTimeout(()=>{h.innerHTML='';},2400);}
+function scheduleSave(){setStatus('saving');clearTimeout(SAVET);SAVET=setTimeout(save,600);}
+async function save(){try{var r=await sb.from('home_budget').update({data:DATA,updated_at:new Date().toISOString()}).eq('id',1);if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
+function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1);}
+function sym(){return SIDE==='uae'?'AED ':'R';}
+function fx(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||18.3);}
+function fmtC(v){v=+v||0;return (v<0?'-':'')+sym()+Math.abs(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function newVals(W){var a=[];for(var i=0;i<W;i++)a.push({b:0,p:0});return a;}
+function newMonth(side,ym,W){
+  W=W||4;
+  var sections=[{name:'INCOME',income:true,items:WKDAYS.map(function(d){return {id:uid('i_'),name:d,vals:newVals(W)};})}];
+  EXP_SECTIONS.forEach(function(nm){
+    var items=[];
+    if(side==='sa'&&nm==='HOME EXPENSES')items=SA_HOME.map(function(x){return {id:uid('e_'),name:x,vals:newVals(W)};});
+    sections.push({name:nm,items:items});
+  });
+  return {weekStart:firstFriday(ym),weeks:W,startBal:0,sections:sections};
+}
+function ensureMonth(){
+  var store=DATA[SIDE]=DATA[SIDE]||{};
+  if(!store[YM])store[YM]=newMonth(SIDE,YM,4);
+  var M=store[YM];
+  M.weeks=Math.max(1,Math.min(6,+M.weeks||4));
+  if(!M.weekStart)M.weekStart=firstFriday(YM);
+  // normalise vals length to weeks
+  M.sections.forEach(function(sec){sec.items.forEach(function(it){it.vals=it.vals||[];while(it.vals.length<M.weeks)it.vals.push({b:0,p:0});it.vals.length=M.weeks;it.vals.forEach(function(v){if(v.b==null)v.b=0;if(v.p==null)v.p=0;});});});
+  return M;
+}
+function cur(){return DATA[SIDE][YM];}
+function weekCols(M){var out=[];for(var i=0;i<M.weeks;i++){var s=addDays(M.weekStart,i*7);out.push([s,addDays(s,6)]);}return out;}
+function wlabel(c){var a=new Date(c[0]+'T00:00:00'),b=new Date(c[1]+'T00:00:00');var am=a.toLocaleDateString('en',{month:'short'});return a.getDate()+' – '+b.getDate()+' '+am;}
+function secWk(sec,w,f){return sec.items.reduce(function(s,it){return s+(+(it.vals[w]||{})[f]||0);},0);}
+
+function render(){
+  var M=ensureMonth();var W=M.weeks;var cols=weekCols(M);
+  document.getElementById('ym').value=YM;
+  document.getElementById('weeks').value=W;
+  document.getElementById('wstart').value=M.weekStart;
+  document.getElementById('startbal').value=M.startBal||0;
+  var inc=M.sections[0],exps=M.sections.slice(1);
+  var incB=[],incP=[],expB=[],expP=[];
+  for(var w=0;w<W;w++){incB[w]=secWk(inc,w,'b');incP[w]=secWk(inc,w,'p');expB[w]=exps.reduce((s,se)=>s+secWk(se,w,'b'),0);expP[w]=exps.reduce((s,se)=>s+secWk(se,w,'p'),0);}
+  var sum=a=>a.reduce((s,x)=>s+x,0);
+  // header
+  var h='<thead><tr><th class="ln">'+fmtYM(YM)+' · '+sym().trim()+'</th>';
+  cols.forEach(c=>{h+='<th class="wk" colspan="2">'+wlabel(c)+'</th>';});
+  h+='<th class="mtd" colspan="2">MONTH TO DATE</th><th class="ln" style="min-width:34px"></th></tr>';
+  h+='<tr><th class="ln">Line</th>';
+  for(var i=0;i<W;i++)h+='<th>Budget</th><th>Paid</th>';
+  h+='<th>Budget</th><th>Paid</th><th class="ln" style="min-width:34px"></th></tr></thead>';
+  // summary rows
+  var body='<tbody>';
+  body+=sumRow('inc','Total Income',incB,incP,sum(incB),sum(incP),W);
+  body+=sumRow('exp','Total Expenses',expB,expP,sum(expB),sum(expP),W);
+  var balB=incB.map((v,i)=>r2(v-expB[i])),balP=incP.map((v,i)=>r2(v-expP[i]));
+  body+=sumRow('bal','Weekly Balance',balB,balP,sum(balB),sum(balP),W);
+  // sections
+  M.sections.forEach(function(sec,si){
+    body+='<tr class="sec"><td colspan="'+(W*2+3)+'">'+esc(sec.name)+'<button class="addi" data-addi="'+si+'">+ add line</button></td></tr>';
+    sec.items.forEach(function(it,ii){
+      body+='<tr><td class="ln iname">'+(sec.income?'<span class="datechip">'+esc(it.name)+'</span>':'<input class="nm" data-nm="'+si+'|'+ii+'" value="'+esc(it.name)+'">')+'</td>';
+      var rb=0,rp=0;
+      for(var w=0;w<W;w++){var v=it.vals[w]||{b:0,p:0};rb+=+v.b||0;rp+=+v.p||0;
+        body+='<td class="num"><input class="c" data-c="'+si+'|'+ii+'|'+w+'|b" value="'+(v.b||0)+'"></td><td class="num"><input class="c p" data-c="'+si+'|'+ii+'|'+w+'|p" value="'+(v.p||0)+'"></td>';}
+      body+='<td class="mtdcell">'+fmtC(rb)+'</td><td class="mtdcell">'+fmtC(rp)+'</td>';
+      body+='<td class="ln" style="min-width:34px">'+(sec.income?'':'<button class="delrow" data-delrow="'+si+'|'+ii+'" title="Remove line">×</button>')+'</td></tr>';
+    });
+    // section total
+    var tb=[],tp=[];for(var w2=0;w2<W;w2++){tb[w2]=secWk(sec,w2,'b');tp[w2]=secWk(sec,w2,'p');}
+    body+='<tr class="tot"><td class="ln">Total '+esc(sec.name)+'</td>';
+    for(var w3=0;w3<W;w3++)body+='<td class="mtdcell">'+fmtC(tb[w3])+'</td><td class="mtdcell">'+fmtC(tp[w3])+'</td>';
+    body+='<td class="mtdcell">'+fmtC(sum(tb))+'</td><td class="mtdcell">'+fmtC(sum(tp))+'</td><td class="ln"></td></tr>';
+  });
+  body+='</tbody>';
+  document.getElementById('tbl').innerHTML=h+body;
+  wire();
+}
+function sumRow(cls,label,arrB,arrP,mtdB,mtdP,W){
+  var s='<tr class="sum '+cls+'"><td class="ln">'+label+'</td>';
+  for(var w=0;w<W;w++)s+='<td class="mtdcell">'+fmtC(arrB[w])+'</td><td class="mtdcell">'+fmtC(arrP[w])+'</td>';
+  s+='<td class="mtdcell">'+fmtC(mtdB)+'</td><td class="mtdcell">'+fmtC(mtdP)+'</td><td class="ln"></td></tr>';
+  return s;
+}
+function wire(){
+  var M=cur();
+  document.querySelectorAll('input.c').forEach(el=>el.onchange=()=>{var p=el.dataset.c.split('|');M.sections[+p[0]].items[+p[1]].vals[+p[2]][p[3]]=r2(el.value);scheduleSave();render();});
+  document.querySelectorAll('input.nm').forEach(el=>el.onchange=()=>{var p=el.dataset.nm.split('|');M.sections[+p[0]].items[+p[1]].name=el.value;scheduleSave();});
+  document.querySelectorAll('[data-addi]').forEach(el=>el.onclick=()=>{var si=+el.dataset.addi;M.sections[si].items.push({id:uid('e_'),name:'',vals:newVals(M.weeks)});scheduleSave();render();});
+  document.querySelectorAll('[data-delrow]').forEach(el=>el.onclick=()=>{var p=el.dataset.delrow.split('|');if(!confirm('Remove this line?'))return;M.sections[+p[0]].items.splice(+p[1],1);scheduleSave();render();});
+}
+
+async function loadRef(){
+  try{
+    var from=YM+'-01',to=YM+'-'+pad(dim(YM));
+    var res=await sb.from('day_blocks').select('day,expenses').gte('day',from).lte('day',to);
+    if(res.error)throw res.error;
+    var usd=0;(res.data||[]).forEach(function(r){(r.expenses||[]).forEach(function(l){var c=l[2]||'';var seg=CATSEG[c]!=null?CATSEG[c]:(HOME_CATS.indexOf(c)>=0?'home':null);if(seg==='home')usd+=(+l[1]||0);});});
+    document.getElementById('reflbl').textContent=fmtYM(YM);
+    document.getElementById('refval').textContent='$'+usd.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+'  ≈  '+fmtC(usd*fx());
+  }catch(e){document.getElementById('refval').textContent='—';}
+}
+
+async function load(){
+  var st=await sb.from('app_settings').select('fx_zar,fx_aed,cat_segments').eq('id',1).single();
+  if(st.data){CFG.zar=+st.data.fx_zar||18.3;CFG.aed=+st.data.fx_aed||3.6725;CATSEG=st.data.cat_segments||{};}
+  var r=await sb.from('home_budget').select('data').eq('id',1).single();
+  if(r.error)console.error(r.error);
+  DATA=(r.data&&r.data.data)||{sa:{},uae:{}};DATA.sa=DATA.sa||{};DATA.uae=DATA.uae||{};
+}
+function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
+async function start(){
+  YM=curYM();
+  document.querySelectorAll('#sides button').forEach(b=>b.onclick=()=>{SIDE=b.dataset.side;document.querySelectorAll('#sides button').forEach(x=>x.classList.toggle('on',x===b));render();loadRef();});
+  document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();loadRef();};
+  document.getElementById('weeks').onchange=e=>{var M=ensureMonth();M.weeks=Math.max(1,Math.min(6,+e.target.value||4));scheduleSave();render();};
+  document.getElementById('wstart').onchange=e=>{var M=ensureMonth();M.weekStart=e.target.value||firstFriday(YM);scheduleSave();render();};
+  document.getElementById('startbal').onchange=e=>{var M=ensureMonth();M.startBal=r2(e.target.value);scheduleSave();};
+  await load();showApp();render();loadRef();setStatus('saved');
+}
+async function gate(){
+  var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;
+  if(!u){document.getElementById('loginwrap').style.display='flex';return;}
+  if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}
+  start();
+}
+document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
+document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
+document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
+gate();
+</script>
