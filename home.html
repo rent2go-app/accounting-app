@@ -35,6 +35,8 @@ table.bud td.num{text-align:right}
 table.bud input.c{width:88px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;text-align:right;font-family:inherit;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
 table.bud input.c:hover{border-color:var(--line)}table.bud input.c:focus{border-color:var(--brand);background:var(--surface);outline:none}
 table.bud input.c.p{color:var(--in)}
+table.bud td.linkedcell{text-align:right;font-weight:700;color:var(--in);background:color-mix(in srgb,var(--in) 7%,var(--surface))}
+.linknote{font-size:10px;font-weight:700;text-transform:none;letter-spacing:0;color:#cfe9d8;margin-left:8px}
 table.bud .mtdcell{text-align:right;font-weight:800;background:color-mix(in srgb,var(--band) 8%,var(--surface));font-variant-numeric:tabular-nums}
 tr.sec td{background:var(--band);color:#fff;font-weight:800;text-transform:uppercase;letter-spacing:.03em;font-size:11.5px;padding:7px 8px;position:sticky;left:0}
 tr.sec td .addi{float:right;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer;font-family:inherit;font-weight:700;text-transform:none;letter-spacing:0}
@@ -77,7 +79,7 @@ td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname i
   <div class="refbox"><div class="l">Funded by owner draws (ledger actual) · <span id="reflbl">—</span></div><div class="v tnum" id="refval">—</div></div>
 </div>
 <div class="tablewrap"><table class="bud" id="tbl"></table></div>
-<p class="hint">Two sides — <b>SA (ZAR)</b> and <b>UAE (AED)</b> — each a weekly home budget with <b>Budget</b> (plan) and <b>Paid</b> (actual) per week and an auto <b>Month-to-date</b>. The <b>INCOME</b> block is the money you draw from the business into home life; the reference above shows what the main ledger actually recorded as owner-draw / home outflow this month (USD → converted at your Settings FX). Amounts are yours to fill in — the structure mirrors your July sheet.</p>
+<p class="hint">Two sides — <b>SA (ZAR)</b> and <b>UAE (AED)</b> — each a weekly home budget with one planning value per week and an auto <b>Month-to-date</b>. On the <b>SA</b> side the <b>INCOME</b> block is <b>fed live from the main ledger's Owner-Draw lines</b> (each draw lands on its actual date, in the right week, converted USD→ZAR at your Settings FX) — so it stays read-only and always matches the ledger. Expense lines are yours to plan/edit.</p>
 </main>
 </div>
 <div id="toastHost"></div>
@@ -112,7 +114,7 @@ function sym(){return SIDE==='uae'?'AED ':'R';}
 function fx(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||18.3);}
 function fmtC(v){v=+v||0;return (v<0?'-':'')+sym()+Math.abs(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
-function newVals(W){var a=[];for(var i=0;i<W;i++)a.push({b:0,p:0});return a;}
+function newVals(W){var a=[];for(var i=0;i<W;i++)a.push(0);return a;}
 function newMonth(side,ym,W){
   W=W||4;
   var sections=[{name:'INCOME',income:true,items:WKDAYS.map(function(d){return {id:uid('i_'),name:d,vals:newVals(W)};})}];
@@ -130,13 +132,33 @@ function ensureMonth(){
   M.weeks=Math.max(1,Math.min(6,+M.weeks||4));
   if(!M.weekStart)M.weekStart=firstFriday(YM);
   // normalise vals length to weeks
-  M.sections.forEach(function(sec){sec.items.forEach(function(it){it.vals=it.vals||[];while(it.vals.length<M.weeks)it.vals.push({b:0,p:0});it.vals.length=M.weeks;it.vals.forEach(function(v){if(v.b==null)v.b=0;if(v.p==null)v.p=0;});});});
+  M.sections.forEach(function(sec){sec.items.forEach(function(it){it.vals=(it.vals||[]).map(function(v){return (v&&typeof v==='object')?(+v.b||+v.p||0):(+v||0);});while(it.vals.length<M.weeks)it.vals.push(0);it.vals.length=M.weeks;});});
   return M;
 }
 function cur(){return DATA[SIDE][YM];}
 function weekCols(M){var out=[];for(var i=0;i<M.weeks;i++){var s=addDays(M.weekStart,i*7);out.push([s,addDays(s,6)]);}return out;}
 function wlabel(c){var a=new Date(c[0]+'T00:00:00'),b=new Date(c[1]+'T00:00:00');var am=a.toLocaleDateString('en',{month:'short'});return a.getDate()+' – '+b.getDate()+' '+am;}
-function secWk(sec,w,f){return sec.items.reduce(function(s,it){return s+(+(it.vals[w]||{})[f]||0);},0);}
+function secWk(sec,w){return sec.items.reduce(function(s,it){return s+(+it.vals[w]||0);},0);}
+// ---- live link: income fed from main-app Owner-Draw lines (SA), mapped by date into week/weekday ----
+async function fetchDraws(ym){
+  var from=ym+'-01',to=ym+'-'+pad(dim(ym)),map={};
+  try{var res=await sb.from('day_blocks').select('day,expenses').gte('day',from).lte('day',to);if(res.error)throw res.error;
+    (res.data||[]).forEach(function(r){var s=0;(r.expenses||[]).forEach(function(l){if((l[2]||'')==='Owner Draw')s+=(+l[1]||0);});if(s)map[r.day]=s;});}catch(e){}
+  return map;
+}
+async function applyLink(M){
+  if(SIDE!=='sa'){M._linked=false;return;}
+  var map=await fetchDraws(YM),fxr=+CFG.zar||16.5,inc=M.sections[0];
+  inc.items.forEach(function(it){it.vals=[];for(var w=0;w<M.weeks;w++)it.vals.push(0);});
+  Object.keys(map).forEach(function(d){
+    var wi=Math.floor((Date.parse(d+'T00:00:00')-Date.parse(M.weekStart+'T00:00:00'))/(7*86400000));
+    if(wi<0)wi=0;if(wi>=M.weeks)wi=M.weeks-1;
+    var k=(new Date(d+'T00:00:00').getDay()+2)%7;
+    inc.items[k].vals[wi]=r2((+inc.items[k].vals[wi]||0)+map[d]*fxr);
+  });
+  M._linked=true;
+}
+async function refresh(){var M=ensureMonth();await applyLink(M);render();loadRef();}
 
 function render(){
   var M=ensureMonth();var W=M.weeks;var cols=weekCols(M);
@@ -145,52 +167,51 @@ function render(){
   document.getElementById('wstart').value=M.weekStart;
   document.getElementById('startbal').value=M.startBal||0;
   var inc=M.sections[0],exps=M.sections.slice(1);
-  var incB=[],incP=[],expB=[],expP=[];
-  for(var w=0;w<W;w++){incB[w]=secWk(inc,w,'b');incP[w]=secWk(inc,w,'p');expB[w]=exps.reduce((s,se)=>s+secWk(se,w,'b'),0);expP[w]=exps.reduce((s,se)=>s+secWk(se,w,'p'),0);}
+  var incA=[],expA=[];
+  for(var w=0;w<W;w++){incA[w]=secWk(inc,w);expA[w]=exps.reduce((s,se)=>s+secWk(se,w),0);}
   var sum=a=>a.reduce((s,x)=>s+x,0);
   // header
   var h='<thead><tr><th class="ln">'+fmtYM(YM)+' · '+sym().trim()+'</th>';
-  cols.forEach(c=>{h+='<th class="wk" colspan="2">'+wlabel(c)+'</th>';});
-  h+='<th class="mtd" colspan="2">MONTH TO DATE</th><th class="ln" style="min-width:34px"></th></tr>';
-  h+='<tr><th class="ln">Line</th>';
-  for(var i=0;i<W;i++)h+='<th>Budget</th><th>Paid</th>';
-  h+='<th>Budget</th><th>Paid</th><th class="ln" style="min-width:34px"></th></tr></thead>';
+  cols.forEach(c=>{h+='<th class="wk">'+wlabel(c)+'</th>';});
+  h+='<th class="mtd">MONTH TO DATE</th><th class="ln" style="min-width:34px"></th></tr></thead>';
   // summary rows
   var body='<tbody>';
-  body+=sumRow('inc','Total Income',incB,incP,sum(incB),sum(incP),W);
-  body+=sumRow('exp','Total Expenses',expB,expP,sum(expB),sum(expP),W);
-  var balB=incB.map((v,i)=>r2(v-expB[i])),balP=incP.map((v,i)=>r2(v-expP[i]));
-  body+=sumRow('bal','Weekly Balance',balB,balP,sum(balB),sum(balP),W);
+  body+=sumRow('inc','Total Income',incA,sum(incA),W);
+  body+=sumRow('exp','Total Expenses',expA,sum(expA),W);
+  var balA=incA.map((v,i)=>r2(v-expA[i]));
+  body+=sumRow('bal','Weekly Balance',balA,sum(balA),W);
   // sections
   M.sections.forEach(function(sec,si){
-    body+='<tr class="sec"><td colspan="'+(W*2+3)+'">'+esc(sec.name)+'<button class="addi" data-addi="'+si+'">+ add line</button></td></tr>';
+    var linkNote=(sec.income&&M._linked)?' <span class="linknote">🔗 fed live from ledger owner-draws (converted to '+sym().trim()+')</span>':'';
+    var addBtn=(sec.income&&M._linked)?'':'<button class="addi" data-addi="'+si+'">+ add line</button>';
+    body+='<tr class="sec"><td colspan="'+(W+3)+'">'+esc(sec.name)+linkNote+addBtn+'</td></tr>';
     sec.items.forEach(function(it,ii){
+      var linkedInc=sec.income&&M._linked;
       body+='<tr><td class="ln iname">'+(sec.income?'<span class="datechip">'+esc(it.name)+'</span>':'<input class="nm" data-nm="'+si+'|'+ii+'" value="'+esc(it.name)+'">')+'</td>';
-      var rb=0,rp=0;
-      for(var w=0;w<W;w++){var v=it.vals[w]||{b:0,p:0};rb+=+v.b||0;rp+=+v.p||0;
-        body+='<td class="num"><input class="c" data-c="'+si+'|'+ii+'|'+w+'|b" value="'+(v.b||0)+'"></td><td class="num"><input class="c p" data-c="'+si+'|'+ii+'|'+w+'|p" value="'+(v.p||0)+'"></td>';}
-      body+='<td class="mtdcell">'+fmtC(rb)+'</td><td class="mtdcell">'+fmtC(rp)+'</td>';
-      body+='<td class="ln" style="min-width:34px">'+(sec.income?'':'<button class="delrow" data-delrow="'+si+'|'+ii+'" title="Remove line">×</button>')+'</td></tr>';
+      var rt=0;
+      for(var w=0;w<W;w++){var v=+it.vals[w]||0;rt+=v;
+        body+=linkedInc?'<td class="num linkedcell tnum">'+(v?fmtC(v):'—')+'</td>':'<td class="num"><input class="c" data-c="'+si+'|'+ii+'|'+w+'" value="'+v+'"></td>';}
+      body+='<td class="mtdcell">'+fmtC(rt)+'</td>';
+      body+='<td class="ln" style="min-width:34px">'+((sec.income)?'':'<button class="delrow" data-delrow="'+si+'|'+ii+'" title="Remove line">×</button>')+'</td></tr>';
     });
-    // section total
-    var tb=[],tp=[];for(var w2=0;w2<W;w2++){tb[w2]=secWk(sec,w2,'b');tp[w2]=secWk(sec,w2,'p');}
+    var tt=[];for(var w2=0;w2<W;w2++)tt[w2]=secWk(sec,w2);
     body+='<tr class="tot"><td class="ln">Total '+esc(sec.name)+'</td>';
-    for(var w3=0;w3<W;w3++)body+='<td class="mtdcell">'+fmtC(tb[w3])+'</td><td class="mtdcell">'+fmtC(tp[w3])+'</td>';
-    body+='<td class="mtdcell">'+fmtC(sum(tb))+'</td><td class="mtdcell">'+fmtC(sum(tp))+'</td><td class="ln"></td></tr>';
+    for(var w3=0;w3<W;w3++)body+='<td class="mtdcell">'+fmtC(tt[w3])+'</td>';
+    body+='<td class="mtdcell">'+fmtC(sum(tt))+'</td><td class="ln"></td></tr>';
   });
   body+='</tbody>';
   document.getElementById('tbl').innerHTML=h+body;
   wire();
 }
-function sumRow(cls,label,arrB,arrP,mtdB,mtdP,W){
+function sumRow(cls,label,arr,mtd,W){
   var s='<tr class="sum '+cls+'"><td class="ln">'+label+'</td>';
-  for(var w=0;w<W;w++)s+='<td class="mtdcell">'+fmtC(arrB[w])+'</td><td class="mtdcell">'+fmtC(arrP[w])+'</td>';
-  s+='<td class="mtdcell">'+fmtC(mtdB)+'</td><td class="mtdcell">'+fmtC(mtdP)+'</td><td class="ln"></td></tr>';
+  for(var w=0;w<W;w++)s+='<td class="mtdcell">'+fmtC(arr[w])+'</td>';
+  s+='<td class="mtdcell">'+fmtC(mtd)+'</td><td class="ln"></td></tr>';
   return s;
 }
 function wire(){
   var M=cur();
-  document.querySelectorAll('input.c').forEach(el=>el.onchange=()=>{var p=el.dataset.c.split('|');M.sections[+p[0]].items[+p[1]].vals[+p[2]][p[3]]=r2(el.value);scheduleSave();render();});
+  document.querySelectorAll('input.c').forEach(el=>el.onchange=()=>{var p=el.dataset.c.split('|');M.sections[+p[0]].items[+p[1]].vals[+p[2]]=r2(el.value);scheduleSave();render();});
   document.querySelectorAll('input.nm').forEach(el=>el.onchange=()=>{var p=el.dataset.nm.split('|');M.sections[+p[0]].items[+p[1]].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-addi]').forEach(el=>el.onclick=()=>{var si=+el.dataset.addi;M.sections[si].items.push({id:uid('e_'),name:'',vals:newVals(M.weeks)});scheduleSave();render();});
   document.querySelectorAll('[data-delrow]').forEach(el=>el.onclick=()=>{var p=el.dataset.delrow.split('|');if(!confirm('Remove this line?'))return;M.sections[+p[0]].items.splice(+p[1],1);scheduleSave();render();});
@@ -217,12 +238,12 @@ async function load(){
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
 async function start(){
   YM=curYM();
-  document.querySelectorAll('#sides button').forEach(b=>b.onclick=()=>{SIDE=b.dataset.side;document.querySelectorAll('#sides button').forEach(x=>x.classList.toggle('on',x===b));render();loadRef();});
-  document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();loadRef();};
-  document.getElementById('weeks').onchange=e=>{var M=ensureMonth();M.weeks=Math.max(1,Math.min(6,+e.target.value||4));scheduleSave();render();};
-  document.getElementById('wstart').onchange=e=>{var M=ensureMonth();M.weekStart=e.target.value||firstFriday(YM);scheduleSave();render();};
+  document.querySelectorAll('#sides button').forEach(b=>b.onclick=()=>{SIDE=b.dataset.side;document.querySelectorAll('#sides button').forEach(x=>x.classList.toggle('on',x===b));refresh();});
+  document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();refresh();};
+  document.getElementById('weeks').onchange=e=>{var M=ensureMonth();M.weeks=Math.max(1,Math.min(6,+e.target.value||4));scheduleSave();refresh();};
+  document.getElementById('wstart').onchange=e=>{var M=ensureMonth();M.weekStart=e.target.value||firstFriday(YM);scheduleSave();refresh();};
   document.getElementById('startbal').onchange=e=>{var M=ensureMonth();M.startBal=r2(e.target.value);scheduleSave();};
-  await load();showApp();render();loadRef();setStatus('saved');
+  await load();showApp();await refresh();setStatus('saved');
 }
 async function gate(){
   var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;
