@@ -80,10 +80,9 @@ td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname i
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="sub">· My Personal Budget</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="sub">· My Budget · USD</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
 <div class="ctl">
-  <div class="sides" id="sides"><button data-side="sa" class="on">🇿🇦 SA · ZAR</button><button data-side="uae">🇦🇪 UAE · AED</button></div>
   <label>Month</label><input type="month" id="ym">
   <label>Weeks</label><input type="number" id="weeks" min="1" max="6" style="width:56px">
   <label>Week 1 starts</label><input type="date" id="wstart">
@@ -92,7 +91,7 @@ td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname i
 </div>
 <div class="hdash" id="hdash"></div>
 <div class="tablewrap"><table class="bud" id="tbl"></table></div>
-<p class="hint">Your own <b>private</b> weekly budget — only you can see or edit it. Two currency sides (<b>ZAR / AED</b>), one planning value per week, an auto <b>Month-to-date</b>, and a USD line using each week's rate. Add income and expense lines under any section, rename or remove anything, add your own months, and set each week's exchange rate (⟳ auto-fetches). Nothing here touches anyone else's budget.</p>
+<p class="hint">Your own <b>private</b> weekly budget in <b>USD</b> — only you can see or edit it. One planning value per week with an auto <b>Month-to-date</b>. Add income and expense lines under any section, rename or remove anything, and add your own months. Nothing here touches anyone else's budget.</p>
 </main>
 </div>
 <div id="toastHost"></div>
@@ -121,9 +120,9 @@ let CFG={zar:18.3,aed:3.6725},CATSEG={},WEEKLY={};
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(m){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+m+'</div>';setTimeout(()=>{h.innerHTML='';},2400);}
 function scheduleSave(){setStatus('saving');clearTimeout(SAVET);SAVET=setTimeout(save,600);}
-async function save(){try{DATA.weekly=WEEKLY;DATA.cfg={zar:CFG.zar,aed:CFG.aed};var r=await sb.from('personal_budgets').upsert({user_id:UID,data:DATA,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
+async function save(){try{if(!UID){var _s=await sb.auth.getSession();UID=(_s.data.session&&_s.data.session.user&&_s.data.session.user.id)||UID;}if(!UID){setStatus('error');return;}var r=await sb.from('personal_budgets').upsert({user_id:UID,data:DATA,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
 function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1);}
-function sym(){return SIDE==='uae'?'AED ':'R';}
+function sym(){return '$';}
 function fx(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||18.3);}
 function curcode(){return SIDE==='uae'?'AED':'ZAR';}
 function defRate(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||16.5);}
@@ -183,7 +182,7 @@ function render(){
     var uInc=usdSum(incA),uExp=usdSum(expA);
     var wlab=(inMonth?'This week':'Week '+(wi+1))+' · '+rng+' · @'+(wr[wi]||defRate());
     var ml=fmtYM(YM);
-    function card(l,v,usdStr,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hu">≈ '+usdStr+' USD</div><div class="hs">'+sub+'</div></div>';}
+    function card(l,v,usdStr,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hs">'+sub+'</div></div>';}
     var el=document.getElementById('hdash');if(el)el.innerHTML=
       card('Weekly income',wInc,usdc(wInc,wr[wi]),wlab,'pos',1)+
       card('Weekly expenses',wExp,usdc(wExp,wr[wi]),wlab,'neg',1)+
@@ -194,7 +193,7 @@ function render(){
   })();
   // header
   var h='<thead><tr><th class="ln">'+fmtYM(YM)+' · '+sym().trim()+'</th>';
-  cols.forEach(function(c,w){var f=addDays(M.weekStart,7*w);var rt=rateForFriday(f);h+='<th class="wk">'+wlabel(c)+'<div class="wkrate"><input class="wkr" data-f="'+f+'" value="'+rt+'" title="'+curcode()+' per USD for this week"><button class="wkfetch" data-f="'+f+'" title="Auto-fetch rate">⟳</button></div></th>';});
+  cols.forEach(function(c){h+='<th class="wk">'+wlabel(c)+'</th>';});
   h+='<th class="mtd">MONTH TO DATE</th><th class="ln" style="min-width:34px"></th></tr></thead>';
   // summary rows
   var body='<tbody>';
@@ -253,7 +252,7 @@ async function loadRef(){
 }
 
 async function load(){
-  var u=(await sb.auth.getUser()).data.user;UID=u?u.id:null;
+  var s=await sb.auth.getSession();var u=(s.data.session&&s.data.session.user)||null;if(!u){try{u=(await sb.auth.getUser()).data.user;}catch(e){}}UID=u?u.id:null;
   var _rv=document.getElementById('refval');if(_rv)_rv.textContent=u?u.email:'—';
   var r=await sb.from('personal_budgets').select('data').eq('user_id',UID).maybeSingle();
   if(r.error)console.error(r.error);
