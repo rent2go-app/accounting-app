@@ -1,0 +1,237 @@
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M9%2041c0-1%201-2%202-3l3-1%204-8c1-2%202-3%205-3h18c3%200%204%201%205%203l4%208%203%201c1%201%202%202%202%203v5c0%201-1%202-2%202h-3a5%205%200%200%201-10%200H23a5%205%200%200%201-10%200h-2c-1%200-2-1-2-2z%22%20fill%3D%22%230f8a4d%22/%3E%3C/svg%3E">
+<title>Owners Programme — Rent 2 Go</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--gold:#eab54e;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--gold:#e6c458}}
+:root[data-theme=light]{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a}
+:root[data-theme=dark]{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;line-height:1.4}
+.tnum{font-variant-numeric:tabular-nums}
+.topbar{display:flex;align-items:center;gap:14px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brand{font-weight:800;font-size:17px}.brand span{color:var(--brand)}
+.sub{font-size:12.5px;color:var(--muted);font-weight:700}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.pri:hover{color:#fff;opacity:.92}
+.btn.danger{color:var(--out);border-color:var(--line)}.btn.danger:hover{border-color:var(--out)}
+.wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);position:sticky;top:56px;z-index:15}
+.ctl label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+input[type=month],input[type=text],input[type=number]{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+.grand{margin-left:auto;text-align:right}.grand .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}.grand .v{font-size:24px;font-weight:800;color:var(--in);letter-spacing:-.01em}
+.owner{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-top:16px;overflow:hidden}
+.ohead{display:flex;align-items:center;gap:12px;padding:14px 18px;background:linear-gradient(0deg,color-mix(in srgb,var(--brand) 6%,var(--surface)),var(--surface));border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ohead .oname{font-weight:800;font-size:16px;border:1px solid transparent;background:transparent;color:var(--text);padding:4px 6px;border-radius:8px;min-width:160px}
+.ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
+.pill{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.otot{margin-left:auto;text-align:right}.otot .l{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)}.otot .v{font-size:20px;font-weight:800;color:var(--in)}
+.cars{padding:6px 12px 12px}
+.crow{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:none}
+.crow .cname{width:100%}
+.tiers{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.tiers button{padding:6px 10px;border:none;background:var(--surface);color:var(--muted);font-weight:700;cursor:pointer;font-family:inherit;font-size:12px;border-left:1px solid var(--line)}
+.tiers button:first-child{border-left:none}.tiers button.on{background:var(--brand);color:#fff}
+.crow .days{width:74px;text-align:center}
+.crow .fee{font-weight:800;text-align:right;min-width:88px;color:var(--in)}
+.crow .fee.pro{color:var(--gold)}
+.hint{color:var(--muted);font-size:12px}
+.chdr{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;padding:6px 6px 2px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--muted);font-weight:800;font-family:inherit}
+.iconbtn:hover{border-color:var(--out);color:var(--out)}
+.ofoot{padding:10px 16px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}
+.loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
+.logincard h1{margin:0 0 4px;font-size:22px}.logincard h1 span{color:var(--brand)}
+.logincard p{margin:0 0 16px;color:var(--muted);font-size:13px}
+.logincard label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.logincard input{width:100%}
+.logincard button{width:100%;margin-top:16px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+.err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
+.modal{position:fixed;inset:0;background:rgba(9,12,18,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:640px;max-width:100%;max-height:88vh;display:flex;flex-direction:column}
+.mhd{padding:16px 20px;border-bottom:1px solid var(--line);font-weight:800;font-size:16px}
+.mbody{padding:8px 20px;overflow:auto}
+.mfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+table.prev{width:100%;border-collapse:collapse;font-size:13px}
+table.prev th{text-align:left;font-size:10px;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+table.prev td{padding:6px 8px;border-bottom:1px solid var(--line)}
+table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:60}
+.savestate{font-size:12px;font-weight:700;color:var(--muted)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><h1>Rent <span>2</span> Go</h1><p>Owners Programme — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+
+<div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
+
+<div id="appwrap" style="display:none">
+<div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="sub">· Owners Programme Payments</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<main class="wrap">
+<div class="ctl">
+  <label>Working month</label><input type="month" id="ym">
+  <label>Standard fee</label><span class="pill">$500 / car · Preferred $350 / $250</span>
+  <button class="btn" id="addOwner">+ Add owner</button>
+  <button class="btn pri" id="pushBtn">⇪ Preview &amp; push to ledger</button>
+  <div class="grand"><div class="l">Programme total · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div></div>
+</div>
+<div id="owners"></div>
+<p class="hint" style="margin-top:18px">Each owner's monthly total = sum of their cars' fees, prorated daily by <b>days available ÷ days in the month</b>. <b>Push</b> writes each owner's total as an income line in the ledger on their payout day (25th or 30th), tagged with their category and a hidden source ref so re-pushing <b>updates</b> the same month instead of duplicating.</p>
+</main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toastHost"></div>
+
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const ADMINS=['gorentaride@gmail.com'];
+const TIERS=[['std','Standard $500',500],['p350','Preferred $350',350],['p250','Preferred $250',250]];
+const pad=n=>String(n).padStart(2,'0');
+const r2=n=>Math.round((+n||0)*100)/100;
+const fmt=a=>{const n=(+a||0);return (n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})};
+const uid=p=>p+Math.random().toString(36).slice(2,9);
+function dim(ym){var p=ym.split('-');return new Date(+p[0],+p[1],0).getDate();}
+function tierOf(rate){var t=TIERS.find(x=>x[2]===+rate);return t?t[0]:'std';}
+function carFee(car,ym){var d=dim(ym);var a=(car.days&&car.days[ym]!=null)?+car.days[ym]:d;a=Math.max(0,Math.min(a,d));return r2((+car.rate||0)*a/d);}
+function carDays(car,ym){var d=dim(ym);return (car.days&&car.days[ym]!=null)?Math.max(0,Math.min(+car.days[ym],d)):d;}
+function ownerTotal(o,ym){return r2((o.cars||[]).reduce((s,c)=>s+carFee(c,ym),0));}
+
+let STATE=[];let YM='';let SAVET=null;
+function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
+function toast(msg){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+msg+'</div>';setTimeout(()=>{h.innerHTML='';},2600);}
+
+function scheduleSave(){setStatus('saving');clearTimeout(SAVET);SAVET=setTimeout(save,600);}
+async function save(){try{var r=await sb.from('owners_program').update({owners:STATE,updated_at:new Date().toISOString()}).eq('id',1);if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
+
+function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1);}
+
+function render(){
+  var host=document.getElementById('owners');
+  document.getElementById('ymlbl').textContent=fmtYM(YM);
+  if(!STATE.length){host.innerHTML='<div class="owner"><div class="empty">No owners yet.<br><br><button class="btn pri" onclick="document.getElementById(\'addOwner\').click()">+ Add your first owner</button></div></div>';document.getElementById('grand').textContent='$0.00';return;}
+  var grand=0;
+  host.innerHTML=STATE.map(function(o,oi){
+    var ot=ownerTotal(o,YM);grand+=ot;
+    var carsHTML=(o.cars||[]).map(function(c,ci){
+      var full=dim(YM),days=carDays(c,YM),fee=carFee(c,YM),pro=days<full;
+      var tiers=TIERS.map(t=>'<button class="'+(tierOf(c.rate)===t[0]?'on':'')+'" data-tier="'+oi+'|'+ci+'|'+t[2]+'">'+t[1].replace('Standard ','').replace('Preferred ','')+'</button>').join('');
+      return '<div class="crow"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car / plate">'
+        +'<div class="tiers">'+tiers+'</div>'
+        +'<input class="days tnum" type="number" min="0" max="'+full+'" data-cd="'+oi+'|'+ci+'" value="'+days+'" title="Days available (of '+full+')">'
+        +'<span class="pill">/ '+full+'d</span>'
+        +'<span class="fee tnum'+(pro?' pro':'')+'" title="'+(pro?'Prorated '+days+'/'+full+' days':'Full month')+'">'+fmt(fee)+'</span>'
+        +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></div>';
+    }).join('');
+    return '<div class="owner"><div class="ohead">'
+      +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
+      +'<span class="pill">Pays on</span><select data-oday="'+oi+'"><option value="25"'+(+o.day===25?' selected':'')+'>25th</option><option value="30"'+(+o.day!==25?' selected':'')+'>30th</option></select>'
+      +'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:170px" title="Income category tag on the ledger">'
+      +'<div class="otot"><div class="l">'+((o.cars||[]).length)+' car'+((o.cars||[]).length===1?'':'s')+' · month total</div><div class="v tnum">'+fmt(ot)+'</div></div>'
+      +'</div>'
+      +'<div class="cars">'+((o.cars||[]).length?'<div class="chdr"><span>Car / plate</span><span>Rate</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>':'<div class="hint" style="padding:10px 6px">No cars in this owner\'s fleet yet.</div>')+carsHTML+'</div>'
+      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add car</button><span class="spacer"></span><button class="btn danger" data-delowner="'+oi+'">Remove owner</button></div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('grand').textContent=fmt(r2(grand));
+  wire();
+}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtYM(ym){if(!ym)return '—';var p=ym.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en',{month:'long',year:'numeric'});}
+
+function wire(){
+  document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.on].name=el.value;scheduleSave();});
+  document.querySelectorAll('[data-oday]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.oday].day=+el.value;scheduleSave();});
+  document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
+  document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
+  document.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{var p=el.dataset.cd.split('|');var c=STATE[+p[0]].cars[+p[1]];c.days=c.days||{};c.days[YM]=Math.max(0,Math.min(+el.value||0,dim(YM)));scheduleSave();render();});
+  document.querySelectorAll('[data-tier]').forEach(el=>el.onclick=()=>{var p=el.dataset.tier.split('|');STATE[+p[0]].cars[+p[1]].rate=+p[2];scheduleSave();render();});
+  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('c_'),name:'',rate:500,days:{}});scheduleSave();render();});
+  document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
+  document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
+}
+
+// ---- push to ledger ----
+function buildPush(ym){
+  var dm=dim(ym),lines=[];
+  STATE.forEach(function(o){
+    var total=ownerTotal(o,ym);if(total<=0)return;
+    var day=Math.min(+o.day===25?25:30,dm);
+    var date=ym+'-'+pad(day);
+    var n=(o.cars||[]).length;
+    var desc=(o.name||'Owner')+' — Owners Programme ('+n+' car'+(n===1?'':'s')+')';
+    lines.push({date:date,owner:o.name||'Owner',cars:n,amt:total,line:[desc,total,(o.tag||'Owners Programme'),'','op:'+(o.id||uid('o_'))]});
+  });
+  return lines;
+}
+function openPush(){
+  var ym=YM,lines=buildPush(ym);
+  var dm=dim(ym);var dates=[ym+'-25',ym+'-'+pad(Math.min(30,dm))];
+  var total=r2(lines.reduce((s,l)=>s+l.amt,0));
+  var rows=lines.length?lines.map(l=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.owner)+'</td><td>'+l.cars+'</td><td class="n">'+fmt(l.amt)+'</td></tr>').join(''):'<tr><td colspan="4" class="hint" style="padding:14px">Nothing to push — no owner has a positive total this month.</td></tr>';
+  var html='<div class="modal"><div class="mcard"><div class="mhd">Push to ledger · '+fmtYM(ym)+'</div>'
+    +'<div class="mbody"><p class="hint">This will set the Owners-Programme income lines on <b>'+esc(dates.join(' and '))+'</b>. Existing programme lines on those days are replaced (never duplicated); your other income, deposits and expenses are untouched.</p>'
+    +'<table class="prev"><thead><tr><th>Ledger day</th><th>Owner</th><th>Cars</th><th>Income</th></tr></thead><tbody>'+rows
+    +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;padding:8px">Total pushed</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(total)+'</td></tr></tfoot></table></div>'
+    +'<div class="mfoot"><button class="btn" id="pxCancel">Cancel</button><button class="btn pri" id="pxGo"'+(lines.length?'':' disabled')+'>Confirm &amp; write '+fmt(total)+'</button></div></div></div>';
+  document.getElementById('modalHost').innerHTML=html;
+  document.getElementById('pxCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
+  document.getElementById('pxGo').onclick=()=>doPush(ym,lines,dates);
+}
+async function doPush(ym,lines,dates){
+  var go=document.getElementById('pxGo');go.disabled=true;go.textContent='Writing…';
+  try{
+    await save(); // persist config first
+    var res=await sb.from('day_blocks').select('day,deposits,income,expenses').in('day',dates);
+    if(res.error)throw res.error;
+    var ex={};(res.data||[]).forEach(r=>ex[r.day]=r);
+    var byDate={};lines.forEach(l=>{(byDate[l.date]=byDate[l.date]||[]).push(l.line);});
+    var created=0;
+    var ups=dates.map(function(date){
+      var row=ex[date];if(!row){created++;row={day:date,deposits:[],income:[],expenses:[]};}
+      var inc=(row.income||[]).filter(l=>!(l[4]&&String(l[4]).indexOf('op:')===0));
+      inc=inc.concat(byDate[date]||[]);
+      return {day:date,deposits:row.deposits||[],income:inc,expenses:row.expenses||[],updated_at:new Date().toISOString()};
+    });
+    var r=await sb.from('day_blocks').upsert(ups,{onConflict:'day'});
+    if(r.error)throw r.error;
+    document.getElementById('modalHost').innerHTML='';
+    toast('Pushed '+fmt(r2(lines.reduce((s,l)=>s+l.amt,0)))+' to '+fmtYM(ym)+(created?(' · '+created+' new ledger day'+(created===1?'':'s')+' created'):''));
+  }catch(e){console.error(e);go.disabled=false;go.textContent='Retry';alert('Push failed: '+(e.message||e));}
+}
+
+// ---- boot ----
+async function load(){
+  var r=await sb.from('owners_program').select('owners').eq('id',1).single();
+  if(r.error){console.error(r.error);}
+  STATE=(r.data&&r.data.owners)||[];
+  // normalise
+  STATE.forEach(o=>{o.id=o.id||uid('o_');o.day=+o.day===25?25:(+o.day===30?30:25);o.tag=o.tag||'Owners Programme';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',rate:+c.rate||500,days:c.days||{}}));});
+}
+function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
+async function start(){
+  YM=curYM();document.getElementById('ym').value=YM;
+  document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();};
+  document.getElementById('addOwner').onclick=()=>{STATE.push({id:uid('o_'),name:'',day:25,tag:'Owners Programme',cars:[]});scheduleSave();render();document.querySelector('.owner:last-child .oname')&&document.querySelector('.owner:last-child .oname').focus();};
+  document.getElementById('pushBtn').onclick=openPush;
+  await load();showApp();render();setStatus('saved');
+}
+async function gate(){
+  var s=await sb.auth.getSession();
+  var u=s.data.session&&s.data.session.user;
+  if(!u){document.getElementById('loginwrap').style.display='flex';return;}
+  if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to programme admins.';return;}
+  start();
+}
+document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
+document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
+document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
+gate();
+</script>
