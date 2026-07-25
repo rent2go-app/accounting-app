@@ -29,7 +29,8 @@ input[type=month],input[type=number],input[type=text],input[type=date]{padding:7
 .hcard .hl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 .hcard .hv{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 .hcard .hv.pos{color:var(--in)}.hcard .hv.neg{color:var(--out)}
-.hcard .hs{font-size:11px;color:var(--muted);margin-top:2px}
+.hcard .hu{font-size:12px;font-weight:700;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
+.hcard .hs{font-size:11px;color:var(--muted);margin-top:3px}
 .savestate{font-size:12px;font-weight:700;color:var(--muted)}
 .tablewrap{margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:var(--surface)}
 table.bud{border-collapse:collapse;width:100%;font-size:13px;min-width:900px}
@@ -121,6 +122,7 @@ function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1)
 function sym(){return SIDE==='uae'?'AED ':'R';}
 function fx(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||18.3);}
 function fmtC(v){v=+v||0;return (v<0?'-':'')+sym()+Math.abs(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function usdc(v){var u=(+v||0)/(fx()||1);return (u<0?'-$':'$')+Math.abs(u).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
 function newVals(W){var a=[];for(var i=0;i<W;i++)a.push(0);return a;}
 function newMonth(side,ym,W){
@@ -188,7 +190,7 @@ function render(){
     var tInc=sum(incA),tExp=sum(expA),tBal=r2(tInc-tExp);
     var wlab=(inMonth?'This week':'Week '+(wi+1))+' · '+rng;
     var ml=fmtYM(YM);
-    function card(l,v,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hs">'+sub+'</div></div>';}
+    function card(l,v,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hu">≈ '+usdc(v)+' USD</div><div class="hs">'+sub+'</div></div>';}
     var el=document.getElementById('hdash');if(el)el.innerHTML=
       card('Weekly income',wInc,wlab,'pos',1)+
       card('Weekly expenses',wExp,wlab,'neg',1)+
