@@ -38,6 +38,10 @@ table.bud th,table.bud td{border-bottom:1px solid var(--line);border-right:1px s
 table.bud th{background:var(--surface-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;text-align:center}
 table.bud th.ln,table.bud td.ln{text-align:left;position:sticky;left:0;background:var(--surface);z-index:2;min-width:210px}
 table.bud th.wk{color:var(--text);background:color-mix(in srgb,var(--brand) 10%,var(--surface-2))}
+.wkrate{display:flex;gap:3px;align-items:center;justify-content:center;margin-top:4px}
+.wkrate .wkr{width:56px;padding:2px 4px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--text);font-size:11px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums}
+.wkrate .wkfetch{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:5px;cursor:pointer;font-size:11px;padding:2px 5px;font-family:inherit;line-height:1}
+.wkrate .wkfetch:hover{border-color:var(--brand);color:var(--brand)}
 table.bud th.mtd{color:#fff;background:var(--band)}
 table.bud td.num{text-align:right}
 table.bud input.c{width:88px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;text-align:right;font-family:inherit;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
@@ -112,7 +116,7 @@ const SA_HOME=['House Rent','Rent Savings','Lawyers fees','Wood','Trackers for R
 const HOME_CATS=['Owner Draw','SA Salaries','School & Education','Rent & Housing','Groceries & Household','Allowances','Utilities','Home & Personal','Savings & Moving'];
 
 let DATA={sa:{},uae:{}},SIDE='sa',YM='',SAVET=null;
-let CFG={zar:18.3,aed:3.6725},CATSEG={};
+let CFG={zar:18.3,aed:3.6725},CATSEG={},WEEKLY={};
 
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(m){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+m+'</div>';setTimeout(()=>{h.innerHTML='';},2400);}
@@ -121,8 +125,17 @@ async function save(){try{var r=await sb.from('home_budget').update({data:DATA,u
 function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1);}
 function sym(){return SIDE==='uae'?'AED ':'R';}
 function fx(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||18.3);}
+function curcode(){return SIDE==='uae'?'AED':'ZAR';}
+function defRate(){return SIDE==='uae'?(+CFG.aed||3.6725):(+CFG.zar||16.5);}
+function rateForFriday(f){var t=WEEKLY[curcode()];return (t&&t[f]!=null&&t[f]!=='')?+t[f]:defRate();}
 function fmtC(v){v=+v||0;return (v<0?'-':'')+sym()+Math.abs(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function usdc(v){var u=(+v||0)/(fx()||1);return (u<0?'-$':'$')+Math.abs(u).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtUSD(u){u=+u||0;return (u<0?'-$':'$')+Math.abs(u).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function usdc(v,rate){return fmtUSD((+v||0)/((rate||defRate())||1));}
+async function fetchRate(dateISO,code){
+  if(code==='AED')return 3.6725;
+  try{var r=await fetch('https://api.frankfurter.app/'+dateISO+'?from=USD&to=ZAR');if(!r.ok)throw 0;var j=await r.json();return (j.rates&&j.rates.ZAR)?+j.rates.ZAR:null;}catch(e){return null;}
+}
+async function saveRates(){try{await sb.from('app_settings').update({fx_weekly:WEEKLY,updated_at:new Date().toISOString()}).eq('id',1);}catch(e){console.error(e);}}
 
 function newVals(W){var a=[];for(var i=0;i<W;i++)a.push(0);return a;}
 function newMonth(side,ym,W){
@@ -158,13 +171,14 @@ async function fetchDraws(ym){
 }
 async function applyLink(M){
   if(SIDE!=='sa'){M._linked=false;return;}
-  var map=await fetchDraws(YM),fxr=+CFG.zar||16.5,inc=M.sections[0];
+  var map=await fetchDraws(YM),inc=M.sections[0];
   inc.items.forEach(function(it){it.vals=[];for(var w=0;w<M.weeks;w++)it.vals.push(0);});
   Object.keys(map).forEach(function(d){
     var wi=Math.floor((Date.parse(d+'T00:00:00')-Date.parse(M.weekStart+'T00:00:00'))/(7*86400000));
     if(wi<0)wi=0;if(wi>=M.weeks)wi=M.weeks-1;
     var k=(new Date(d+'T00:00:00').getDay()+2)%7;
-    inc.items[k].vals[wi]=r2((+inc.items[k].vals[wi]||0)+map[d]*fxr);
+    var rate=rateForFriday(addDays(M.weekStart,7*wi));
+    inc.items[k].vals[wi]=r2((+inc.items[k].vals[wi]||0)+map[d]*rate);
   });
   M._linked=true;
 }
@@ -182,26 +196,29 @@ function render(){
   var sum=a=>a.reduce((s,x)=>s+x,0);
   // top dashboard — weekly (current week by today's date) + month totals
   (function(){
+    var wr=[];for(var w=0;w<W;w++)wr[w]=rateForFriday(addDays(M.weekStart,7*w));
     var now=new Date();var ti=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
     var wi=Math.floor((Date.parse(ti+'T00:00:00')-Date.parse(M.weekStart+'T00:00:00'))/(7*86400000));
     var inMonth=ti.slice(0,7)===YM;if(wi<0)wi=0;if(wi>=W)wi=W-1;
     var rng=cols[wi]?wlabel(cols[wi]):'';
     var wInc=incA[wi]||0,wExp=expA[wi]||0,wBal=r2(wInc-wExp);
     var tInc=sum(incA),tExp=sum(expA),tBal=r2(tInc-tExp);
-    var wlab=(inMonth?'This week':'Week '+(wi+1))+' · '+rng;
+    var usdSum=function(arr){var u=0;for(var w=0;w<W;w++)u+=(arr[w]||0)/(wr[w]||1);return u;};
+    var uInc=usdSum(incA),uExp=usdSum(expA);
+    var wlab=(inMonth?'This week':'Week '+(wi+1))+' · '+rng+' · @'+(wr[wi]||defRate());
     var ml=fmtYM(YM);
-    function card(l,v,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hu">≈ '+usdc(v)+' USD</div><div class="hs">'+sub+'</div></div>';}
+    function card(l,v,usdStr,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hu">≈ '+usdStr+' USD</div><div class="hs">'+sub+'</div></div>';}
     var el=document.getElementById('hdash');if(el)el.innerHTML=
-      card('Weekly income',wInc,wlab,'pos',1)+
-      card('Weekly expenses',wExp,wlab,'neg',1)+
-      card('Weekly balance',wBal,wlab,wBal>=0?'pos':'neg',1)+
-      card('Total income',tInc,ml+' · month',(tInc>=0?'pos':''))+
-      card('Total expenses',tExp,ml+' · month','neg')+
-      card('Month balance',tBal,ml+' · month',tBal>=0?'pos':'neg');
+      card('Weekly income',wInc,usdc(wInc,wr[wi]),wlab,'pos',1)+
+      card('Weekly expenses',wExp,usdc(wExp,wr[wi]),wlab,'neg',1)+
+      card('Weekly balance',wBal,usdc(wBal,wr[wi]),wlab,wBal>=0?'pos':'neg',1)+
+      card('Total income',tInc,fmtUSD(uInc),ml+' · month','pos')+
+      card('Total expenses',tExp,fmtUSD(uExp),ml+' · month','neg')+
+      card('Month balance',tBal,fmtUSD(uInc-uExp),ml+' · month',(uInc-uExp)>=0?'pos':'neg');
   })();
   // header
   var h='<thead><tr><th class="ln">'+fmtYM(YM)+' · '+sym().trim()+'</th>';
-  cols.forEach(c=>{h+='<th class="wk">'+wlabel(c)+'</th>';});
+  cols.forEach(function(c,w){var f=addDays(M.weekStart,7*w);var rt=rateForFriday(f);h+='<th class="wk">'+wlabel(c)+'<div class="wkrate"><input class="wkr" data-f="'+f+'" value="'+rt+'" title="'+curcode()+' per USD for this week"><button class="wkfetch" data-f="'+f+'" title="Auto-fetch rate">⟳</button></div></th>';});
   h+='<th class="mtd">MONTH TO DATE</th><th class="ln" style="min-width:34px"></th></tr></thead>';
   // summary rows
   var body='<tbody>';
@@ -244,6 +261,8 @@ function wire(){
   document.querySelectorAll('input.nm').forEach(el=>el.onchange=()=>{var p=el.dataset.nm.split('|');M.sections[+p[0]].items[+p[1]].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-addi]').forEach(el=>el.onclick=()=>{var si=+el.dataset.addi;M.sections[si].items.push({id:uid('e_'),name:'',vals:newVals(M.weeks)});scheduleSave();render();});
   document.querySelectorAll('[data-delrow]').forEach(el=>el.onclick=()=>{var p=el.dataset.delrow.split('|');if(!confirm('Remove this line?'))return;M.sections[+p[0]].items.splice(+p[1],1);scheduleSave();render();});
+  document.querySelectorAll('.wkr').forEach(el=>el.onchange=()=>{var f=el.dataset.f;WEEKLY[curcode()]=WEEKLY[curcode()]||{};WEEKLY[curcode()][f]=+el.value||defRate();saveRates();refresh();});
+  document.querySelectorAll('.wkfetch').forEach(el=>el.onclick=async()=>{var f=el.dataset.f;var t=el.textContent;el.textContent='…';var r=await fetchRate(f,curcode());el.textContent=t;if(r){WEEKLY[curcode()]=WEEKLY[curcode()]||{};WEEKLY[curcode()][f]=r2(r);saveRates();refresh();}else{alert('Could not auto-fetch a rate for the week of '+f+'. Enter it manually.');}});
 }
 
 async function loadRef(){
@@ -258,8 +277,8 @@ async function loadRef(){
 }
 
 async function load(){
-  var st=await sb.from('app_settings').select('fx_zar,fx_aed,cat_segments').eq('id',1).single();
-  if(st.data){CFG.zar=+st.data.fx_zar||18.3;CFG.aed=+st.data.fx_aed||3.6725;CATSEG=st.data.cat_segments||{};}
+  var st=await sb.from('app_settings').select('fx_zar,fx_aed,cat_segments,fx_weekly').eq('id',1).single();
+  if(st.data){CFG.zar=+st.data.fx_zar||18.3;CFG.aed=+st.data.fx_aed||3.6725;CATSEG=st.data.cat_segments||{};WEEKLY=st.data.fx_weekly||{};}
   var r=await sb.from('home_budget').select('data').eq('id',1).single();
   if(r.error)console.error(r.error);
   DATA=(r.data&&r.data.data)||{sa:{},uae:{}};DATA.sa=DATA.sa||{};DATA.uae=DATA.uae||{};

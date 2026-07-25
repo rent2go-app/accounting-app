@@ -263,7 +263,7 @@ function showApp(){document.getElementById('loginwrap').style.display='none';doc
 async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}showApp();runApp();}
 async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){showApp();runApp();}else{showLogin();}}
 async function runApp(){
-let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null;
+let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={};
 async function load(){
   var res=await sb.from('day_blocks').select('*');
   if(res.error){setStatus('error');console.error(res.error);}
@@ -272,7 +272,7 @@ async function load(){
   var rows=res.data||[];MD={};rows.forEach(function(r){MD[r.day]={d:(r.deposits||[]).map(Number),j:(r.income||[]),e:(r.expenses||[])};});
   for(var d in MD){MD[d].j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});MD[d].e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(d<=TODAY);if(l.length<5)l.push('');});}
   DK=Object.keys(MD).sort();
-  if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;}
+  if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
   LASTOPEN=OPEN;LASTFX=JSON.stringify({z:CFG.zar,a:CFG.aed,s:CFG.sacur});LASTCATSEG=JSON.stringify(CATSEG);LASTSAL=OWNERSAL;LASTSYNC={};for(var d2 in MD)LASTSYNC[d2]=JSON.stringify(MD[d2]);
   setStatus('saved');
 }
@@ -291,7 +291,9 @@ const TODAY=(function(){var _n=new Date();return _n.getFullYear()+'-'+String(_n.
 const CFG={zar:18.3,aed:3.6725,sacur:'ZAR'};
 const saveCfg=()=>{scheduleFlush();};
 const saRate=()=>CFG.sacur==='AED'?+CFG.aed:+CFG.zar;const saSym=()=>CFG.sacur==='AED'?'AED ':'R';
-const saChip=v=>'<span class="rchip tnum" title="'+CFG.sacur+' @ '+saRate()+'/USD">'+saSym()+(v*saRate()).toLocaleString('en',{maximumFractionDigits:0})+'</span>';
+const weekKey=d=>{var dt=new Date(d+'T00:00:00');var back=(dt.getDay()-5+7)%7;dt.setDate(dt.getDate()-back);return isod(dt);};
+const rateFor=d=>{var t=WEEKLY[CFG.sacur];var k=weekKey(d);return (t&&t[k]!=null&&t[k]!=='')?+t[k]:saRate();};
+const saChip=(v,d)=>{var rt=d?rateFor(d):saRate();return '<span class="rchip tnum" title="'+CFG.sacur+' @ '+rt+'/USD'+(d?' (week of '+weekKey(d)+')':'')+'">'+saSym()+(v*rt).toLocaleString('en',{maximumFractionDigits:0})+'</span>';};
 const SEGS=[
  {k:'blue',t:'🚗 Vehicle & Business Operating Costs',add:'Maintenance & Repairs',al:'+ operating cost',cats:['Staff & Payroll','Owner Payouts','Maintenance & Repairs','Fuel & Oil','Tyres & Brakes','Servicing','Licensing & Compliance','Insurance','Subscriptions & Software','Financing & Fees']},
  {k:'home',t:'🏠 Home & Personal / Owner’s Draws',add:'Owner Draw',al:'+ home / draw',cats:['Owner Draw','SA Salaries','School & Education','Rent & Housing','Groceries & Household','Allowances','Utilities','Home & Personal','Savings & Moving']},
@@ -339,7 +341,7 @@ function rangeFor(){if(customRange)return customRange;const a=new Date(anchor+'T
  const q=Math.floor(a.getMonth()/3);return[isod(new Date(a.getFullYear(),q*3,1)),isod(new Date(a.getFullYear(),q*3+3,0))]}
 function catSel(kind,d,k,i,val){const list=kind==='e'?allCats():ICATS;const has=list.includes(val);const opts=list.map(c=>'<option'+(c===val?' selected':'')+'>'+c+'</option>').join('');return '<select class="cat" data-d="'+d+'" data-k="'+k+'" data-f="c" data-i="'+i+'">'+opts+(has?'':'<option selected>'+esc(val)+'</option>')+(kind==='e'?'<option value="__add__">\uFF0B Add category\u2026</option>':'')+'</select>'}
 function carSel(d,i,val){if(!FLEETCARS.length)return '';var has=!val||FLEETCARS.some(function(c){return c.id===val;});var opts='<option value="">— car —</option>'+FLEETCARS.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===val?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');return '<select class="cat carsel" data-cd2="'+d+'" data-i="'+i+'" title="Attribute to a car">'+opts+(has?'':'<option value="'+esc(val)+'" selected>'+esc(val)+' (removed)</option>')+'</select>';}
-function eline(l,i,d){const v=+l[1]||0;const paid=!!l[3];const col=l[4]||'';const r=isSA(l[0])?saChip(v):'';
+function eline(l,i,d){const v=+l[1]||0;const paid=!!l[3];const col=l[4]||'';const r=isSA(l[0])?saChip(v,d):'';
  return '<div class="eline'+(paid?' paid':'')+'"'+(col?' style="border-left:6px solid '+col+';border-radius:9px;padding-left:9px'+(paid?'':';background:color-mix(in srgb,'+col+' 20%,var(--surface))')+'"':'')+'><span class="grip" draggable="true" data-dgd="'+d+'" data-dgi="'+i+'" title="Drag to another category">\u283F</span><button class="chk'+(paid?' on':'')+'" data-paid="'+d+'" data-i="'+i+'" title="'+(paid?'Paid — click to unmark':'Mark as paid')+'">'+(paid?'✓':'')+'</button><input class="di" list="expnames" data-d="'+d+'" data-k="e" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+catSel('e',d,'e',i,l[2]||'Other')+carSel(d,i,l[5]||'')+r+'<span class="wrapmoney"><span class="cur">$</span><input class="amt exp tnum" type="number" step="0.01" data-d="'+d+'" data-k="e" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="e" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button><button class="dup" data-dup="'+d+'|'+i+'" title="Duplicate line">⧉</button><button class="mv" data-mv="'+d+'" data-i="'+i+'" title="Move to next day">→</button><button class="del" data-dk="e" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
 function iline(l,i,d){const v=+l[1]||0;const col=l[3]||'';const adj=isAdj(l);
  return '<div class="eline'+(adj?' adjline':'')+'"'+(col?' style="border-left:6px solid '+col+';border-radius:9px;padding-left:9px;background:color-mix(in srgb,'+col+' 20%,var(--surface))"':'')+'><input class="di" data-d="'+d+'" data-k="j" data-f="t" data-i="'+i+'" value="'+esc(l[0])+'">'+(adj?'<span class="linktag">reconciles to sheet</span>':catSel('j',d,'j',i,l[2]||'Other Income'))+'<span class="wrapmoney"><span class="cur">$</span><input class="amt '+(adj?'adj':'inc')+' tnum" type="number" step="0.01" data-d="'+d+'" data-k="j" data-f="a" data-i="'+i+'" value="'+v.toFixed(2)+'"></span><button class="swatch" data-swk="j" data-swd="'+d+'" data-swi="'+i+'" style="background:'+(col||'transparent')+'" title="Colour tag"></button>'+(adj?'':'<button class="mvi" data-mvi="'+d+'" data-i="'+i+'" title="Move to next day">→</button>')+'<button class="del" data-dk="j" data-dd="'+d+'" data-di="'+i+'" title="Delete line">×</button></div>'}
