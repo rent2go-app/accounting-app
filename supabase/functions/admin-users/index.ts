@@ -3,7 +3,7 @@
 // Only allow-listed admin emails may call it. Actions: list / create / password / delete.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ADMIN_EMAILS = ["gorentaride@gmail.com"];
+const ADMIN_EMAILS = ["gorentaride@gmail.com", "thurstonrdavis@gmail.com"];
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
