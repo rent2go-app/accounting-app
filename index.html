@@ -39,7 +39,6 @@ body.haswarn #appwrap{padding-top:48px}
 body.haswarn .topbar{top:48px}
 body.haswarn .filters{top:104px}
 body.haswarn .dashfloat{top:110px}
-body.haswarn .repwrap{top:48px}
 .cashwarn{margin:12px 0 0;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700}
 .cashwarn[hidden]{display:none}
 .cashwarn.danger{background:color-mix(in srgb,var(--out) 16%,var(--surface));border:1px solid var(--out);color:var(--out)}
@@ -58,7 +57,7 @@ body.haswarn .repwrap{top:48px}
 .sumtab th:first-child,.sumtab td:first-child{text-align:left;font-weight:700}
 .sumtab th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--surface-2)}
 .sumtab tbody tr:last-child td{border-bottom:none}.sumtab td:last-child{font-weight:800}
-.setpanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(920px,94vw);max-height:88vh;overflow:auto;margin:0;padding:20px 22px;background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.45),0 0 0 100vmax rgba(9,12,18,.55);z-index:60}
+.setpanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(920px,94vw);max-height:88vh;overflow:auto;margin:0;padding:20px 22px;background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.45),0 0 0 100vmax rgba(9,12,18,.55);z-index:120}
 .setpanel[hidden]{display:none}
 .setmtop{display:flex;align-items:center;justify-content:space-between;margin:-4px 0 14px}.setmtop h2{margin:0;font-size:18px;font-weight:800}
 .setgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}@media(max-width:720px){.setgrid{grid-template-columns:1fr}}
@@ -159,7 +158,7 @@ body.readonly #setCur,body.readonly #setZar,body.readonly #setAed,body.readonly 
 .chk.on{background:var(--in);border-color:var(--in)}
 .mv,.del,.mvi,.dup{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:6px;width:22px;height:22px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1}
 .mv,.mvi{font-size:13px}.del{font-size:15px}.dup{font-size:12px}.dup:hover{border-color:var(--brand);color:var(--brand)}
-.movepop{position:fixed;inset:0;background:rgba(9,12,18,.5);display:flex;align-items:center;justify-content:center;z-index:80}
+.movepop{position:fixed;inset:0;background:rgba(9,12,18,.5);display:flex;align-items:center;justify-content:center;z-index:120}
 .movepop[hidden]{display:none}
 .mpcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:320px;max-width:92vw}
 .mpcard .mptitle{font-weight:800;font-size:15px;margin-bottom:12px}
@@ -175,7 +174,7 @@ body.readonly #setCur,body.readonly #setZar,body.readonly #setAed,body.readonly 
 .droptarget.dropover{outline:2px dashed var(--brand);outline-offset:2px;border-radius:8px}
 .rttoast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--surface);padding:9px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.3);opacity:0;transition:opacity .2s,transform .2s;z-index:60;pointer-events:none}
 .rttoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.repwrap{position:fixed;inset:0;background:var(--bg);z-index:80;overflow:auto;padding-bottom:50px}
+.repwrap{position:fixed;inset:0;background:var(--bg);z-index:120;overflow:auto;padding-bottom:50px}
 .rephead{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:14px 22px;z-index:2}
 .rephead h2{margin:0;font-size:18px}
 .repctl,.reptabs{display:flex;gap:9px;align-items:center;flex-wrap:wrap;max-width:920px;margin:0 auto;padding:14px 22px 0}
@@ -267,8 +266,8 @@ const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G
 function setStatus(s){var el=document.getElementById('savestate');if(!el)return;el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error — retrying…':'';el.className='savestate '+(s||'');}
 function showLogin(){document.getElementById('loginwrap').style.display='flex';document.getElementById('appwrap').style.display='none';}
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';}
-async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}showApp();runApp();}
-async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){showApp();runApp();}else{showLogin();}}
+async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(em.toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}
+async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(((s.data.session.user.email)||'').toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}else{showLogin();}}
 async function runApp(){
 let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={};
 async function load(){
