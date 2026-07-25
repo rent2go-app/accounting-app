@@ -149,6 +149,13 @@ body.haswarn .topbar{top:48px}
 .chk.on{background:var(--in);border-color:var(--in)}
 .mv,.del,.mvi,.dup{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:6px;width:22px;height:22px;font-weight:800;cursor:pointer;font-family:inherit;line-height:1}
 .mv,.mvi{font-size:13px}.del{font-size:15px}.dup{font-size:12px}.dup:hover{border-color:var(--brand);color:var(--brand)}
+.movepop{position:fixed;inset:0;background:rgba(9,12,18,.5);display:flex;align-items:center;justify-content:center;z-index:80}
+.movepop[hidden]{display:none}
+.mpcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:320px;max-width:92vw}
+.mpcard .mptitle{font-weight:800;font-size:15px;margin-bottom:12px}
+.mpcard .mplbl{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}
+.mpcard input[type=date]{width:100%}
+.mpcard .mprow{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
 .mv:hover,.mvi:hover{border-color:var(--brand);color:var(--brand)}
 .del:hover{border-color:var(--out);color:var(--out);background:color-mix(in srgb,var(--out) 10%,var(--surface))}
 .dep .del{width:16px;height:16px;font-size:12px;border:none;padding:0;margin-left:1px;background:transparent}
@@ -237,6 +244,7 @@ body.haswarn .topbar{top:48px}
 </div>
 <div class="setdiv"></div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" id="setDone" style="background:var(--brand);color:#fff;border-color:var(--brand)">Save &amp; close</button><span class="setmsg" id="set_saved" style="margin:0">Changes save automatically as you type.</span></div></div>
 <main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2035-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button><button class="qchip" id="addMonth" style="border-color:var(--brand);color:var(--brand);font-weight:800">+ Add month</button></div></div><div id="dashfloat" class="dashfloat"><div class="dashbar"><span class="dashttl">📊 <span id="dashRT">—</span></span><button class="dashmin" id="dashMin" title="Minimise / expand">▾</button></div><div class="dashbody"><div id="cashwarn" class="cashwarn" hidden></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div></div></div><div class="stack" id="stack"></div><datalist id="expnames"></datalist>
+<div id="movepop" class="movepop" hidden><div class="mpcard"><div class="mptitle" id="mvtitle">Move line to…</div><label class="mplbl">Target date</label><input type="date" id="mvdate"><div class="mprow"><button class="btn" id="mvCancel">Cancel</button><button class="btn" id="mvGo" style="background:var(--brand);color:#fff;border-color:var(--brand)">Move line</button></div></div></div>
 <div id="reports" class="repwrap" hidden>
 <div class="rephead"><h2>Management Accounts</h2><button class="btn" id="repClose">✕ Close</button></div>
 <div class="repctl"><label>From</label><input type="date" id="repFrom"><label>To</label><input type="date" id="repTo"><button class="qchip" data-rp="2026">2026</button><button class="qchip" data-rp="2027">2027 Q1</button><button class="qchip" data-rp="all">All</button><div class="spacer"></div><button class="btn" id="repCSV">⬇ Download CSV</button><button class="btn" id="repPrint">🖨 Print / PDF</button></div>
@@ -250,7 +258,7 @@ function showApp(){document.getElementById('loginwrap').style.display='none';doc
 async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}showApp();runApp();}
 async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){showApp();runApp();}else{showLogin();}}
 async function runApp(){
-let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[];
+let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null;
 async function load(){
   var res=await sb.from('day_blocks').select('*');
   if(res.error){setStatus('error');console.error(res.error);}
@@ -359,6 +367,8 @@ function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00'
   +'<div class="expwrap">'+exp+'</div>'
   +'<div class="foot"><div class="f"><span class="k neg">Total out</span><b class="neg tnum">'+fmt(x.exp)+'</b></div><div class="f"><span class="k">Net day</span><b class="tnum '+((x.incReal-x.exp)>=0?'pos':'neg')+'">'+((x.incReal-x.exp)>=0?'+':'')+fmt(x.incReal-x.exp)+'</b></div><div class="f carry"><span class="k">Carried forward →</span><b class="tnum">'+fmt(x.carried)+'</b></div></div>'
   +'</div>';}
+function openMove(d,i,kind){MVCTX={d:d,i:i,kind:kind};var inp=document.getElementById('mvdate');var nd=addDays(d,1);var last=DK[DK.length-1]||nd;inp.min=nd;inp.max=last;inp.value=nd>last?last:nd;var ln=(MD[d]&&MD[d][kind])?MD[d][kind][i]:null;var t=document.getElementById('mvtitle');if(t)t.textContent='Move "'+((ln&&ln[0])||'line')+'" from '+d+' to…';document.getElementById('movepop').hidden=false;setTimeout(function(){inp.focus();},30);}
+function doMove(){if(!MVCTX)return;var t=document.getElementById('mvdate').value;if(!t||t<=MVCTX.d){alert('Pick a date after '+MVCTX.d+'.');return;}if(!MD[t]){alert('No block exists for '+t+'. Add that month first with “＋ Add month”.');return;}snapshot();var ln=MD[MVCTX.d][MVCTX.kind].splice(MVCTX.i,1)[0];if(MVCTX.kind==='e'){while(ln.length<5)ln.push(ln.length===3?false:'');ln[3]=false;}MD[t][MVCTX.kind].push(ln);document.getElementById('movepop').hidden=true;MVCTX=null;save();recompute();render();}
 function render(){CUSTOMCATS=[];var _cseen={};DK.forEach(function(dd){(MD[dd].e||[]).forEach(function(l){var c=l[2];if(c&&ECATS.indexOf(c)<0&&c!=='Adjustment'&&!_cseen[c]){_cseen[c]=1;CUSTOMCATS.push(c);}})});
  var _en={};for(var _ed in MD){(MD[_ed].e||[]).forEach(function(l){if(l[0]&&l[0]!=='New expense')_en[l[0]]=1;});}var _eld=document.getElementById('expnames');if(_eld)_eld.innerHTML=Object.keys(_en).sort().map(function(n){return '<option value="'+esc(n)+'"></option>';}).join('');
  const rg=rangeFor();const kpiDays=DK.filter(d=>d>=rg[0]&&d<=rg[1]);
@@ -407,8 +417,8 @@ function wire(){
  document.querySelectorAll('.applybtn').forEach(btn=>btn.onclick=()=>{snapshot();const d=btn.dataset.apply,mon=d.slice(0,7),src=MD[d].d.slice();
    DK.forEach(d2=>{if(d2>d&&d2.slice(0,7)===mon)MD[d2].d=src.slice()});save();recompute();render();});
  document.querySelectorAll('.chk').forEach(c=>c.onclick=()=>{snapshot();const d=c.dataset.paid,i=+c.dataset.i;MD[d].e[i][3]=!MD[d].e[i][3];save();recompute();render()});
- document.querySelectorAll('.mv').forEach(b=>b.onclick=()=>{snapshot();const d=b.dataset.mv,i=+b.dataset.i;const nd=addDays(d,1);if(!MD[nd]){alert('No next-day block.');return;}const ln=MD[d].e.splice(i,1)[0];if(ln.length<4)ln.push(false);ln[3]=false;MD[nd].e.push(ln);save();recompute();render()});
- document.querySelectorAll('.mvi').forEach(b=>b.onclick=()=>{snapshot();const d=b.dataset.mvi,i=+b.dataset.i;const nd=addDays(d,1);if(!MD[nd]){alert('No next-day block.');return;}const ln=MD[d].j.splice(i,1)[0];MD[nd].j.push(ln);save();recompute();render()});
+ document.querySelectorAll('.mv').forEach(b=>b.onclick=()=>openMove(b.dataset.mv,+b.dataset.i,'e'));
+ document.querySelectorAll('.mvi').forEach(b=>b.onclick=()=>openMove(b.dataset.mvi,+b.dataset.i,'j'));
  document.querySelectorAll('.del').forEach(b=>b.onclick=()=>{snapshot();const k=b.dataset.dk,d=b.dataset.dd,i=+b.dataset.di;MD[d][k].splice(i,1);save();recompute();render()});
  document.querySelectorAll('.dup').forEach(b=>b.onclick=()=>{snapshot();const p=b.dataset.dup.split('|'),d=p[0],i=+p[1];const copy=JSON.parse(JSON.stringify(MD[d].e[i]));while(copy.length<5)copy.push(copy.length===3?'Other':copy.length===4?false:'');copy[3]=false;MD[d].e.splice(i+1,0,copy);save();recompute();render()});
  document.querySelectorAll('.carsel').forEach(s=>s.onchange=()=>{snapshot();const d=s.dataset.cd2,i=+s.dataset.i;const a=MD[d].e[i];while(a.length<5)a.push(a.length===3?false:'');a[5]=s.value;save()});
@@ -427,6 +437,7 @@ function setQuick(q){var t=TODAY,end=DK[DK.length-1];if(q==='today'){customRange
 document.querySelectorAll('.qchip').forEach(function(b){b.onclick=function(){document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});b.classList.add('on');setQuick(b.dataset.q);};});
 var sd=document.getElementById('setDone');if(sd)sd.onclick=async function(){var m=document.getElementById('set_saved');if(m)m.textContent='Saving…';try{await flush();if(m){m.textContent='Saved ✓';m.style.color='var(--in)';}}catch(e){if(m){m.textContent='Save error';m.style.color='var(--out)';}}setTimeout(function(){document.getElementById('settings').hidden=true;if(m){m.textContent='Changes save automatically as you type.';m.style.color='';}},700);};
 const setP=document.getElementById('settings');document.getElementById('setBtn').onclick=()=>{setP.hidden=!setP.hidden};var _sx=document.getElementById('setX');if(_sx)_sx.onclick=function(){setP.hidden=true;};
+var _mvg=document.getElementById('mvGo');if(_mvg)_mvg.onclick=doMove;var _mvc=document.getElementById('mvCancel');if(_mvc)_mvc.onclick=function(){document.getElementById('movepop').hidden=true;MVCTX=null;};var _mvp=document.getElementById('movepop');if(_mvp)_mvp.onclick=function(e){if(e.target===_mvp){_mvp.hidden=true;MVCTX=null;}};
 document.getElementById('undoBtn').onclick=undo;updateUndo();
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
 const setCur=document.getElementById('setCur'),setZar=document.getElementById('setZar'),setAed=document.getElementById('setAed'),setSal=document.getElementById('setSal');
