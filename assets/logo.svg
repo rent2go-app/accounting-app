@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 68">
+  <g transform="translate(0,13) scale(0.8)" fill="#7cc746">
+    <path d="M4 40c0-1.2 .8-2.6 2-3.2l3-1.3 4.2-9C14.4 24 16 22.6 19 22.6h22c3 0 4.6 1.4 5.8 3.9l4.2 9 3 1.3c1.2 .6 2 2 2 3.2v5.2c0 1.2-1 2.2-2.2 2.2h-3.3a5.6 5.6 0 0 1-11.2 0H24a5.6 5.6 0 0 1-11.2 0H9c-1.2 0-2.2-1-2.2-2.2z"/>
+    <path d="M17 27.5l-3.2 7.5h32.4l-3.2-7.5c-.7-1.4-1.2-1.6-2.6-1.6H19.6c-1.4 0-1.9 .2-2.6 1.6z" fill="#eafaf0"/>
+    <circle cx="19" cy="46" r="4.4" fill="#2f6b1c"/><circle cx="43" cy="46" r="4.4" fill="#2f6b1c"/>
+  </g>
+  <g transform="translate(56,13)" fill="none" stroke="#7cc746" stroke-width="5" stroke-linecap="round">
+    <circle cx="7" cy="8" r="7" fill="#fff"/>
+    <line x1="7" y1="15" x2="7" y2="46"/>
+    <line x1="7" y1="35" x2="14" y2="35"/><line x1="7" y1="42" x2="12" y2="42"/>
+  </g>
+  <text x="80" y="49" font-family="'Arial Rounded MT Bold','Baloo 2','Nunito',Verdana,sans-serif" font-weight="900" font-size="40" letter-spacing="0.5" fill="#7cc746">RENT<tspan fill="#5aa32f">2</tspan>GO</text>
+</svg>

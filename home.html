@@ -72,15 +72,16 @@ td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname i
 .logincard button{width:100%;margin-top:16px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
 .err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:60}
+.brandlogo{height:30px;display:block}.loginlogo{text-align:center;margin-bottom:8px}.loginlogo img{height:58px;max-width:100%}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 
-<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><h1>Rent <span>2</span> Go</h1><p>Home Budget — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.svg" alt="Rent 2 Go"></div><p>Home Budget — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><div class="brand">Rent <span>2</span> Go</div><div class="sub">· Home Budget</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><div class="brand"><img class="brandlogo" src="assets/logo.svg" alt="Rent 2 Go"></div><div class="sub">· Home Budget</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
 <div class="ctl">
   <div class="sides" id="sides"><button data-side="sa" class="on">🇿🇦 SA · ZAR</button><button data-side="uae">🇦🇪 UAE · AED</button></div>
