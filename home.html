@@ -23,6 +23,13 @@ input[type=month],input[type=number],input[type=text],input[type=date]{padding:7
 .sides button{padding:9px 18px;border:none;background:var(--surface);color:var(--muted);font-weight:800;cursor:pointer;font-family:inherit;font-size:14px;border-left:1px solid var(--line)}
 .sides button:first-child{border-left:none}.sides button.on{background:var(--brand);color:#fff}
 .refbox{margin-left:auto;text-align:right}.refbox .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.refbox .v{font-size:16px;font-weight:800;color:var(--in)}
+.hdash{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-top:14px}
+.hcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.hcard.wk{border-left:4px solid var(--brand)}
+.hcard .hl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.hcard .hv{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.hcard .hv.pos{color:var(--in)}.hcard .hv.neg{color:var(--out)}
+.hcard .hs{font-size:11px;color:var(--muted);margin-top:2px}
 .savestate{font-size:12px;font-weight:700;color:var(--muted)}
 .tablewrap{margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);background:var(--surface)}
 table.bud{border-collapse:collapse;width:100%;font-size:13px;min-width:900px}
@@ -78,6 +85,7 @@ td.iname input:hover,tr td.ln input.nm:hover{border-color:var(--line)}td.iname i
   <label>Start bal</label><input type="number" id="startbal" step="0.01" style="width:100px">
   <div class="refbox"><div class="l">Funded by owner draws (ledger actual) · <span id="reflbl">—</span></div><div class="v tnum" id="refval">—</div></div>
 </div>
+<div class="hdash" id="hdash"></div>
 <div class="tablewrap"><table class="bud" id="tbl"></table></div>
 <p class="hint">Two sides — <b>SA (ZAR)</b> and <b>UAE (AED)</b> — each a weekly home budget with one planning value per week and an auto <b>Month-to-date</b>. On the <b>SA</b> side the <b>INCOME</b> block is <b>fed live from the main ledger's Owner-Draw lines</b> (each draw lands on its actual date, in the right week, converted USD→ZAR at your Settings FX) — so it stays read-only and always matches the ledger. Expense lines are yours to plan/edit.</p>
 </main>
@@ -170,6 +178,25 @@ function render(){
   var incA=[],expA=[];
   for(var w=0;w<W;w++){incA[w]=secWk(inc,w);expA[w]=exps.reduce((s,se)=>s+secWk(se,w),0);}
   var sum=a=>a.reduce((s,x)=>s+x,0);
+  // top dashboard — weekly (current week by today's date) + month totals
+  (function(){
+    var now=new Date();var ti=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+    var wi=Math.floor((Date.parse(ti+'T00:00:00')-Date.parse(M.weekStart+'T00:00:00'))/(7*86400000));
+    var inMonth=ti.slice(0,7)===YM;if(wi<0)wi=0;if(wi>=W)wi=W-1;
+    var rng=cols[wi]?wlabel(cols[wi]):'';
+    var wInc=incA[wi]||0,wExp=expA[wi]||0,wBal=r2(wInc-wExp);
+    var tInc=sum(incA),tExp=sum(expA),tBal=r2(tInc-tExp);
+    var wlab=(inMonth?'This week':'Week '+(wi+1))+' · '+rng;
+    var ml=fmtYM(YM);
+    function card(l,v,sub,cls,wk){return '<div class="hcard'+(wk?' wk':'')+'"><div class="hl">'+l+'</div><div class="hv '+(cls||'')+'">'+fmtC(v)+'</div><div class="hs">'+sub+'</div></div>';}
+    var el=document.getElementById('hdash');if(el)el.innerHTML=
+      card('Weekly income',wInc,wlab,'pos',1)+
+      card('Weekly expenses',wExp,wlab,'neg',1)+
+      card('Weekly balance',wBal,wlab,wBal>=0?'pos':'neg',1)+
+      card('Total income',tInc,ml+' · month',(tInc>=0?'pos':''))+
+      card('Total expenses',tExp,ml+' · month','neg')+
+      card('Month balance',tBal,ml+' · month',tBal>=0?'pos':'neg');
+  })();
   // header
   var h='<thead><tr><th class="ln">'+fmtYM(YM)+' · '+sym().trim()+'</th>';
   cols.forEach(c=>{h+='<th class="wk">'+wlabel(c)+'</th>';});
