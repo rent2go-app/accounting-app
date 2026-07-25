@@ -25,10 +25,11 @@
 .ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
 .otot{margin-left:auto;text-align:right}.otot .l{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)}.otot .v{font-size:20px;font-weight:800;color:var(--brand)}
 .cars{padding:6px 12px 12px}
-.chdr{display:grid;grid-template-columns:1.4fr 1fr 1.4fr auto auto;gap:10px;padding:6px 6px 2px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
-.crow{display:grid;grid-template-columns:1.4fr 1fr 1.4fr auto auto;gap:10px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line)}
+.chdr{display:grid;grid-template-columns:1.3fr .8fr 1fr 1.1fr .7fr auto auto;gap:10px;padding:6px 6px 2px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.crow{display:grid;grid-template-columns:1.3fr .8fr 1fr 1.1fr .7fr auto auto;gap:10px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line)}
 .crow:last-child{border-bottom:none}
-.crow input[type=text]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.crow input[type=text],.crow input[type=number]{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.crow .cprice{text-align:right;font-variant-numeric:tabular-nums}
 .crow .act{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:700}
 .iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--muted);font-weight:800;font-family:inherit}
 .iconbtn:hover{border-color:var(--out);color:var(--out)}
@@ -86,7 +87,9 @@ function render(){
     var carsHTML=(o.cars||[]).map(function(c,ci){
       return '<div class="crow"><input type="text" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car name / model">'
         +'<input type="text" data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate">'
+        +'<input type="text" data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN">'
         +'<input type="text" data-cm="'+oi+'|'+ci+'" value="'+esc(c.make||'')+'" placeholder="Make / notes">'
+        +'<input type="number" class="cprice" data-cprice="'+oi+'|'+ci+'" value="'+(+c.price||0)+'" placeholder="$/day" min="0" step="1">'
         +'<label class="act"><input type="checkbox" data-ca="'+oi+'|'+ci+'"'+((c.active!==false)?' checked':'')+'> active</label>'
         +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></div>';
     }).join('');
@@ -94,7 +97,7 @@ function render(){
     return '<div class="owner"><div class="ohead">'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
       +'<div class="otot"><div class="l">Fleet size</div><div class="v tnum">'+n+' car'+(n===1?'':'s')+'</div></div></div>'
-      +'<div class="cars">'+(n?'<div class="chdr"><span>Car / model</span><span>Plate</span><span>Make / notes</span><span></span><span></span></div>':'<div class="hint" style="padding:10px 6px">No cars yet.</div>')+carsHTML+'</div>'
+      +'<div class="cars">'+(n?'<div class="chdr"><span>Car / model</span><span>Plate</span><span>VIN</span><span>Make / notes</span><span>Daily $</span><span></span><span></span></div>':'<div class="hint" style="padding:10px 6px">No cars yet.</div>')+carsHTML+'</div>'
       +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add car</button><span class="spacer"></span><button class="btn danger" data-delowner="'+oi+'">Remove owner</button></div></div>';
   }).join('');
   wire();
@@ -103,12 +106,14 @@ function wire(){
   document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.on].name=el.value;scheduleSave();});
   function cell(attr,key){document.querySelectorAll('['+attr+']').forEach(el=>el.onchange=()=>{var p=el.dataset[key].split('|');STATE[+p[0]].cars[+p[1]][key==='cn'?'name':key==='cp'?'plate':'make']=el.value;scheduleSave();});}
   cell('data-cn','cn');cell('data-cp','cp');cell('data-cm','cm');
+  document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
+  document.querySelectorAll('[data-cprice]').forEach(el=>el.onchange=()=>{var p=el.dataset.cprice.split('|');STATE[+p[0]].cars[+p[1]].price=+el.value||0;scheduleSave();});
   document.querySelectorAll('[data-ca]').forEach(el=>el.onchange=()=>{var p=el.dataset.ca.split('|');STATE[+p[0]].cars[+p[1]].active=el.checked;scheduleSave();});
-  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('car_'),name:'',plate:'',make:'',active:true});scheduleSave();render();});
+  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('car_'),name:'',plate:'',vin:'',make:'',price:0,active:true});scheduleSave();render();});
   document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
   document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their cars?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
 }
-async function load(){var r=await sb.from('fleet').select('owners').eq('id',1).single();if(r.error)console.error(r.error);STATE=(r.data&&r.data.owners)||[];STATE.forEach(o=>{o.id=o.id||uid('o_');o.cars=(o.cars||[]).map(c=>({id:c.id||uid('car_'),name:c.name||'',plate:c.plate||'',make:c.make||'',active:c.active!==false}));});}
+async function load(){var r=await sb.from('fleet').select('owners').eq('id',1).single();if(r.error)console.error(r.error);STATE=(r.data&&r.data.owners)||[];STATE.forEach(o=>{o.id=o.id||uid('o_');o.cars=(o.cars||[]).map(c=>({id:c.id||uid('car_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',make:c.make||'',price:+c.price||0,active:c.active!==false}));});}
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
 async function start(){
   document.getElementById('addOwner').onclick=()=>{STATE.push({id:uid('o_'),name:'',cars:[]});scheduleSave();render();var el=document.querySelector('.owner:last-child .oname');if(el)el.focus();};
