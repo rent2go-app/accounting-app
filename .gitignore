@@ -10,3 +10,4 @@ ops-console-backup/
 *.csv
 seed-*.sql
 backups/
+*.pdf
