@@ -24,7 +24,7 @@
 .ohead .oname{font-weight:800;font-size:16px;border:1px solid transparent;background:transparent;color:var(--text);padding:4px 6px;border-radius:8px;min-width:180px}
 .ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
 .otot{margin-left:auto;text-align:right}.otot .l{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)}.otot .v{font-size:20px;font-weight:800;color:var(--brand)}
-.cars{padding:6px 12px 12px}
+.cars{padding:10px 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(262px,1fr));gap:12px}.ctl label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.ctl input{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}.otot .permo{font-size:11px;color:var(--muted);font-weight:700}.carcard{border:1px solid var(--line);border-radius:12px;padding:11px;background:var(--surface-2);display:flex;flex-direction:column;gap:7px}.carcard.inactive{opacity:.55}.carcard .cc-head{display:flex;gap:6px;align-items:center}.carcard input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px}.carcard .cname{font-weight:800}.carcard .cc-ids{display:flex;gap:6px}.carcard .cc-row{display:flex;gap:8px}.carcard .cc-row label{flex:1;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;flex-direction:column;gap:3px}.carcard .cc-row input{text-align:right;font-variant-numeric:tabular-nums}.carcard .cc-calc{border-top:1px dashed var(--line);padding-top:7px;display:flex;flex-direction:column;gap:2px;font-size:12px;font-variant-numeric:tabular-nums}.carcard .cc-calc .fee{color:var(--out)}.carcard .cc-calc .net{font-weight:800;color:var(--in)}.carcard .cc-calc .net.big{font-size:14px}.carcard .act{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}.carcard .maint{border-top:1px dashed var(--line);padding-top:7px}.carcard .maint .mh{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:5px}.carcard .maddbtn{border:1px dashed var(--line-strong);background:transparent;color:var(--muted);border-radius:6px;font-size:11px;padding:2px 7px;cursor:pointer;font-family:inherit;font-weight:700}.carcard .mitem{display:grid;grid-template-columns:110px 1fr 66px auto;gap:4px;align-items:center;margin-bottom:4px}.carcard .mitem input{padding:4px 6px;font-size:11.5px}.carcard .mitem .mamt{text-align:right}.carcard .mitem .mdel{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;padding:0}.carcard .mtot{font-size:11px;color:var(--muted);font-weight:700;text-align:right}
 .chdr{display:grid;grid-template-columns:1.3fr .8fr 1fr 1.1fr .7fr auto auto;gap:10px;padding:6px 6px 2px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .crow{display:grid;grid-template-columns:1.3fr .8fr 1fr 1.1fr .7fr auto auto;gap:10px;align-items:center;padding:7px 6px;border-bottom:1px solid var(--line)}
 .crow:last-child{border-bottom:none}
@@ -58,8 +58,10 @@
 <main class="wrap">
 <div class="ctl">
   <button class="btn" id="addOwner">+ Add owner</button>
-  <span class="hint" style="margin:0">Cars added here become selectable on expense lines in the main ledger (e.g. Parts → which car).</span>
-  <div class="grand"><div class="l">Cars in fleet</div><div class="v tnum" id="grand">0</div></div>
+  <label>Stripe %</label><input id="sPct" type="number" step="0.1" min="0" style="width:66px">
+  <label>+ fixed $</label><input id="sFix" type="number" step="0.01" min="0" style="width:78px">
+  <label>Days / mo</label><input id="sDays" type="number" step="1" min="1" style="width:62px">
+  <div class="grand"><div class="l">Fleet net revenue / month</div><div class="v tnum" id="grand">$0</div></div>
 </div>
 <div id="owners"></div>
 <p class="hint">Each owner block holds that owner's cars. A car's <b>name</b> (or plate) is what shows in the ledger's car picker. Toggle a car <b>inactive</b> to keep its history but hide it from new selections.</p>
@@ -72,52 +74,69 @@ const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
 const uid=p=>p+Math.random().toString(36).slice(2,9);
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-let STATE=[],SAVET=null;
+let STATE=[],SETTINGS={},SAVET=null;const r2=n=>Math.round((+n||0)*100)/100;const money=v=>'$'+(+v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(m){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+m+'</div>';setTimeout(()=>{h.innerHTML='';},2400);}
 function scheduleSave(){setStatus('saving');clearTimeout(SAVET);SAVET=setTimeout(save,600);}
-async function save(){try{var r=await sb.from('fleet').update({owners:STATE,updated_at:new Date().toISOString()}).eq('id',1);if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
+async function save(){try{var r=await sb.from('fleet').update({owners:STATE,settings:SETTINGS,updated_at:new Date().toISOString()}).eq('id',1);if(r.error)throw r.error;setStatus('saved');}catch(e){console.error(e);setStatus('error');clearTimeout(SAVET);SAVET=setTimeout(save,3000);}}
 
+function feePerDay(c){var earn=+c.earn||0;if(earn<=0)return 0;return r2(earn*(+SETTINGS.stripePct||0)/100+(+SETTINGS.stripeFixed||0));}
+function netDay(c){return r2((+c.earn||0)-feePerDay(c));}
+function netMonth(c){return r2(netDay(c)*(+SETTINGS.daysPerMonth||30));}
+function ownerNetDay(o){return r2((o.cars||[]).filter(c=>c.active!==false).reduce((s,c)=>s+netDay(c),0));}
+function ownerNetMonth(o){return r2(ownerNetDay(o)*(+SETTINGS.daysPerMonth||30));}
+function maintHTML(c,oi,ci){var m=c.maint||[];var t=m.reduce((s,x)=>s+(+x.amount||0),0);return '<div class="maint"><div class="mh"><span>🔧 Maintenance ('+m.length+')</span><button class="maddbtn" data-maddm="'+oi+'|'+ci+'">+ log</button></div>'+m.map(function(x,mi){return '<div class="mitem"><input class="mdate" type="date" data-mfield="'+oi+'|'+ci+'|'+mi+'|date" value="'+esc(x.date||'')+'"><input class="mdesc" type="text" placeholder="Item (e.g. Tyres)" data-mfield="'+oi+'|'+ci+'|'+mi+'|desc" value="'+esc(x.desc||'')+'"><input class="mamt" type="number" min="0" step="1" placeholder="$" data-mfield="'+oi+'|'+ci+'|'+mi+'|amount" value="'+(+x.amount||0)+'"><button class="mdel" data-mdel="'+oi+'|'+ci+'|'+mi+'" title="Remove">×</button></div>';}).join('')+(m.length?'<div class="mtot">Total maintenance '+money(t)+'</div>':'')+'</div>';}
 function render(){
   var host=document.getElementById('owners');
-  var total=STATE.reduce((s,o)=>s+(o.cars||[]).length,0);
-  document.getElementById('grand').textContent=total;
+  var fleetMonth=STATE.reduce((s,o)=>s+ownerNetMonth(o),0);
+  document.getElementById('grand').textContent=money(fleetMonth);
   if(!STATE.length){host.innerHTML='<div class="owner"><div class="empty">No owners yet.<br><br><button class="btn pri" onclick="document.getElementById(\'addOwner\').click()">+ Add your first owner</button></div></div>';return;}
   host.innerHTML=STATE.map(function(o,oi){
-    var carsHTML=(o.cars||[]).map(function(c,ci){
-      return '<div class="crow"><input type="text" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car name / model">'
-        +'<input type="text" data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate">'
-        +'<input type="text" data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN">'
-        +'<input type="text" data-cm="'+oi+'|'+ci+'" value="'+esc(c.make||'')+'" placeholder="Make / notes">'
-        +'<input type="number" class="cprice" data-cprice="'+oi+'|'+ci+'" value="'+(+c.price||0)+'" placeholder="$/day" min="0" step="1">'
-        +'<label class="act"><input type="checkbox" data-ca="'+oi+'|'+ci+'"'+((c.active!==false)?' checked':'')+'> active</label>'
-        +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></div>';
+    var cards=(o.cars||[]).map(function(c,ci){
+      var fee=feePerDay(c),nd=netDay(c),nm=netMonth(c),inact=(c.active===false);
+      return '<div class="carcard'+(inact?' inactive':'')+'">'
+        +'<div class="cc-head"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car / model"><button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove">×</button></div>'
+        +'<div class="cc-ids"><input data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate"><input data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN"></div>'
+        +'<input data-cm="'+oi+'|'+ci+'" value="'+esc(c.make||'')+'" placeholder="Make / notes">'
+        +'<div class="cc-row"><label>List $/day<input type="number" min="0" step="1" data-cprice="'+oi+'|'+ci+'" value="'+(+c.price||0)+'"></label><label>Earns/day<input type="number" min="0" step="1" data-cearn="'+oi+'|'+ci+'" value="'+(+c.earn||0)+'"></label></div>'
+        +'<div class="cc-calc"><span class="fee">− Stripe fee/day '+money(fee)+'</span><span class="net">Net/day '+money(nd)+'</span><span class="net big">Net/month '+money(nm)+'</span></div>'
+        +maintHTML(c,oi,ci)
+        +'<label class="act"><input type="checkbox" data-ca="'+oi+'|'+ci+'"'+(inact?'':' checked')+'> active (counts to revenue)</label>'
+      +'</div>';
     }).join('');
-    var n=(o.cars||[]).length;
+    var nc=(o.cars||[]).length,and=ownerNetDay(o),anm=ownerNetMonth(o);
     return '<div class="owner"><div class="ohead">'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
-      +'<div class="otot"><div class="l">Fleet size</div><div class="v tnum">'+n+' car'+(n===1?'':'s')+'</div></div></div>'
-      +'<div class="cars">'+(n?'<div class="chdr"><span>Car / model</span><span>Plate</span><span>VIN</span><span>Make / notes</span><span>Daily $</span><span></span><span></span></div>':'<div class="hint" style="padding:10px 6px">No cars yet.</div>')+carsHTML+'</div>'
+      +'<div class="otot"><div class="l">'+nc+' car'+(nc===1?'':'s')+' · revenue</div><div class="v tnum">'+money(anm)+'<span class="permo"> /mo</span></div><div class="l" style="margin-top:2px;text-transform:none">'+money(and)+' / day (net of Stripe)</div></div></div>'
+      +'<div class="cars">'+(nc?cards:'<div class="hint" style="padding:10px 6px">No cars yet.</div>')+'</div>'
       +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add car</button><span class="spacer"></span><button class="btn danger" data-delowner="'+oi+'">Remove owner</button></div></div>';
   }).join('');
   wire();
 }
 function wire(){
   document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.on].name=el.value;scheduleSave();});
-  function cell(attr,key){document.querySelectorAll('['+attr+']').forEach(el=>el.onchange=()=>{var p=el.dataset[key].split('|');STATE[+p[0]].cars[+p[1]][key==='cn'?'name':key==='cp'?'plate':'make']=el.value;scheduleSave();});}
-  cell('data-cn','cn');cell('data-cp','cp');cell('data-cm','cm');
-  document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
+  function txt(k,field){document.querySelectorAll('[data-'+k+']').forEach(el=>el.onchange=()=>{var p=el.dataset[k].split('|');STATE[+p[0]].cars[+p[1]][field]=el.value;scheduleSave();});}
+  txt('cn','name');txt('cp','plate');txt('cv','vin');txt('cm','make');
   document.querySelectorAll('[data-cprice]').forEach(el=>el.onchange=()=>{var p=el.dataset.cprice.split('|');STATE[+p[0]].cars[+p[1]].price=+el.value||0;scheduleSave();});
-  document.querySelectorAll('[data-ca]').forEach(el=>el.onchange=()=>{var p=el.dataset.ca.split('|');STATE[+p[0]].cars[+p[1]].active=el.checked;scheduleSave();});
-  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('car_'),name:'',plate:'',vin:'',make:'',price:0,active:true});scheduleSave();render();});
+  document.querySelectorAll('[data-cearn]').forEach(el=>el.onchange=()=>{var p=el.dataset.cearn.split('|');STATE[+p[0]].cars[+p[1]].earn=+el.value||0;scheduleSave();render();});
+  document.querySelectorAll('[data-ca]').forEach(el=>el.onchange=()=>{var p=el.dataset.ca.split('|');STATE[+p[0]].cars[+p[1]].active=el.checked;scheduleSave();render();});
+  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('car_'),name:'',plate:'',vin:'',make:'',price:0,earn:0,active:true,maint:[]});scheduleSave();render();});
   document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
   document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their cars?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
+  document.querySelectorAll('[data-maddm]').forEach(b=>b.onclick=()=>{var p=b.dataset.maddm.split('|');var c=STATE[+p[0]].cars[+p[1]];c.maint=c.maint||[];c.maint.push({id:uid('m_'),date:'',desc:'',amount:0});scheduleSave();render();});
+  document.querySelectorAll('[data-mfield]').forEach(el=>el.onchange=()=>{var p=el.dataset.mfield.split('|');var m=(STATE[+p[0]].cars[+p[1]].maint||[])[+p[2]];if(!m)return;m[p[3]]=(p[3]==='amount')?(+el.value||0):el.value;scheduleSave();if(p[3]==='amount')render();});
+  document.querySelectorAll('[data-mdel]').forEach(b=>b.onclick=()=>{var p=b.dataset.mdel.split('|');if(!confirm('Remove this maintenance item?'))return;STATE[+p[0]].cars[+p[1]].maint.splice(+p[2],1);scheduleSave();render();});
 }
-async function load(){var r=await sb.from('fleet').select('owners').eq('id',1).single();if(r.error)console.error(r.error);STATE=(r.data&&r.data.owners)||[];STATE.forEach(o=>{o.id=o.id||uid('o_');o.cars=(o.cars||[]).map(c=>({id:c.id||uid('car_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',make:c.make||'',price:+c.price||0,active:c.active!==false}));});}
+async function load(){var r=await sb.from('fleet').select('owners,settings').eq('id',1).single();if(r.error)console.error(r.error);STATE=(r.data&&r.data.owners)||[];SETTINGS=Object.assign({stripePct:2.9,stripeFixed:0.30,daysPerMonth:30},(r.data&&r.data.settings)||{});STATE.forEach(o=>{o.id=o.id||uid('o_');o.cars=(o.cars||[]).map(c=>({id:c.id||uid('car_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',make:c.make||'',price:+c.price||0,earn:+c.earn||0,active:c.active!==false,maint:(c.maint||[]).map(m=>({id:m.id||uid('m_'),date:m.date||'',desc:m.desc||'',amount:+m.amount||0}))}));});}
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
 async function start(){
   document.getElementById('addOwner').onclick=()=>{STATE.push({id:uid('o_'),name:'',cars:[]});scheduleSave();render();var el=document.querySelector('.owner:last-child .oname');if(el)el.focus();};
-  await load();showApp();render();setStatus('saved');
+  await load();
+  var sp=document.getElementById('sPct'),sf=document.getElementById('sFix'),sd=document.getElementById('sDays');
+  if(sp){sp.value=SETTINGS.stripePct;sp.onchange=()=>{SETTINGS.stripePct=+sp.value||0;scheduleSave();render();};}
+  if(sf){sf.value=SETTINGS.stripeFixed;sf.onchange=()=>{SETTINGS.stripeFixed=+sf.value||0;scheduleSave();render();};}
+  if(sd){sd.value=SETTINGS.daysPerMonth;sd.onchange=()=>{SETTINGS.daysPerMonth=+sd.value||30;scheduleSave();render();};}
+  showApp();render();setStatus('saved');
 }
 async function gate(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u){document.getElementById('loginwrap').style.display='flex';return;}if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}start();}
 document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
