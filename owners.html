@@ -36,6 +36,10 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .tiers{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
 .tiers button{padding:6px 10px;border:none;background:var(--surface);color:var(--muted);font-weight:700;cursor:pointer;font-family:inherit;font-size:12px;border-left:1px solid var(--line)}
 .tiers button:first-child{border-left:none}.tiers button.on{background:var(--brand);color:#fff}
+.tiers.cad button{padding:6px 12px;font-size:12.5px}
+.crow.wk{grid-template-columns:1fr 160px auto}
+.chdr.wk{grid-template-columns:1fr 160px auto}
+.crow.wk .wkamt{width:100%;text-align:right}
 .crow .days{width:74px;text-align:center}
 .crow .fee{font-weight:800;text-align:right;min-width:88px;color:var(--in)}
 .crow .fee.pro{color:var(--gold)}
@@ -79,11 +83,10 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
   <label>Working month</label><input type="month" id="ym">
   <label>Standard fee</label><span class="pill">$500 / car · Preferred $350 / $250</span>
   <button class="btn" id="addOwner">+ Add owner</button>
-  <button class="btn pri" id="pushBtn">⇪ Preview &amp; push to ledger</button>
   <div class="grand"><div class="l">Programme total · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div></div>
 </div>
 <div id="owners"></div>
-<p class="hint" style="margin-top:18px">Each owner's monthly total = sum of their cars' fees, prorated daily by <b>days available ÷ days in the month</b>. <b>Push</b> writes each owner's total as an income line in the ledger on their payout day (25th or 30th), tagged with their category and a hidden source ref so re-pushing <b>updates</b> the same month instead of duplicating.</p>
+<p class="hint" style="margin-top:18px"><b>Monthly</b> owners: total = sum of their cars' fees, prorated daily by <b>days available ÷ days in the month</b>, paid once on the 25th or 30th. <b>Weekly</b> owners: the monthly total is <b>split 4 ways</b> and paid on the chosen weekday (4 payments a month). Each owner has its own <b>⇪ Preview &amp; push</b> — it writes only that owner's lines for the selected month, tagged with a hidden source ref so re-pushing <b>updates</b> instead of duplicating. Other owners and the rest of your ledger are never touched.</p>
 </main>
 </div>
 
@@ -103,6 +106,11 @@ function tierOf(rate){var t=TIERS.find(x=>x[2]===+rate);return t?t[0]:'std';}
 function carFee(car,ym){var d=dim(ym);var a=(car.days&&car.days[ym]!=null)?+car.days[ym]:d;a=Math.max(0,Math.min(a,d));return r2((+car.rate||0)*a/d);}
 function carDays(car,ym){var d=dim(ym);return (car.days&&car.days[ym]!=null)?Math.max(0,Math.min(+car.days[ym],d)):d;}
 function ownerTotal(o,ym){return r2((o.cars||[]).reduce((s,c)=>s+carFee(c,ym),0));}
+const WD=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function occ4(ym,wd){var y=+ym.split('-')[0],m=+ym.split('-')[1],last=dim(ym),out=[];for(var d=1;d<=last&&out.length<4;d++){if(new Date(y,m-1,d).getDay()===wd)out.push(ym+'-'+pad(d));}return out;}
+function weeklyMonthly(o){return r2((o.cars||[]).reduce((s,c)=>s+(+c.rate||0),0));}
+function weeklySplit(total){var w=r2(total/4);return [w,w,w,r2(total-w*3)];}
+function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o):ownerTotal(o,ym);}
 
 let STATE=[];let YM='';let SAVET=null;
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
@@ -119,8 +127,14 @@ function render(){
   if(!STATE.length){host.innerHTML='<div class="owner"><div class="empty">No owners yet.<br><br><button class="btn pri" onclick="document.getElementById(\'addOwner\').click()">+ Add your first owner</button></div></div>';document.getElementById('grand').textContent='$0.00';return;}
   var grand=0;
   host.innerHTML=STATE.map(function(o,oi){
-    var ot=ownerTotal(o,YM);grand+=ot;
+    var weekly=o.cadence==='weekly';var wd=(o.weekday!=null)?+o.weekday:5;
+    var ot=ownerMonthTotal(o,YM);grand+=ot;
     var carsHTML=(o.cars||[]).map(function(c,ci){
+      if(weekly){
+        return '<div class="crow wk"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Fleet / description">'
+          +'<input class="wkamt tnum" type="number" min="0" step="1" data-crate="'+oi+'|'+ci+'" value="'+(+c.rate||0)+'" placeholder="$ / month">'
+          +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove">×</button></div>';
+      }
       var full=dim(YM),days=carDays(c,YM),fee=carFee(c,YM),pro=days<full;
       var tiers=TIERS.map(t=>'<button class="'+(tierOf(c.rate)===t[0]?'on':'')+'" data-tier="'+oi+'|'+ci+'|'+t[2]+'">'+t[1].replace('Standard ','').replace('Preferred ','')+'</button>').join('');
       return '<div class="crow"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car / plate">'
@@ -130,14 +144,24 @@ function render(){
         +'<span class="fee tnum'+(pro?' pro':'')+'" title="'+(pro?'Prorated '+days+'/'+full+' days':'Full month')+'">'+fmt(fee)+'</span>'
         +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></div>';
     }).join('');
+    var cadSeg='<div class="tiers cad"><button class="'+(weekly?'':'on')+'" data-cad="'+oi+'|monthly">Monthly</button><button class="'+(weekly?'on':'')+'" data-cad="'+oi+'|weekly">Weekly</button></div>';
+    var whenCtl=weekly
+      ? '<span class="pill">Every</span><select data-owd="'+oi+'">'+WD.map((w,i)=>'<option value="'+i+'"'+(i===wd?' selected':'')+'>'+w+'</option>').join('')+'</select>'
+      : '<span class="pill">Pays on</span><select data-oday="'+oi+'"><option value="25"'+(+o.day===25?' selected':'')+'>25th</option><option value="30"'+(+o.day!==25?' selected':'')+'>30th</option></select>';
+    var totLine=weekly
+      ? '<div class="l">'+fmt(r2(ot/4))+' / wk · 4 payments on '+WD[wd]+'s</div><div class="v tnum">'+fmt(ot)+'</div>'
+      : '<div class="l">'+((o.cars||[]).length)+' car'+((o.cars||[]).length===1?'':'s')+' · month total</div><div class="v tnum">'+fmt(ot)+'</div>';
+    var hdr=weekly
+      ? '<div class="chdr wk"><span>Fleet / description</span><span>$ / month</span><span></span></div>'
+      : '<div class="chdr"><span>Car / plate</span><span>Rate</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
     return '<div class="owner"><div class="ohead">'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
-      +'<span class="pill">Pays on</span><select data-oday="'+oi+'"><option value="25"'+(+o.day===25?' selected':'')+'>25th</option><option value="30"'+(+o.day!==25?' selected':'')+'>30th</option></select>'
-      +'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:170px" title="Income category tag on the ledger">'
-      +'<div class="otot"><div class="l">'+((o.cars||[]).length)+' car'+((o.cars||[]).length===1?'':'s')+' · month total</div><div class="v tnum">'+fmt(ot)+'</div></div>'
+      +cadSeg+whenCtl
+      +'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">'
+      +'<div class="otot">'+totLine+'</div>'
       +'</div>'
-      +'<div class="cars">'+((o.cars||[]).length?'<div class="chdr"><span>Car / plate</span><span>Rate</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>':'<div class="hint" style="padding:10px 6px">No cars in this owner\'s fleet yet.</div>')+carsHTML+'</div>'
-      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add car</button><span class="spacer"></span><button class="btn danger" data-delowner="'+oi+'">Remove owner</button></div>'
+      +'<div class="cars">'+((o.cars||[]).length?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
+      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div>'
       +'</div>';
   }).join('');
   document.getElementById('grand').textContent=fmt(r2(grand));
@@ -149,7 +173,11 @@ function fmtYM(ym){if(!ym)return '—';var p=ym.split('-');return new Date(+p[0]
 function wire(){
   document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.on].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-oday]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.oday].day=+el.value;scheduleSave();});
+  document.querySelectorAll('[data-owd]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.owd].weekday=+el.value;scheduleSave();render();});
+  document.querySelectorAll('[data-cad]').forEach(el=>el.onclick=()=>{var p=el.dataset.cad.split('|');var o=STATE[+p[0]];o.cadence=p[1];if(p[1]==='weekly'&&o.weekday==null)o.weekday=5;scheduleSave();render();});
   document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
+  document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
+  document.querySelectorAll('[data-pushowner]').forEach(el=>el.onclick=()=>openPushOwner(+el.dataset.pushowner));
   document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{var p=el.dataset.cd.split('|');var c=STATE[+p[0]].cars[+p[1]];c.days=c.days||{};c.days[YM]=Math.max(0,Math.min(+el.value||0,dim(YM)));scheduleSave();render();});
   document.querySelectorAll('[data-tier]').forEach(el=>el.onclick=()=>{var p=el.dataset.tier.split('|');STATE[+p[0]].cars[+p[1]].rate=+p[2];scheduleSave();render();});
@@ -158,52 +186,57 @@ function wire(){
   document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
 }
 
-// ---- push to ledger ----
-function buildPush(ym){
-  var dm=dim(ym),lines=[];
-  STATE.forEach(function(o){
-    var total=ownerTotal(o,ym);if(total<=0)return;
-    var day=Math.min(+o.day===25?25:30,dm);
-    var date=ym+'-'+pad(day);
-    var n=(o.cars||[]).length;
-    var desc=(o.name||'Owner')+' — Owners Programme ('+n+' car'+(n===1?'':'s')+')';
-    lines.push({date:date,owner:o.name||'Owner',cars:n,amt:total,line:[desc,total,(o.tag||'Owners Programme'),'','op:'+(o.id||uid('o_'))]});
-  });
+// ---- push to ledger (per owner) ----
+function buildOwnerLines(o,ym){
+  var dm=dim(ym),lines=[],tag=o.tag||'Owners Programme',oid=o.id,n=(o.cars||[]).length;
+  if(o.cadence==='weekly'){
+    var total=weeklyMonthly(o);if(total<=0)return lines;
+    var wd=(o.weekday!=null)?+o.weekday:5;var occ=occ4(ym,wd);var parts=weeklySplit(total);
+    occ.forEach(function(date,i){var amt=parts[i]!=null?parts[i]:r2(total/4);var desc=(o.name||'Owner')+' — Owners Programme (weekly '+(i+1)+'/'+occ.length+')';lines.push({date:date,info:WD[wd].slice(0,3)+' · wk '+(i+1),amt:amt,line:[desc,amt,tag,'','op:'+oid]});});
+  }else{
+    var t=ownerTotal(o,ym);if(t<=0)return lines;
+    var day=Math.min(+o.day===25?25:30,dm);var date=ym+'-'+pad(day);
+    var desc2=(o.name||'Owner')+' — Owners Programme ('+n+' car'+(n===1?'':'s')+')';
+    lines.push({date:date,info:n+' car'+(n===1?'':'s'),amt:t,line:[desc2,t,tag,'','op:'+oid]});
+  }
   return lines;
 }
-function openPush(){
-  var ym=YM,lines=buildPush(ym);
-  var dm=dim(ym);var dates=[ym+'-25',ym+'-'+pad(Math.min(30,dm))];
+function openPushOwner(oi){
+  var o=STATE[oi],ym=YM,lines=buildOwnerLines(o,ym);
   var total=r2(lines.reduce((s,l)=>s+l.amt,0));
-  var rows=lines.length?lines.map(l=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.owner)+'</td><td>'+l.cars+'</td><td class="n">'+fmt(l.amt)+'</td></tr>').join(''):'<tr><td colspan="4" class="hint" style="padding:14px">Nothing to push — no owner has a positive total this month.</td></tr>';
-  var html='<div class="modal"><div class="mcard"><div class="mhd">Push to ledger · '+fmtYM(ym)+'</div>'
-    +'<div class="mbody"><p class="hint">This will set the Owners-Programme income lines on <b>'+esc(dates.join(' and '))+'</b>. Existing programme lines on those days are replaced (never duplicated); your other income, deposits and expenses are untouched.</p>'
-    +'<table class="prev"><thead><tr><th>Ledger day</th><th>Owner</th><th>Cars</th><th>Income</th></tr></thead><tbody>'+rows
-    +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;padding:8px">Total pushed</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(total)+'</td></tr></tfoot></table></div>'
+  var rows=lines.length?lines.map(l=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.info)+'</td><td class="n">'+fmt(l.amt)+'</td></tr>').join(''):'<tr><td colspan="3" class="hint" style="padding:14px">Nothing to push — this owner has no positive total this month.</td></tr>';
+  var html='<div class="modal"><div class="mcard"><div class="mhd">Push '+esc(o.name||'owner')+' · '+fmtYM(ym)+'</div>'
+    +'<div class="mbody"><p class="hint">Writes '+esc(o.name||'this owner')+"'s "+(o.cadence==='weekly'?'4 weekly payments':'monthly payment')+' into the ledger. Only <b>this owner\'s</b> programme lines for '+esc(fmtYM(ym))+' are replaced — every other owner, plus your income, deposits and expenses, stays untouched.</p>'
+    +'<table class="prev"><thead><tr><th>Ledger day</th><th>Detail</th><th>Income</th></tr></thead><tbody>'+rows
+    +'</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:800;padding:8px">Total</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(total)+'</td></tr></tfoot></table></div>'
     +'<div class="mfoot"><button class="btn" id="pxCancel">Cancel</button><button class="btn pri" id="pxGo"'+(lines.length?'':' disabled')+'>Confirm &amp; write '+fmt(total)+'</button></div></div></div>';
   document.getElementById('modalHost').innerHTML=html;
   document.getElementById('pxCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
-  document.getElementById('pxGo').onclick=()=>doPush(ym,lines,dates);
+  document.getElementById('pxGo').onclick=()=>doPushOwner(o,ym,lines);
 }
-async function doPush(ym,lines,dates){
+async function doPushOwner(o,ym,lines){
   var go=document.getElementById('pxGo');go.disabled=true;go.textContent='Writing…';
   try{
-    await save(); // persist config first
-    var res=await sb.from('day_blocks').select('day,deposits,income,expenses').in('day',dates);
+    await save();
+    var last=dim(ym),from=ym+'-01',to=ym+'-'+pad(last);
+    var res=await sb.from('day_blocks').select('day,deposits,income,expenses').gte('day',from).lte('day',to);
     if(res.error)throw res.error;
     var ex={};(res.data||[]).forEach(r=>ex[r.day]=r);
+    var tagRef='op:'+o.id;
     var byDate={};lines.forEach(l=>{(byDate[l.date]=byDate[l.date]||[]).push(l.line);});
-    var created=0;
+    var affected={};
+    Object.keys(ex).forEach(function(d){if((ex[d].income||[]).some(l=>l[4]===tagRef))affected[d]=1;});
+    Object.keys(byDate).forEach(d=>affected[d]=1);
+    var dates=Object.keys(affected),created=0;
     var ups=dates.map(function(date){
       var row=ex[date];if(!row){created++;row={day:date,deposits:[],income:[],expenses:[]};}
-      var inc=(row.income||[]).filter(l=>!(l[4]&&String(l[4]).indexOf('op:')===0));
+      var inc=(row.income||[]).filter(l=>l[4]!==tagRef);
       inc=inc.concat(byDate[date]||[]);
       return {day:date,deposits:row.deposits||[],income:inc,expenses:row.expenses||[],updated_at:new Date().toISOString()};
     });
-    var r=await sb.from('day_blocks').upsert(ups,{onConflict:'day'});
-    if(r.error)throw r.error;
+    if(ups.length){var r=await sb.from('day_blocks').upsert(ups,{onConflict:'day'});if(r.error)throw r.error;}
     document.getElementById('modalHost').innerHTML='';
-    toast('Pushed '+fmt(r2(lines.reduce((s,l)=>s+l.amt,0)))+' to '+fmtYM(ym)+(created?(' · '+created+' new ledger day'+(created===1?'':'s')+' created'):''));
+    toast('Pushed '+esc(o.name||'owner')+' · '+fmt(r2(lines.reduce((s,l)=>s+l.amt,0)))+' → '+fmtYM(ym)+(created?(' · '+created+' new day'+(created===1?'':'s')):''));
   }catch(e){console.error(e);go.disabled=false;go.textContent='Retry';alert('Push failed: '+(e.message||e));}
 }
 
@@ -213,14 +246,13 @@ async function load(){
   if(r.error){console.error(r.error);}
   STATE=(r.data&&r.data.owners)||[];
   // normalise
-  STATE.forEach(o=>{o.id=o.id||uid('o_');o.day=+o.day===25?25:(+o.day===30?30:25);o.tag=o.tag||'Owners Programme';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',rate:+c.rate||500,days:c.days||{}}));});
+  STATE.forEach(o=>{o.id=o.id||uid('o_');o.cadence=o.cadence==='weekly'?'weekly':'monthly';o.day=+o.day===25?25:(+o.day===30?30:25);o.weekday=(o.weekday!=null)?+o.weekday:5;o.tag=o.tag||'Owners Programme';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',rate:+c.rate||0,days:c.days||{}}));});
 }
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
 async function start(){
   YM=curYM();document.getElementById('ym').value=YM;
   document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();};
-  document.getElementById('addOwner').onclick=()=>{STATE.push({id:uid('o_'),name:'',day:25,tag:'Owners Programme',cars:[]});scheduleSave();render();document.querySelector('.owner:last-child .oname')&&document.querySelector('.owner:last-child .oname').focus();};
-  document.getElementById('pushBtn').onclick=openPush;
+  document.getElementById('addOwner').onclick=()=>{STATE.push({id:uid('o_'),name:'',cadence:'monthly',day:25,weekday:5,tag:'Owners Programme',cars:[]});scheduleSave();render();document.querySelector('.owner:last-child .oname')&&document.querySelector('.owner:last-child .oname').focus();};
   await load();showApp();render();setStatus('saved');
 }
 async function gate(){
