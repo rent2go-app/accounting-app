@@ -55,6 +55,7 @@
 .card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}.card .v.pink{color:#d6336c}
 #heroBubble li.pink{color:#d6336c;font-weight:700}
 h2{font-size:15px;margin:18px 0 8px}
+.ic{width:16px;height:16px;vertical-align:-3px;margin-right:5px;flex:0 0 auto}
 .acct{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
 .accttl{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 10px}
 .accmeta{font-size:11px;color:var(--muted);font-weight:600}
@@ -140,6 +141,8 @@ const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
 let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const IC_FEE='<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#0f8a4d"/><text x="10" y="14.5" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">$</text></svg>';
+const IC_DOC='<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#0f8a4d"/><rect x="6.3" y="4.8" width="7.4" height="10.4" rx="1.2" fill="#fff"/><path d="M8 8h4M8 10.2h4M8 12.4h2.4" stroke="#0f8a4d" stroke-width="1.1" stroke-linecap="round"/></svg>';
 function bodyToHtml(t,br){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(t))){out+=esc(t.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" target="_blank" rel="noopener" style="color:#0f8a4d;font-weight:700;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(t.slice(last));return br?out.replace(/\n/g,'<br>'):out;}
 async function load(){
   var d=await sb.from('linda_drafts').select('*').order('kind',{ascending:true});DRAFTS=d.data||[];
@@ -159,7 +162,7 @@ function render(){
     card('Disconnections',disc,'red')+
     card('Recovery',rec,'red')+
     card('Outstanding',fmt(out),'')+
-    card('🩷 $10 invoices to raise',feeCount+' · '+fmt(feeTotal),'pink')+
+    card(IC_FEE+'$10 invoices to raise',feeCount+' · '+fmt(feeTotal),'')+
     card('Red flags',flags,flags?'red':'');
   renderFeeLedger();
   var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)))).filter(Boolean).sort();
@@ -224,12 +227,12 @@ function renderFeeLedger(){
     var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
     var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
     return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><span class="status skipped">'+esc(f.status)+'</span></td></tr>'
-      +(f.memo?'<tr class="memorow"><td colspan="5">🧾 <b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
+      +(f.memo?'<tr class="memorow"><td colspan="5">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
   }).join('');
   var tot=FEES.reduce(function(s,f){return s+(+f.fee||0);},0);
-  el.innerHTML='<details class="feewrap"><summary>🩷 $10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+' <span class="hint">(who &amp; when — click to expand)</span></summary>'
+  el.innerHTML='<details class="feewrap"><summary>'+IC_FEE+'$10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+' <span class="hint">(who &amp; when — click to expand)</span></summary>'
     +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Attached to rental invoice</td><td>Fee</td><td>Status</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total to raise</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table>'
-    +'<p class="hint">🩷 Each $10 late fee is attached to the specific past-due <b>rental</b> invoice shown, and will be created in Stripe on go-live. Nothing is charged in dry-run.</p></details>';
+    +'<p class="hint">Each $10 late fee is attached to the specific past-due <b>rental</b> invoice shown, and will be created in Stripe on go-live. Nothing is charged in dry-run.</p></details>';
 }
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
 function greetWord(){var h=parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}),10)%24;return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
@@ -246,7 +249,7 @@ function renderSuggestions(){
   if(disc)s.push({c:'red',t:disc+' customer(s) under disconnection — recovery follows in 12h if uncured.'});
   near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
   if(draftN)s.push({c:'',t:draftN+' draft notice(s) awaiting your review. Approve to queue, then send.'});
-  if(FEES.length)s.push({c:'pink',t:'🩷 Pink flag: I will raise '+FEES.length+' × $10 late-fee invoice(s) ('+fmt(FEES.reduce((a,f)=>a+(+f.fee||0),0))+') on go-live — proposed now, only posted once you approve writes.'});
+  if(FEES.length)s.push({c:'',t:IC_FEE+'I will raise '+FEES.length+' × $10 late-fee invoice(s) ('+fmt(FEES.reduce((a,f)=>a+(+f.fee||0),0))+') on go-live — proposed now, only posted once you approve writes.'});
   s.push({c:'',t:'To email customers, verify rentaride2go.com in Resend.'});
   if(!draftN&&!disc&&!rec)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
   var el=document.getElementById('heroBubble');
