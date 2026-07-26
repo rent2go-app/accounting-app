@@ -110,6 +110,39 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .dtbl.small{margin-top:4px}
 .dsub{margin-top:18px;margin-bottom:2px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5c6a7a}
 .dnote{margin-top:18px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}
+@media(max-width:600px){
+  .topbar{padding:9px 12px;gap:8px}
+  .topbar .sub{display:none}
+  .wrap{padding:12px 10px 60px}
+  .ctl{position:static;padding:10px 12px;gap:8px}
+  .odash{grid-template-columns:1fr 1fr;gap:8px}
+  .odash .dcard{padding:10px}
+  .odash .dv{font-size:17px}
+  .mbreak .mbchips{gap:6px}
+  .odetails{grid-template-columns:1fr}
+  .ohead{padding:12px;gap:8px}
+  .ohead .oname{min-width:0;width:100%;font-size:15px}
+  .otot{margin-left:0;text-align:left;width:100%}
+  .ostripe{padding:10px 12px}
+  .ostripe .slabel{min-width:0;flex:1 1 auto;width:100%}
+  .ostripe .sgrid{margin-left:0;width:100%;gap:14px}
+  .osnap{width:100%}
+  .rowscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .rowscroll .crow,.rowscroll .chdr{min-width:500px}
+  .rowscroll .mrow,.rowscroll .mrow.mhdr{min-width:680px}
+  .mbreakrow{grid-template-columns:1fr;gap:10px}
+  .maint,.cars{padding-left:12px;padding-right:12px}
+  .ofoot{padding:10px 12px}
+  .ofoot .btn{flex:1 1 auto;text-align:center}
+  .ofoot .spacer{display:none}
+  .docmc{width:100%}
+  .docmc .printdoc{padding:16px 14px}
+  .dhdr{flex-direction:column;gap:10px}
+  .ddate{text-align:left}
+  .dparties{grid-template-columns:1fr;gap:12px}
+  .prev,.dtbl{font-size:12px}
+  .mcard{width:100%}
+}
 @media print{
  body>*{display:none!important}
  #modalHost,#modalHost *{display:revert!important}
@@ -215,7 +248,7 @@ function maintHTML(o){var oi=STATE.indexOf(o);var cars=(o.cars||[]);var m=o.main
  var rows=m.map(function(x,mi){return '<div class="mrow"><input type="date" data-mf="'+oi+'|'+mi+'|date" value="'+esc(x.date||'')+'"><select data-mf="'+oi+'|'+mi+'|carId">'+carOpts(x.carId)+'</select><select data-mf="'+oi+'|'+mi+'|cat">'+maintCatOpts(x.cat)+'</select><input type="text" placeholder="Item / details" data-mf="'+oi+'|'+mi+'|desc" value="'+esc(x.desc||'')+'"><input type="number" min="0" placeholder="Mileage" data-mf="'+oi+'|'+mi+'|mileage" value="'+(x.mileage!=null?x.mileage:'')+'"><input class="tnum" type="number" min="0" step="0.01" placeholder="$ cost" data-mf="'+oi+'|'+mi+'|cost" value="'+(+x.cost||0)+'"><button class="mdel" data-mdel="'+oi+'|'+mi+'" title="Remove">×</button></div>';}).join('');
  var byCar={},byCat={};m.forEach(function(x){if(String(x.date||'').slice(0,7)===YM){var c=+x.cost||0;var cn=(cars.find(function(cc){return cc.id===x.carId;})||{}).name||'Unassigned';byCar[cn]=(byCar[cn]||0)+c;var k=x.cat||'Uncategorised';byCat[k]=(byCat[k]||0)+c;}});
  var breakdown=m.length?'<div class="mbreakrow"><div><div class="mbl">By car · '+fmtYM(YM)+'</div><div class="mchips">'+maintChips(byCar)+'</div></div><div><div class="mbl">By type · '+fmtYM(YM)+'</div><div class="mchips">'+maintChips(byCat)+'</div></div></div>':'';
- return '<div class="maint"><div class="mh"><span>🔧 Maintenance · '+fmt(maintYM(o))+' in '+fmtYM(YM)+' · '+fmt(maintTotal(o))+' all-time</span><button class="btn small" data-maddm="'+oi+'">+ maintenance record</button></div>'+(m.length?'<div class="mrow mhdr"><span>Date</span><span>Car</span><span>Type</span><span>Item / details</span><span>Mileage</span><span>Cost</span><span></span></div>'+rows+breakdown:'<div class="hint" style="padding:6px 2px">No maintenance logged yet — add records to track cost per car.</div>')+'</div>';}
+ return '<div class="maint"><div class="mh"><span>🔧 Maintenance · '+fmt(maintYM(o))+' in '+fmtYM(YM)+' · '+fmt(maintTotal(o))+' all-time</span><button class="btn small" data-maddm="'+oi+'">+ maintenance record</button></div>'+(m.length?'<div class="rowscroll"><div class="mrow mhdr"><span>Date</span><span>Car</span><span>Type</span><span>Item / details</span><span>Mileage</span><span>Cost</span><span></span></div>'+rows+'</div>'+breakdown:'<div class="hint" style="padding:6px 2px">No maintenance logged yet — add records to track cost per car.</div>')+'</div>';}
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(msg){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+msg+'</div>';setTimeout(()=>{h.innerHTML='';},2600);}
 
@@ -269,7 +302,7 @@ function render(){
     var summary='<div class="otot"><div class="l">Platform fees /mo</div><div class="v tnum">'+fmt(ot)+'</div><div class="osnap"><span class="chip earn"><span class="cl">Earned '+fmtYM(YM)+'</span><span class="cv">'+fmt(s.n)+'</span></span><span class="chip paid"><span class="cl">Paid out'+(s.fi>0?' *':'')+'</span><span class="cv">'+fmt(s.pn)+'</span></span>'+(mm?'<span class="chip net"><span class="cl">Net −maint</span><span class="cv">'+fmt(netAfter)+'</span></span>':'')+'</div><div class="l" style="margin-top:4px;text-transform:none">'+nc+' car'+(nc===1?'':'s')+(mm?' · maint −'+fmt(mm)+' this mo':'')+'</div></div>';
     var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">';
     var body='<div class="obody">'+odetails(o)+stripeStrip(o)
-      +'<div class="cars">'+(nc?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
+      +'<div class="cars">'+(nc?'<div class="rowscroll">'+hdr+carsHTML+'</div>':'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+'</div>'
       +maintHTML(o)
       +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn" data-doc="statement|'+oi+'">📄 Statement</button><button class="btn" data-doc="invoice|'+oi+'">🧾 Invoice</button><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div></div>';
     return '<div class="owner'+(open?'':' collapsed')+'"><div class="ohead"><button class="otoggle" data-otog="'+esc(o.id)+'" title="'+(open?'Collapse':'Expand')+'">'+(open?'▾':'▸')+'</button><span class="oflag" title="'+esc(o.country||'')+'">'+flagOf(o.country)+'</span>'
@@ -360,6 +393,17 @@ function openPushOwner(oi){
 }
 // R2G letterhead — fill addr/email/phone/reg to complete the invoice header
 const R2G_BIZ={name:'RENT 2 GO LLC',addr:'',email:'',phone:'',reg:''};
+const EMAIL_CSS='body{margin:0;background:#f2f5f9;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#131820}.ew{max-width:640px;margin:0 auto;background:#fff;padding:24px 26px}.dhdr{border-bottom:2px solid #0f8a4d;padding-bottom:12px;margin-bottom:14px}.dtitle{font-size:24px;font-weight:800;letter-spacing:.04em;color:#0f8a4d}.dsubb{font-size:12px;color:#5c6a7a;margin-top:2px}.dparty{margin-top:10px}.dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:2px}.dpn{font-weight:800;font-size:14px}.dtbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}.dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}.dtbl td.n,.dtbl th.n{text-align:right}.dtbl td.neg{color:#c22a2a}.dtbl tr.sec td{background:#f2f5f9;font-weight:800;font-size:11px;text-transform:uppercase;color:#5c6a7a}.dtbl tr.tot td{font-weight:800;border-top:2px solid #c9d2de}.dtbl tfoot td.tl{font-weight:800;font-size:15px;border-top:2px solid #0f8a4d;color:#0f8a4d;padding-top:10px}.dnote{margin-top:16px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}.dsub{margin-top:14px;font-size:11px;font-weight:800;text-transform:uppercase;color:#5c6a7a}';
+async function sendDoc(to,subject,html,btn){
+  if(!to){alert('This owner has no email yet — add one in the owner card details, then try again.');return;}
+  var t=btn.textContent;btn.disabled=true;btn.textContent='Sending…';
+  try{
+    var r=await sb.functions.invoke('send-doc',{body:{to:to,subject:subject,html:html}});
+    if(r.error)throw r.error;
+    if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
+    btn.textContent='Sent ✓';toast('Emailed to '+to);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2200);
+  }catch(e){console.error(e);btn.disabled=false;btn.textContent='Retry send';alert('Send failed: '+(e.message||e)+'\n\n(While your domain is unverified, Resend only delivers to your own account email.)');}
+}
 function docNo(kind,oi){return (kind==='invoice'?'INV':'STMT')+'-'+YM+'-'+pad(oi+1);}
 function maintRowsYM(o){return (o.maint||[]).filter(function(x){return String(x.date||'').slice(0,7)===YM;});}
 function carName(o,id){var c=(o.cars||[]).find(function(cc){return cc.id===id;});return c?(c.name||c.plate||'Car'):'Unassigned';}
@@ -408,15 +452,20 @@ function openDoc(oi,kind){
   if(kind==='invoice'){eln.push('Please find your Rent 2 Go invoice for '+fmtYM(YM)+' attached.');eln.push('');eln.push('Invoice '+docNo('invoice',oi));eln.push('Platform fees: '+fmt(plat));if(mtot>0)eln.push('Fleet maintenance: '+fmt(mtot));eln.push('Total due: '+fmt(totVal));eln.push('');eln.push('Payment due within 7 days. Amounts in USD.');}
   else{eln.push('Please find your Rent 2 Go statement for '+fmtYM(YM)+' attached.');eln.push('');eln.push('Statement '+docNo('statement',oi));eln.push('Net earnings: '+fmt(s.n));eln.push('Payouts received: '+fmt(s.pn));eln.push('R2G charges (platform fee + maintenance): '+fmt(totVal));}
   eln.push('');eln.push('Thank you,');eln.push(R2G_BIZ.name);
-  var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent((kind==='invoice'?'Invoice ':'Statement ')+docNo(kind,oi)+' — Rent 2 Go — '+fmtYM(YM))+'&body='+encodeURIComponent(eln.join('\n'));
+  var subj=(kind==='invoice'?'Invoice ':'Statement ')+docNo(kind,oi)+' — Rent 2 Go — '+fmtYM(YM);
+  var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(eln.join('\n'));
+  var emailHTML='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+EMAIL_CSS+'</style></head><body><div class="ew">'
+    +'<div class="dhdr"><div class="dtitle">RENT 2 GO</div><div class="dsubb">'+title+' · '+docNo(kind,oi)+' · '+fmtYM(YM)+' · Issued '+esc(todayStr)+'</div></div>'
+    +fromP+billP+body+'</div></body></html>';
   var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
     +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.svg" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
     +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
-    +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn" id="dxEmail">✉️ Email owner</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
+    +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn" id="dxDraft">✉️ Draft</button><button class="btn" id="dxSend">📧 Send</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
   document.getElementById('modalHost').innerHTML=html;
   document.getElementById('dxClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
   document.getElementById('dxPrint').onclick=function(){window.print();};
-  document.getElementById('dxEmail').onclick=function(){if(!o.email){alert('This owner has no email yet — add one in the owner card details (Email field), then try again.');return;}window.location.href=mailHref;toast('Opening your mail app — attach the PDF you saved via Print, then send.');};
+  document.getElementById('dxDraft').onclick=function(){if(!o.email){alert('This owner has no email yet — add one in the owner card details (Email field), then try again.');return;}window.location.href=mailHref;toast('Opening your mail app — attach the PDF you saved via Print, then send.');};
+  document.getElementById('dxSend').onclick=function(){sendDoc(o.email,subj,emailHTML,this);};
 }
 // Write one or more owners' packs into the ledger for a month. Idempotent: replaces
 // each owner's prior pushed income (op:/mr:) and expense (mn:) lines with the new set.
