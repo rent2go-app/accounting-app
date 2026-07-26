@@ -100,6 +100,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .dparties{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:18px;font-size:13px;color:#131820;line-height:1.45}
 .dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:3px}
 .dpn{font-weight:800;font-size:14px}
+.dparty{min-width:0}.dparty div{overflow-wrap:anywhere;word-break:break-word;line-height:1.4}
 .dtbl{width:100%;border-collapse:collapse;font-size:13px;color:#131820}
 .dtbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}
 .dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}
@@ -392,10 +393,10 @@ function openPushOwner(oi){
   document.getElementById('pxCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
   document.getElementById('pxGo').onclick=()=>doPushOwner(o,ym,pack);
 }
-// R2G letterhead — fill addr/email/phone/reg to complete the invoice header
-const R2G_BIZ={name:'RENT 2 GO LLC',addr:'',email:'',phone:'',reg:''};
+// R2G letterhead
+const R2G_BIZ={name:'RENT 2 GO LLC',addr1:'9711 David Taylor Drive',addr2:'Charlotte, NC 28262, USA',phone:'+1 (704) 912-0864',email:'billing@rentaride2go.com',web:'www.rentaride2go.com',reg:''};
 const LOGO_URL='https://rent2go-app.github.io/accounting-app/assets/logo.png';
-const EMAIL_CSS='body{margin:0;background:#f2f5f9;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#131820}.ew{max-width:640px;margin:0 auto;background:#fff;padding:24px 26px}.dhdr{border-bottom:2px solid #0f8a4d;padding-bottom:12px;margin-bottom:14px}.dtitle{font-size:24px;font-weight:800;letter-spacing:.04em;color:#0f8a4d}.dsubb{font-size:12px;color:#5c6a7a;margin-top:2px}.dparty{margin-top:10px}.dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:2px}.dpn{font-weight:800;font-size:14px}.dtbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}.dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}.dtbl td.n,.dtbl th.n{text-align:right}.dtbl td.neg{color:#c22a2a}.dtbl tr.sec td{background:#f2f5f9;font-weight:800;font-size:11px;text-transform:uppercase;color:#5c6a7a}.dtbl tr.tot td{font-weight:800;border-top:2px solid #c9d2de}.dtbl tfoot td.tl{font-weight:800;font-size:15px;border-top:2px solid #0f8a4d;color:#0f8a4d;padding-top:10px}.dnote{margin-top:16px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}.dsub{margin-top:14px;font-size:11px;font-weight:800;text-transform:uppercase;color:#5c6a7a}';
+const EMAIL_CSS='body{margin:0;background:#f2f5f9;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#131820}.ew{max-width:640px;margin:0 auto;background:#fff;padding:24px 26px}.dhdr{border-bottom:2px solid #0f8a4d;padding-bottom:12px;margin-bottom:14px}.dtitle{font-size:24px;font-weight:800;letter-spacing:.04em;color:#0f8a4d}.dsubb{font-size:12px;color:#5c6a7a;margin-top:2px}.dparty{margin-top:10px}.dparty div{overflow-wrap:anywhere;word-break:break-word;line-height:1.4}.dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:2px}.dpn{font-weight:800;font-size:14px}.dtbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}.dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}.dtbl td.n,.dtbl th.n{text-align:right}.dtbl td.neg{color:#c22a2a}.dtbl tr.sec td{background:#f2f5f9;font-weight:800;font-size:11px;text-transform:uppercase;color:#5c6a7a}.dtbl tr.tot td{font-weight:800;border-top:2px solid #c9d2de}.dtbl tfoot td.tl{font-weight:800;font-size:15px;border-top:2px solid #0f8a4d;color:#0f8a4d;padding-top:10px}.dnote{margin-top:16px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}.dsub{margin-top:14px;font-size:11px;font-weight:800;text-transform:uppercase;color:#5c6a7a}';
 async function sendDoc(to,subject,html,btn){
   if(!to){alert('This owner has no email yet — add one in the owner card details, then try again.');return;}
   var t=btn.textContent;btn.disabled=true;btn.textContent='Sending…';
@@ -416,7 +417,7 @@ function openDoc(oi,kind){
   var today=new Date();var todayStr=today.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
   var ctry=(COUNTRIES.find(function(c){return c[0]===o.country;})||['',''])[1];
   function party(cls,lbl,name,lines){return '<div class="dparty"><div class="dpl">'+lbl+'</div><div class="dpn">'+esc(name)+'</div>'+lines.filter(Boolean).map(function(l){return '<div>'+l+'</div>';}).join('')+'</div>';}
-  var fromP=party('','From',R2G_BIZ.name,[R2G_BIZ.addr&&esc(R2G_BIZ.addr),R2G_BIZ.email&&esc(R2G_BIZ.email),R2G_BIZ.phone&&esc(R2G_BIZ.phone),R2G_BIZ.reg&&('Reg: '+esc(R2G_BIZ.reg))]);
+  var fromP=party('','From',R2G_BIZ.name,[R2G_BIZ.addr1&&esc(R2G_BIZ.addr1),R2G_BIZ.addr2&&esc(R2G_BIZ.addr2),R2G_BIZ.phone&&esc(R2G_BIZ.phone),R2G_BIZ.email&&esc(R2G_BIZ.email),R2G_BIZ.web&&esc(R2G_BIZ.web),R2G_BIZ.reg&&('Reg: '+esc(R2G_BIZ.reg))]);
   var billP=party('','Bill to',o.bizName||o.name||'Owner',[o.ownerName&&esc(o.ownerName),o.addr&&esc(o.addr),o.email&&esc(o.email),o.phone&&esc(o.phone),o.country&&(flagOf(o.country)+' '+esc(ctry))]);
   var body,title,totVal;
   if(kind==='invoice'){
