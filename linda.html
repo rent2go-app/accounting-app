@@ -55,6 +55,21 @@
 .card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}.card .v.pink{color:#d6336c}
 #heroBubble li.pink{color:#d6336c;font-weight:700}
 h2{font-size:15px;margin:18px 0 8px}
+.acct{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.accttl{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 10px}
+.accmeta{font-size:11px;color:var(--muted);font-weight:600}
+.feetbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.feetbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.feetbl tr.hd td{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;background:var(--surface-2)}
+.feetbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.feetbl tr.tot td{font-weight:800;background:var(--surface-2)}
+.skwrap{margin-top:18px;background:var(--surface-2);border:1px dashed var(--line);border-radius:12px;padding:6px 14px}
+.skwrap summary{cursor:pointer;font-weight:800;font-size:13px;color:var(--muted);padding:6px 0}
+.skbody{padding:6px 0}
+.skrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.skrow .dmail{color:var(--muted);font-size:12px}
+.skrow .amt{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.skrow .skre{font-size:11px;color:var(--muted);font-weight:700}
 .draft{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .draft.disc{border-color:var(--out);border-left:5px solid var(--out)}
 .draft.recovery{border-color:#8a1c1c;border-left:5px solid #8a1c1c}
@@ -69,6 +84,8 @@ h2{font-size:15px;margin:18px 0 8px}
 .dbody{white-space:pre-wrap;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:10px;max-height:0;overflow:hidden;transition:max-height .2s}
 .draft.open .dbody{max-height:400px;overflow:auto}
 .dact{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.ein{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin:4px 0 8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px}
+.eta{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px;line-height:1.5;resize:vertical}
 .status{font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px}
 .status.approved{background:color-mix(in srgb,var(--in) 14%,var(--surface));color:var(--in)}
 .status.sent{background:var(--brand);color:#fff}
@@ -99,10 +116,11 @@ h2{font-size:15px;margin:18px 0 8px}
   </div>
 </div>
 <div class="cards" id="lsum"></div>
-<h2>🔴 Red flags — action required</h2>
-<div id="lflags"></div>
-<h2>✉️ Draft notices</h2>
-<div id="ldrafts"></div>
+<h2>🩷 $10 late-fee invoices to raise — who &amp; when</h2>
+<div id="lfeeledger"></div>
+<h2 style="margin-top:22px">📋 Notices by account</h2>
+<div id="laccounts"></div>
+<div id="lskipped"></div>
 </main></div>
 
 <script>
@@ -131,25 +149,62 @@ function render(){
     card('Outstanding',fmt(out),'')+
     card('🩷 $10 invoices to raise',feeCount+' · '+fmt(feeTotal),'pink')+
     card('Red flags',flags,flags?'red':'');
-  var fl=CUSTS.filter(c=>c.flag&&c.flag!=='none').sort((a,b)=>b.pastdue_count-a.pastdue_count);
-  document.getElementById('lflags').innerHTML=fl.length?fl.map(function(c){return '<div class="draft '+(c.flag==='recovery'?'recovery':'disc')+'"><div class="dhead"><span class="kind '+c.flag+'">'+c.flag.toUpperCase()+'</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'<p class="hint">No red flags. 🎉</p>';
-  var host=document.getElementById('ldrafts');
-  if(!DRAFTS.length){host.innerHTML='<p class="hint">No drafts yet. Linda runs her scan daily.</p>';return;}
-  host.innerHTML=DRAFTS.map(function(d,i){
-    var st=d.status!=='draft'?'<span class="status '+d.status+'">'+d.status+'</span>':'';
-    return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+st+'<span class="amt">'+fmt(d.amount)+'</span></div>'
-      +'<div class="dsubj">'+esc(d.subject)+'</div>'
-      +'<div class="dbody">'+bodyToHtml(d.body,false)+'</div>'
-      +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
-      +(d.status==='draft'?'<button class="btn small pri" data-approve="'+d.id+'">✓ Approve</button><button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
-      +(d.status==='approved'?'<button class="btn small pri" data-send="'+d.id+'"'+(d.email?'':' disabled title="no email"')+'>📧 Send</button><button class="btn small" data-unapprove="'+d.id+'">Undo</button>':'')
-      +'</div></div>';
-  }).join('');
+  renderFeeLedger();
+  var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)))).filter(Boolean).sort();
+  var host=document.getElementById('laccounts');
+  host.innerHTML=accs.map(function(acc){
+    var af=CUSTS.filter(c=>c.account_label===acc&&c.flag&&c.flag!=='none').sort((a,b)=>b.pastdue_count-a.pastdue_count);
+    var ad=DRAFTS.filter(d=>d.account_label===acc&&d.status!=='skipped');
+    var flagsH=af.length?af.map(function(c){return '<div class="draft '+(c.flag==='recovery'?'recovery':'disc')+'"><div class="dhead"><span class="kind '+c.flag+'">'+c.flag.toUpperCase()+'</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'';
+    var draftsH=ad.length?ad.map(draftCard).join(''):'<p class="hint">No past-due notices for this account. 🎉</p>';
+    return '<section class="acct"><h2 class="accttl">🏦 '+esc(acc)+' <span class="accmeta">'+ad.length+' notice(s) · '+af.length+' red flag(s)</span></h2>'+flagsH+draftsH+'</section>';
+  }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
+  renderSkipped();
   wire();
   renderSuggestions();
 }
+function renderSkipped(){
+  var el=document.getElementById('lskipped');if(!el)return;
+  var sk=DRAFTS.filter(d=>d.status==='skipped');
+  if(!sk.length){el.innerHTML='';return;}
+  var rows=sk.map(function(d){
+    var reAt=d.skipped_at?new Date(new Date(d.skipped_at).getTime()+3*86400000):null;
+    var due=reAt?(reAt<=new Date()?'now (re-table due)':reAt.toLocaleDateString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric'})):'in 3 days';
+    return '<div class="skrow"><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.account_label)+'</span><span class="amt">'+fmt(d.amount)+'</span><span class="skre">↻ re-tables '+due+'</span><button class="btn small" data-restore="'+d.id+'">Restore now</button></div>';
+  }).join('');
+  el.innerHTML='<details class="skwrap"><summary>⏭️ Skipped ('+sk.length+') — auto re-tables in 3 days</summary><div class="skbody">'+rows+'</div></details>';
+}
+function draftCard(d){
+  var st=d.status!=='draft'?'<span class="status '+d.status+'">'+d.status+'</span>':'';
+  return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+st+'<span class="amt">'+fmt(d.amount)+'</span></div>'
+    +'<div class="dsubj">'+esc(d.subject)+'</div>'
+    +'<div class="dbody">'+bodyToHtml(d.body,false)+'</div>'
+    +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
+    +(d.status!=='sent'?'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>':'')
+    +(d.status==='draft'?'<button class="btn small pri" data-approve="'+d.id+'">✓ Approve</button><button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
+    +(d.status==='approved'?'<button class="btn small pri" data-send="'+d.id+'"'+(d.email?'':' disabled title="no email"')+'>📧 Send</button><button class="btn small" data-unapprove="'+d.id+'">Undo</button>':'')
+    +'</div></div>';
+}
+function editDraft(id){
+  var d=DRAFTS.find(x=>x.id==id);if(!d)return;var el=document.getElementById('d'+id);
+  el.innerHTML='<div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'no email')+'</span></div>'
+    +'<label class="hint">Subject</label><input id="es'+id+'" class="ein" value="'+esc(d.subject)+'">'
+    +'<label class="hint">Message (you can edit anything before it goes out)</label><textarea id="eb'+id+'" class="eta" rows="14">'+esc(d.body)+'</textarea>'
+    +'<div class="dact"><button class="btn small pri" data-saveedit="'+id+'">💾 Save changes</button><button class="btn small" data-canceledit="1">Cancel</button></div>';
+  el.querySelector('[data-saveedit]').onclick=async function(){await upd(id,{subject:document.getElementById('es'+id).value,body:document.getElementById('eb'+id).value});};
+  el.querySelector('[data-canceledit]').onclick=function(){render();};
+}
+function renderFeeLedger(){
+  var el=document.getElementById('lfeeledger');if(!el)return;
+  var nameOf={};CUSTS.forEach(function(c){nameOf[c.account_label+'|'+c.customer_id]=c.name;});
+  if(!FEES.length){el.innerHTML='<p class="hint">No $10 late-fee invoices pending. 🎉</p>';return;}
+  var rows=FEES.slice().sort(function(a,b){return (a.account_label+(nameOf[a.account_label+'|'+a.customer_id]||''))<(b.account_label+(nameOf[b.account_label+'|'+b.customer_id]||''))?-1:1;}).map(function(f){return '<tr><td>'+esc(nameOf[f.account_label+'|'+f.customer_id]||f.customer_id)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc((f.created_at||'').slice(0,10))+'</td><td class="n">'+fmt(f.fee)+'</td><td><span class="status skipped">'+esc(f.status)+'</span></td></tr>';}).join('');
+  var tot=FEES.reduce(function(s,f){return s+(+f.fee||0);},0);
+  el.innerHTML='<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Flagged</td><td>Fee</td><td>Status</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total to raise</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table><p class="hint">🩷 These $10 late-fee invoices will be created in Stripe when you go live (approve writes). Nothing is charged in dry-run.</p>';
+}
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
-function greetWord(){var h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+function greetWord(){var h=parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}),10)%24;return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+function etStamp(){return new Date().toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}
 function niceName(email){email=(email||'').toLowerCase();if(NAMES[email])return NAMES[email];var lp=email.split('@')[0].replace(/[0-9._-]+/g,' ').trim();return lp?lp.charAt(0).toUpperCase()+lp.slice(1):'there';}
 function setGreeting(email){var el=document.getElementById('greeting');if(el)el.textContent=greetWord()+', '+niceName(email)+' 👋';}
 function renderSuggestions(){
@@ -173,8 +228,10 @@ function wire(){
   document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>document.getElementById('d'+b.dataset.toggle).classList.toggle('open'));
   document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>upd(b.dataset.approve,{status:'approved',approved_at:new Date().toISOString()}));
   document.querySelectorAll('[data-unapprove]').forEach(b=>b.onclick=()=>upd(b.dataset.unapprove,{status:'draft',approved_at:null}));
-  document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>upd(b.dataset.skip,{status:'skipped'}));
+  document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>upd(b.dataset.skip,{status:'skipped',skipped_at:new Date().toISOString()}));
+  document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>upd(b.dataset.restore,{status:'draft',skipped_at:null}));
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send(b.dataset.send,b));
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editDraft(b.dataset.edit));
 }
 async function upd(id,patch){var r=await sb.from('linda_drafts').update(patch).eq('id',id);if(r.error){alert(r.error.message);return;}var d=DRAFTS.find(x=>x.id==id);Object.assign(d,patch);render();}
 async function send(id,btn){
