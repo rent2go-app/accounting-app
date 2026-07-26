@@ -52,7 +52,8 @@
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .card .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .card .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:3px}
-.card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}
+.card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}.card .v.pink{color:#d6336c}
+#heroBubble li.pink{color:#d6336c;font-weight:700}
 h2{font-size:15px;margin:18px 0 8px}
 .draft{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .draft.disc{border-color:var(--out);border-left:5px solid var(--out)}
@@ -85,7 +86,7 @@ h2{font-size:15px;margin:18px 0 8px}
 <div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda.png" alt="Linda" style="width:86px;height:86px;border-radius:50%;box-shadow:0 6px 18px rgba(0,0,0,.18)"></div><h1 style="text-align:center;margin-top:10px">Linda</h1><p class="hint" style="text-align:center">Your billing agent — admin sign in.</p><input id="li_email" type="email" autocomplete="username" placeholder="Email" required><input id="li_pass" type="password" autocomplete="current-password" placeholder="Password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda.png" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda-sm.png" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
 <div class="hero">
   <img src="assets/linda.png" alt="Linda" class="heroimg">
@@ -107,24 +108,28 @@ h2{font-size:15px;margin:18px 0 8px}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[];
+let DRAFTS=[],CUSTS=[],FEES=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function bodyToHtml(t,br){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(t))){out+=esc(t.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" target="_blank" rel="noopener" style="color:#0f8a4d;font-weight:700;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(t.slice(last));return br?out.replace(/\n/g,'<br>'):out;}
 async function load(){
   var d=await sb.from('linda_drafts').select('*').order('kind',{ascending:true});DRAFTS=d.data||[];
   var c=await sb.from('linda_customers').select('*');CUSTS=c.data||[];
+  var f=await sb.from('linda_fees').select('*').eq('status','proposed');FEES=f.data||[];
   render();
 }
 function render(){
   var rem=DRAFTS.filter(x=>x.kind==='reminder').length,disc=DRAFTS.filter(x=>x.kind==='disconnect').length,rec=DRAFTS.filter(x=>x.kind==='recovery').length;
   var out=CUSTS.reduce((s,c)=>s+(+c.outstanding||0),0);
   var flags=CUSTS.filter(c=>c.flag&&c.flag!=='none').length;
+  var feeCount=FEES.length,feeTotal=FEES.reduce((s,f)=>s+(+f.fee||0),0);
   document.getElementById('lsum').innerHTML=
     card('Active rentals',CUSTS.length,'')+
     card('Reminders',rem,'','')+
     card('Disconnections',disc,'red')+
     card('Recovery',rec,'red')+
     card('Outstanding',fmt(out),'')+
+    card('🩷 $10 invoices to raise',feeCount+' · '+fmt(feeTotal),'pink')+
     card('Red flags',flags,flags?'red':'');
   var fl=CUSTS.filter(c=>c.flag&&c.flag!=='none').sort((a,b)=>b.pastdue_count-a.pastdue_count);
   document.getElementById('lflags').innerHTML=fl.length?fl.map(function(c){return '<div class="draft '+(c.flag==='recovery'?'recovery':'disc')+'"><div class="dhead"><span class="kind '+c.flag+'">'+c.flag.toUpperCase()+'</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'<p class="hint">No red flags. 🎉</p>';
@@ -134,7 +139,7 @@ function render(){
     var st=d.status!=='draft'?'<span class="status '+d.status+'">'+d.status+'</span>':'';
     return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+st+'<span class="amt">'+fmt(d.amount)+'</span></div>'
       +'<div class="dsubj">'+esc(d.subject)+'</div>'
-      +'<div class="dbody">'+esc(d.body)+'</div>'
+      +'<div class="dbody">'+bodyToHtml(d.body,false)+'</div>'
       +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
       +(d.status==='draft'?'<button class="btn small pri" data-approve="'+d.id+'">✓ Approve</button><button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
       +(d.status==='approved'?'<button class="btn small pri" data-send="'+d.id+'"'+(d.email?'':' disabled title="no email"')+'>📧 Send</button><button class="btn small" data-unapprove="'+d.id+'">Undo</button>':'')
@@ -157,6 +162,7 @@ function renderSuggestions(){
   if(disc)s.push({c:'red',t:disc+' customer(s) under disconnection — recovery follows in 12h if uncured.'});
   near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
   if(draftN)s.push({c:'',t:draftN+' draft notice(s) awaiting your review. Approve to queue, then send.'});
+  if(FEES.length)s.push({c:'pink',t:'🩷 Pink flag: I will raise '+FEES.length+' × $10 late-fee invoice(s) ('+fmt(FEES.reduce((a,f)=>a+(+f.fee||0),0))+') on go-live — proposed now, only posted once you approve writes.'});
   s.push({c:'',t:'To email customers, verify rentaride2go.com in Resend.'});
   if(!draftN&&!disc&&!rec)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
   var el=document.getElementById('heroBubble');
@@ -175,7 +181,7 @@ async function send(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d||!d.email){alert('No email on file for this customer.');return;}
   btn.disabled=true;btn.textContent='Sending…';
   try{
-    var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;white-space:pre-wrap">'+esc(d.body)+'</div>';
+    var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;line-height:1.55">'+bodyToHtml(d.body,true)+'</div>';
     var r=await sb.functions.invoke('send-doc',{body:{to:d.email,subject:d.subject,html:html}});
     if(r.error)throw r.error; if(r.data&&r.data.error)throw new Error(JSON.stringify(r.data.error));
     await upd(id,{status:'sent',sent_at:new Date().toISOString()});
