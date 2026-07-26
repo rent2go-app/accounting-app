@@ -88,6 +88,9 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .paygrphd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:5px}
 .paygrpt{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .paygrpt b{color:var(--out)}
+.reusehint{margin-top:9px;padding:8px 11px;background:color-mix(in srgb,#7a5cff 9%,var(--surface));border:1px solid color-mix(in srgb,#7a5cff 28%,var(--line));border-radius:9px;font-size:12px;color:var(--muted)}
+.reusesnip{font-style:italic;margin-top:3px;color:var(--muted);font-size:11.5px;line-height:1.35}
+.linkbtn{background:none;border:none;color:#7a5cff;font-weight:800;cursor:pointer;padding:0;font-size:12px;text-decoration:underline}
 .feewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px;margin-bottom:16px;box-shadow:var(--shadow)}
 .feewrap summary{cursor:pointer;font-weight:800;font-size:14px;padding:9px 0;list-style:none}
 .feewrap summary::-webkit-details-marker{display:none}
@@ -184,7 +187,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -233,6 +236,7 @@ async function load(){
   var f=await sb.from('linda_fees').select('*').eq('status','proposed');FEES=f.data||[];
   try{var lr=await sb.from('linda_learnings').select('*').order('kind',{ascending:true});LEARN=lr.data||[];}catch(e){LEARN=[];}
   try{var p=await sb.from('linda_payments').select('*').order('paid_at',{ascending:false});PAY=p.data||[];}catch(e){PAY=[];}
+  try{var nt=await sb.from('linda_notes').select('*');NOTES=nt.data||[];}catch(e){NOTES=[];}
   render();
 }
 function render(){
@@ -330,15 +334,29 @@ function draftCard(d){
         +'<button class="btn small ok" data-sent="'+d.id+'" title="I have sent this to the customer (email / WhatsApp / SMS)">✅ Mark sent</button>'
         +(d.status==='draft'?'<button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
       :'<button class="btn small" data-unsent="'+d.id+'">↩ Undo sent</button>')
-    +'</div></div>';
+    +'</div>'+reuseHint(d)+'</div>';
 }
+function reuseHint(d){
+  if(d.status==='sent')return '';
+  var n=noteFor(d);if(!n||!n.body)return '';
+  if(etDate(n.updated_at)===todayET())return '';   // only suggest wording carried over from a previous day
+  var snip=esc(String(n.body).replace(/\s+/g,' ').slice(0,90));
+  return '<div class="reusehint">💬 You personalised '+esc((d.customer_name||'').split(' ')[0])+'’s notice on '+shortET(n.updated_at)+' — <button class="linkbtn" data-reuse="'+d.id+'">reuse that wording</button><div class="reusesnip">“'+snip+'…”</div></div>';
+}
+function noteFor(d){return NOTES.find(n=>n.account_label===d.account_label&&n.customer_id===d.customer_id);}
+async function saveNote(acc,cid,subject,body){
+  try{await sb.from('linda_notes').upsert({account_label:acc,customer_id:cid,subject:subject,body:body,updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});}catch(e){}
+  var ex=NOTES.find(n=>n.account_label===acc&&n.customer_id===cid);
+  if(ex){ex.subject=subject;ex.body=body;ex.updated_at=new Date().toISOString();}else NOTES.push({account_label:acc,customer_id:cid,subject:subject,body:body,updated_at:new Date().toISOString()});
+}
+function reuseNote(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;var n=noteFor(d);if(!n)return;editDraft(id);setTimeout(function(){var s=document.getElementById('es'+id),b=document.getElementById('eb'+id);if(s&&n.subject)s.value=n.subject;if(b&&n.body)b.value=n.body;if(b)b.focus();},30);}
 function editDraft(id){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;var el=document.getElementById('d'+id);
   el.innerHTML='<div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'no email')+'</span></div>'
     +'<label class="hint">Subject</label><input id="es'+id+'" class="ein" value="'+esc(d.subject)+'">'
     +'<label class="hint">Message (you can edit anything before it goes out)</label><textarea id="eb'+id+'" class="eta" rows="14">'+esc(d.body)+'</textarea>'
     +'<div class="dact"><button class="btn small pri" data-saveedit="'+id+'">💾 Save changes</button><button class="btn small" data-canceledit="1">Cancel</button></div>';
-  el.querySelector('[data-saveedit]').onclick=async function(){await upd(id,{subject:document.getElementById('es'+id).value,body:document.getElementById('eb'+id).value});};
+  el.querySelector('[data-saveedit]').onclick=async function(){var subject=document.getElementById('es'+id).value,body=document.getElementById('eb'+id).value;await saveNote(d.account_label,d.customer_id,subject,body);await upd(id,{subject:subject,body:body});};
   el.querySelector('[data-canceledit]').onclick=function(){render();};
 }
 function renderFeeLedger(){
@@ -451,6 +469,7 @@ function wire(){
   if(ea)ea.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=true);
   if(ca)ca.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=false);
   var ra=document.getElementById('reaudit');if(ra)ra.onclick=()=>reaudit(ra);
+  document.querySelectorAll('[data-reuse]').forEach(b=>b.onclick=()=>reuseNote(b.dataset.reuse));
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
