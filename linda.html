@@ -153,13 +153,16 @@ function bodyToHtml(t,br){
     return h;});
   return br?lines.join('<br>'):lines.join('\n');
 }
+// Soften dashboard status markers for the customer-facing copy (❌/✅ -> neutral bullet).
+function softenMarkers(t){return t.replace(/^([ \t]*)[❌✅]\s+/gm,'$1• ');}
 // Clean, customer-facing HTML for copy/paste (live links, no dashboard highlight boxes).
 function bodyToClean(t){
+  t=softenMarkers(t);
   function lk(s){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(s))){out+=esc(s.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" style="color:#0a7d44;font-weight:bold;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(s.slice(last));return out;}
   return t.split('\n').map(function(ln){var h=lk(ln);return ln.trim().indexOf('💰')===0?'<b>'+h+'</b>':h;}).join('<br>');
 }
 // Plain-text version: spell out links as "Text: URL" so SMS/plain paste stays usable.
-function bodyToPlain(t){return t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,function(m,tx,u){return tx+': '+u;});}
+function bodyToPlain(t){return softenMarkers(t).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,function(m,tx,u){return tx+': '+u;});}
 function copyDraft(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
   var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">'+bodyToClean(d.body)+'</div>';
