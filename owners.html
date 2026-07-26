@@ -187,12 +187,12 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 
-<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.svg" alt="Rent 2 Go"></div><p>Owners Programme — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.png" alt="Rent 2 Go"></div><p>Owners Programme — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><div class="brand"><img class="brandlogo" src="assets/logo.svg" alt="Rent 2 Go"></div><div class="sub">· Owners Programme Payments</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><div class="brand"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"></div><div class="sub">· Owners Programme Payments</div><div class="spacer"></div><span class="savestate" id="savestate"></span><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
 <div class="ctl">
   <label>Working month</label><input type="month" id="ym">
@@ -394,6 +394,7 @@ function openPushOwner(oi){
 }
 // R2G letterhead — fill addr/email/phone/reg to complete the invoice header
 const R2G_BIZ={name:'RENT 2 GO LLC',addr:'',email:'',phone:'',reg:''};
+const LOGO_URL='https://rent2go-app.github.io/accounting-app/assets/logo.png';
 const EMAIL_CSS='body{margin:0;background:#f2f5f9;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#131820}.ew{max-width:640px;margin:0 auto;background:#fff;padding:24px 26px}.dhdr{border-bottom:2px solid #0f8a4d;padding-bottom:12px;margin-bottom:14px}.dtitle{font-size:24px;font-weight:800;letter-spacing:.04em;color:#0f8a4d}.dsubb{font-size:12px;color:#5c6a7a;margin-top:2px}.dparty{margin-top:10px}.dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:2px}.dpn{font-weight:800;font-size:14px}.dtbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}.dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}.dtbl td.n,.dtbl th.n{text-align:right}.dtbl td.neg{color:#c22a2a}.dtbl tr.sec td{background:#f2f5f9;font-weight:800;font-size:11px;text-transform:uppercase;color:#5c6a7a}.dtbl tr.tot td{font-weight:800;border-top:2px solid #c9d2de}.dtbl tfoot td.tl{font-weight:800;font-size:15px;border-top:2px solid #0f8a4d;color:#0f8a4d;padding-top:10px}.dnote{margin-top:16px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}.dsub{margin-top:14px;font-size:11px;font-weight:800;text-transform:uppercase;color:#5c6a7a}';
 async function sendDoc(to,subject,html,btn){
   if(!to){alert('This owner has no email yet — add one in the owner card details, then try again.');return;}
@@ -456,10 +457,10 @@ function openDoc(oi,kind){
   var subj=(kind==='invoice'?'Invoice ':'Statement ')+docNo(kind,oi)+' — Rent 2 Go — '+fmtYM(YM);
   var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(eln.join('\n'));
   var emailHTML='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+EMAIL_CSS+'</style></head><body><div class="ew">'
-    +'<div class="dhdr"><div class="dtitle">RENT 2 GO</div><div class="dsubb">'+title+' · '+docNo(kind,oi)+' · '+fmtYM(YM)+' · Issued '+esc(todayStr)+'</div></div>'
+    +'<div class="dhdr"><img src="'+LOGO_URL+'" alt="Rent 2 Go" style="height:40px;width:auto;display:block;margin-bottom:6px"><div class="dsubb">'+title+' · '+docNo(kind,oi)+' · '+fmtYM(YM)+' · Issued '+esc(todayStr)+'</div></div>'
     +fromP+billP+body+'</div></body></html>';
   var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
-    +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.svg" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
+    +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.png" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
     +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
     +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn" id="dxDraft">✉️ Draft</button><button class="btn" id="dxSend">📧 Send</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
   document.getElementById('modalHost').innerHTML=html;
