@@ -163,6 +163,7 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 <div class="ctl">
   <label>Working month</label><input type="month" id="ym">
   <button class="btn" id="addOwner">+ Add owner</button>
+  <button class="btn pri" id="pushAll">⇪ Push all → ledger</button>
   <button class="btn" id="undoBtn" disabled>↶ Undo</button>
   <button class="btn" id="expandAll">Expand all</button>
   <button class="btn" id="collapseAll">Collapse all</button>
@@ -327,18 +328,35 @@ function buildOwnerLines(o,ym){
   }
   return lines;
 }
+// Maintenance -> ledger: expense line per item (Maintenance & Repairs, blue/operating)
+// + a matching rebill income line (owners are invoiced for maintenance).
+function buildOwnerMaint(o,ym){
+  var oid=o.id,exp=[],inc=[],mt=0;
+  (o.maint||[]).forEach(function(x){if(String(x.date||'').slice(0,7)!==ym)return;var amt=r2(+x.cost||0);if(amt<=0)return;mt=r2(mt+amt);
+    var cn=carName(o,x.carId);var desc=(o.name||'Owner')+' — '+(x.cat||'Maintenance')+(cn&&cn!=='Unassigned'?' · '+cn:'')+(x.desc?' ('+x.desc+')':'');
+    exp.push({date:x.date,info:(x.cat||'Maintenance'),amt:amt,line:[desc,amt,'Maintenance & Repairs',false,'','','mn:'+oid]});});
+  if(mt>0){var dm=dim(ym);var day=Math.min(+o.day===25?25:30,dm);var date=ym+'-'+pad(day);
+    inc.push({date:date,info:'maint rebill',amt:mt,line:[(o.name||'Owner')+' — Maintenance rebilled',mt,'Maintenance Rebilled','','mr:'+oid]});}
+  return {exp:exp,inc:inc,mt:mt};
+}
+function ownerLedgerPack(o,ym){var m=buildOwnerMaint(o,ym);return {inc:buildOwnerLines(o,ym).concat(m.inc),exp:m.exp,mt:m.mt};}
 function openPushOwner(oi){
-  var o=STATE[oi],ym=YM,lines=buildOwnerLines(o,ym);
-  var total=r2(lines.reduce((s,l)=>s+l.amt,0));
-  var rows=lines.length?lines.map(l=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.info)+'</td><td class="n">'+fmt(l.amt)+'</td></tr>').join(''):'<tr><td colspan="3" class="hint" style="padding:14px">Nothing to push — this owner has no positive total this month.</td></tr>';
-  var html='<div class="modal"><div class="mcard"><div class="mhd">Push '+esc(o.name||'owner')+' · '+fmtYM(ym)+'</div>'
-    +'<div class="mbody"><p class="hint">Writes '+esc(o.name||'this owner')+"'s "+(o.cadence==='weekly'?'4 weekly payments':'monthly payment')+' into the ledger. Only <b>this owner\'s</b> programme lines for '+esc(fmtYM(ym))+' are replaced — every other owner, plus your income, deposits and expenses, stays untouched.</p>'
-    +'<table class="prev"><thead><tr><th>Ledger day</th><th>Detail</th><th>Income</th></tr></thead><tbody>'+rows
-    +'</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:800;padding:8px">Total</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(total)+'</td></tr></tfoot></table></div>'
-    +'<div class="mfoot"><button class="btn" id="pxCancel">Cancel</button><button class="btn pri" id="pxGo"'+(lines.length?'':' disabled')+'>Confirm &amp; write '+fmt(total)+'</button></div></div></div>';
+  var o=STATE[oi],ym=YM,pack=ownerLedgerPack(o,ym);
+  var incTot=r2(pack.inc.reduce((s,l)=>s+l.amt,0)),expTot=r2(pack.exp.reduce((s,l)=>s+l.amt,0));
+  function tbl(list,cls){return list.map(l=>'<tr><td>'+esc(l.date)+'</td><td>'+esc(l.info)+'</td><td class="n '+cls+'">'+fmt(l.amt)+'</td></tr>').join('');}
+  var incRows=pack.inc.length?tbl(pack.inc,''):'<tr><td colspan="3" class="hint" style="padding:10px">No income lines this month.</td></tr>';
+  var expRows=pack.exp.length?tbl(pack.exp,'neg'):'';
+  var body='<p class="hint">Writes '+esc(o.name||'this owner')+"'s programme income"+(pack.exp.length?', plus fleet maintenance as operating expense + a matching rebill,':'')+' into the ledger for '+esc(fmtYM(ym))+'. Only <b>this owner\'s</b> pushed lines are replaced — everything else stays untouched.</p>'
+    +'<table class="prev"><thead><tr><th>Ledger day</th><th>Detail</th><th>Income</th></tr></thead><tbody>'+incRows+'</tbody>'
+    +'<tfoot><tr><td colspan="2" style="text-align:right;font-weight:800;padding:8px">Income total</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(incTot)+'</td></tr></tfoot></table>'
+    +(pack.exp.length?'<table class="prev" style="margin-top:12px"><thead><tr><th>Ledger day</th><th>Maintenance (→ expense)</th><th>Amount</th></tr></thead><tbody>'+expRows+'</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:800;padding:8px">Expense total</td><td class="n" style="font-weight:800;color:var(--out)">'+fmt(expTot)+'</td></tr></tfoot></table>':'');
+  var can=pack.inc.length||pack.exp.length;
+  var html='<div class="modal"><div class="mcard"><div class="mhd">Push '+esc(o.name||'owner')+' → ledger · '+fmtYM(ym)+'</div>'
+    +'<div class="mbody">'+body+'</div>'
+    +'<div class="mfoot"><button class="btn" id="pxCancel">Cancel</button><button class="btn pri" id="pxGo"'+(can?'':' disabled')+'>Confirm &amp; write</button></div></div></div>';
   document.getElementById('modalHost').innerHTML=html;
   document.getElementById('pxCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
-  document.getElementById('pxGo').onclick=()=>doPushOwner(o,ym,lines);
+  document.getElementById('pxGo').onclick=()=>doPushOwner(o,ym,pack);
 }
 // R2G letterhead — fill addr/email/phone/reg to complete the invoice header
 const R2G_BIZ={name:'RENT 2 GO LLC',addr:'',email:'',phone:'',reg:''};
@@ -393,30 +411,53 @@ function openDoc(oi,kind){
   document.getElementById('dxClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
   document.getElementById('dxPrint').onclick=function(){window.print();};
 }
-async function doPushOwner(o,ym,lines){
+// Write one or more owners' packs into the ledger for a month. Idempotent: replaces
+// each owner's prior pushed income (op:/mr:) and expense (mn:) lines with the new set.
+async function writePacks(packs,ym){
+  var last=dim(ym),from=ym+'-01',to=ym+'-'+pad(last);
+  var res=await sb.from('day_blocks').select('day,deposits,income,expenses').gte('day',from).lte('day',to);
+  if(res.error)throw res.error;
+  var ex={};(res.data||[]).forEach(r=>ex[r.day]=r);
+  var incRefs={},expRefs={},incByDate={},expByDate={};
+  packs.forEach(function(p){incRefs['op:'+p.oid]=1;incRefs['mr:'+p.oid]=1;expRefs['mn:'+p.oid]=1;
+    p.inc.forEach(l=>{(incByDate[l.date]=incByDate[l.date]||[]).push(l.line);});
+    p.exp.forEach(l=>{(expByDate[l.date]=expByDate[l.date]||[]).push(l.line);});});
+  var affected={};
+  Object.keys(ex).forEach(function(d){var r=ex[d];if((r.income||[]).some(l=>incRefs[l[4]]))affected[d]=1;if((r.expenses||[]).some(l=>expRefs[l[6]]))affected[d]=1;});
+  Object.keys(incByDate).forEach(d=>affected[d]=1);Object.keys(expByDate).forEach(d=>affected[d]=1);
+  var dates=Object.keys(affected),created=0;
+  var ups=dates.map(function(date){
+    var row=ex[date];if(!row){created++;row={day:date,deposits:[],income:[],expenses:[]};}
+    var inc=(row.income||[]).filter(l=>!incRefs[l[4]]).concat(incByDate[date]||[]);
+    var exp=(row.expenses||[]).filter(l=>!expRefs[l[6]]).concat(expByDate[date]||[]);
+    return {day:date,deposits:row.deposits||[],income:inc,expenses:exp,updated_at:new Date().toISOString()};
+  });
+  if(ups.length){var r=await sb.from('day_blocks').upsert(ups,{onConflict:'day'});if(r.error)throw r.error;}
+  return created;
+}
+async function doPushOwner(o,ym,pack){
   var go=document.getElementById('pxGo');go.disabled=true;go.textContent='Writing…';
   try{
     await save();
-    var last=dim(ym),from=ym+'-01',to=ym+'-'+pad(last);
-    var res=await sb.from('day_blocks').select('day,deposits,income,expenses').gte('day',from).lte('day',to);
-    if(res.error)throw res.error;
-    var ex={};(res.data||[]).forEach(r=>ex[r.day]=r);
-    var tagRef='op:'+o.id;
-    var byDate={};lines.forEach(l=>{(byDate[l.date]=byDate[l.date]||[]).push(l.line);});
-    var affected={};
-    Object.keys(ex).forEach(function(d){if((ex[d].income||[]).some(l=>l[4]===tagRef))affected[d]=1;});
-    Object.keys(byDate).forEach(d=>affected[d]=1);
-    var dates=Object.keys(affected),created=0;
-    var ups=dates.map(function(date){
-      var row=ex[date];if(!row){created++;row={day:date,deposits:[],income:[],expenses:[]};}
-      var inc=(row.income||[]).filter(l=>l[4]!==tagRef);
-      inc=inc.concat(byDate[date]||[]);
-      return {day:date,deposits:row.deposits||[],income:inc,expenses:row.expenses||[],updated_at:new Date().toISOString()};
-    });
-    if(ups.length){var r=await sb.from('day_blocks').upsert(ups,{onConflict:'day'});if(r.error)throw r.error;}
+    var created=await writePacks([{oid:o.id,inc:pack.inc,exp:pack.exp}],ym);
+    var incTot=r2(pack.inc.reduce((s,l)=>s+l.amt,0));
     document.getElementById('modalHost').innerHTML='';
-    toast('Pushed '+esc(o.name||'owner')+' · '+fmt(r2(lines.reduce((s,l)=>s+l.amt,0)))+' → '+fmtYM(ym)+(created?(' · '+created+' new day'+(created===1?'':'s')):''));
+    toast('Pushed '+esc(o.name||'owner')+' · income '+fmt(incTot)+(pack.mt?' · maint '+fmt(pack.mt):'')+' → '+fmtYM(ym)+(created?(' · '+created+' new day'+(created===1?'':'s')):''));
   }catch(e){console.error(e);go.disabled=false;go.textContent='Retry';alert('Push failed: '+(e.message||e));}
+}
+function openPushAll(){
+  var ym=YM;var packs=STATE.map(function(o){var p=ownerLedgerPack(o,ym);return {oid:o.id,name:o.name,inc:p.inc,exp:p.exp,mt:p.mt};}).filter(function(p){return p.inc.length||p.exp.length;});
+  var incTot=r2(packs.reduce((s,p)=>s+p.inc.reduce((a,l)=>a+l.amt,0),0));
+  var expTot=r2(packs.reduce((s,p)=>s+p.exp.reduce((a,l)=>a+l.amt,0),0));
+  var rows=packs.map(function(p){var it=r2(p.inc.reduce((a,l)=>a+l.amt,0));return '<tr><td>'+esc(p.name||'Owner')+'</td><td class="n">'+fmt(it)+'</td><td class="n neg">'+(p.mt?fmt(p.mt):'—')+'</td></tr>';}).join('');
+  var html='<div class="modal"><div class="mcard"><div class="mhd">Push all owners → ledger · '+fmtYM(ym)+'</div>'
+    +'<div class="mbody"><p class="hint">Writes every owner\'s programme income + fleet maintenance (expense & rebill) into the ledger for '+esc(fmtYM(ym))+'. Re-running is safe — each owner\'s prior pushed lines are replaced, not duplicated.</p>'
+    +'<table class="prev"><thead><tr><th>Owner</th><th>Income</th><th>Maintenance</th></tr></thead><tbody>'+(rows||'<tr><td colspan="3" class="hint" style="padding:12px">Nothing to push this month.</td></tr>')+'</tbody>'
+    +'<tfoot><tr><td style="text-align:right;font-weight:800;padding:8px">Totals</td><td class="n" style="font-weight:800;color:var(--in)">'+fmt(incTot)+'</td><td class="n" style="font-weight:800;color:var(--out)">'+fmt(expTot)+'</td></tr></tfoot></table></div>'
+    +'<div class="mfoot"><button class="btn" id="paCancel">Cancel</button><button class="btn pri" id="paGo"'+(packs.length?'':' disabled')+'>Confirm &amp; write '+packs.length+' owner'+(packs.length===1?'':'s')+'</button></div></div></div>';
+  document.getElementById('modalHost').innerHTML=html;
+  document.getElementById('paCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
+  document.getElementById('paGo').onclick=async function(){var b=document.getElementById('paGo');b.disabled=true;b.textContent='Writing…';try{await save();var created=await writePacks(packs,ym);document.getElementById('modalHost').innerHTML='';toast('Pushed '+packs.length+' owner'+(packs.length===1?'':'s')+' · income '+fmt(incTot)+' · maint '+fmt(expTot)+' → '+fmtYM(ym)+(created?(' · '+created+' new day'+(created===1?'':'s')):''));}catch(e){console.error(e);b.disabled=false;b.textContent='Retry';alert('Push failed: '+(e.message||e));}};
 }
 
 // ---- boot ----
@@ -435,6 +476,7 @@ async function start(){
   YM=curYM();document.getElementById('ym').value=YM;
   document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();};
   document.getElementById('addOwner').onclick=()=>{snap();var no={id:uid('o_'),name:'',cadence:'monthly',day:25,weekday:5,tag:'Owners Programme',cars:[]};STATE.unshift(no);OPEN.add(no.id);scheduleSave();render();var _f=document.querySelector('.owner:first-child .oname');if(_f){_f.focus();_f.scrollIntoView({block:'center'});}};
+  document.getElementById('pushAll').onclick=openPushAll;
   document.getElementById('undoBtn').onclick=undo;
   document.getElementById('expandAll').onclick=()=>{STATE.forEach(o=>OPEN.add(o.id));render();};
   document.getElementById('collapseAll').onclick=()=>{OPEN.clear();render();};
