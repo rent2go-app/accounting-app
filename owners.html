@@ -403,13 +403,20 @@ function openDoc(oi,kind){
       +(mrows.length?'<div class="dsub">Maintenance detail</div><table class="dtbl small"><thead><tr><th>Date</th><th>Car</th><th>Type</th><th>Detail</th><th class="n">Cost</th></tr></thead><tbody>'+mrows.map(function(x){return '<tr><td>'+esc(x.date)+'</td><td>'+esc(carName(o,x.carId))+'</td><td>'+esc(x.cat||'')+'</td><td>'+esc(x.desc||'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('')+'</tbody></table>':'')
       +'<div class="dnote">Owner earnings are collected in and paid out from the owner\'s own Stripe account. This statement summarises the period; Rent 2 Go charges (platform fee + maintenance) are billed on the matching invoice '+docNo('invoice',oi)+'.</div>';
   }
+  // email draft (mailto) — opens the user's mail client pre-filled; attach the saved PDF
+  var eln=[];eln.push('Hi '+(o.ownerName||o.name||'')+',');eln.push('');
+  if(kind==='invoice'){eln.push('Please find your Rent 2 Go invoice for '+fmtYM(YM)+' attached.');eln.push('');eln.push('Invoice '+docNo('invoice',oi));eln.push('Platform fees: '+fmt(plat));if(mtot>0)eln.push('Fleet maintenance: '+fmt(mtot));eln.push('Total due: '+fmt(totVal));eln.push('');eln.push('Payment due within 7 days. Amounts in USD.');}
+  else{eln.push('Please find your Rent 2 Go statement for '+fmtYM(YM)+' attached.');eln.push('');eln.push('Statement '+docNo('statement',oi));eln.push('Net earnings: '+fmt(s.n));eln.push('Payouts received: '+fmt(s.pn));eln.push('R2G charges (platform fee + maintenance): '+fmt(totVal));}
+  eln.push('');eln.push('Thank you,');eln.push(R2G_BIZ.name);
+  var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent((kind==='invoice'?'Invoice ':'Statement ')+docNo(kind,oi)+' — Rent 2 Go — '+fmtYM(YM))+'&body='+encodeURIComponent(eln.join('\n'));
   var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
     +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.svg" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
     +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
-    +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
+    +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn" id="dxEmail">✉️ Email owner</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
   document.getElementById('modalHost').innerHTML=html;
   document.getElementById('dxClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
   document.getElementById('dxPrint').onclick=function(){window.print();};
+  document.getElementById('dxEmail').onclick=function(){if(!o.email){alert('This owner has no email yet — add one in the owner card details (Email field), then try again.');return;}window.location.href=mailHref;toast('Opening your mail app — attach the PDF you saved via Print, then send.');};
 }
 // Write one or more owners' packs into the ledger for a month. Idempotent: replaces
 // each owner's prior pushed income (op:/mr:) and expense (mn:) lines with the new set.
