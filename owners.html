@@ -199,6 +199,7 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
   <label>Working month</label><input type="month" id="ym">
   <button class="btn" id="addOwner">+ Add owner</button>
   <button class="btn pri" id="pushAll">⇪ Push all → ledger</button>
+  <button class="btn" id="reconcileBtn">⚖️ Reconcile to ledger</button>
   <button class="btn" id="undoBtn" disabled>↶ Undo</button>
   <button class="btn" id="expandAll">Expand all</button>
   <button class="btn" id="collapseAll">Collapse all</button>
@@ -504,6 +505,26 @@ async function doPushOwner(o,ym,pack){
     toast('Pushed '+esc(o.name||'owner')+' · income '+fmt(incTot)+(pack.mt?' · maint '+fmt(pack.mt):'')+' → '+fmtYM(ym)+(created?(' · '+created+' new day'+(created===1?'':'s')):''));
   }catch(e){console.error(e);go.disabled=false;go.textContent='Retry';alert('Push failed: '+(e.message||e));}
 }
+async function openReconcile(){
+  var ym=YM,last=dim(ym),from=ym+'-01',to=ym+'-'+pad(last);
+  document.getElementById('modalHost').innerHTML='<div class="modal"><div class="mcard"><div class="mhd">Reconcile Owners → Ledger · '+fmtYM(ym)+'</div><div class="mbody"><p class="hint">Loading ledger…</p></div></div></div>';
+  var res=await sb.from('day_blocks').select('day,income').gte('day',from).lte('day',to);
+  if(res.error){document.getElementById('modalHost').innerHTML='';alert('Could not load ledger: '+res.error.message);return;}
+  var posted={};(res.data||[]).forEach(function(r){(r.income||[]).forEach(function(l){var ref=(l&&l[4])||'';if(ref.indexOf('op:')===0)posted[ref]=(posted[ref]||0)+(+l[1]||0);});});
+  var tDue=0,tIn=0;
+  var rows=STATE.map(function(o){var due=r2(ownerMonthTotal(o,ym));var inl=r2(posted['op:'+o.id]||0);tDue=r2(tDue+due);tIn=r2(tIn+inl);
+    var st=due<0.01?'<span class="hint">no fee set</span>':Math.abs(inl-due)<0.01?'<span style="color:var(--in);font-weight:700">✓ matched</span>':inl<0.01?'<span style="color:var(--out);font-weight:700">⚠ not pushed</span>':'<span style="color:var(--gold);font-weight:700">≠ '+fmt(r2(inl-due))+'</span>';
+    return '<tr><td>'+esc(o.name||'Owner')+'</td><td class="n">'+fmt(due)+'</td><td class="n">'+fmt(inl)+'</td><td>'+st+'</td></tr>';}).join('');
+  var gap=r2(tDue-tIn);
+  var html='<div class="modal"><div class="mcard"><div class="mhd">Reconcile Owners → Ledger · '+fmtYM(ym)+'</div><div class="mbody">'
+    +'<p class="hint">Platform fee <b>due</b> (from each owner card) vs what is actually <b>posted</b> to the ledger via push for '+esc(fmtYM(ym))+'. Manually-typed income that was not pushed is <b>not</b> counted here — so an owner paid manually will show as “not pushed”.</p>'
+    +'<table class="prev"><thead><tr><th>Owner</th><th>Fee due</th><th>In ledger</th><th>Status</th></tr></thead><tbody>'+rows
+    +'</tbody><tfoot><tr><td style="font-weight:800">Total</td><td class="n" style="font-weight:800">'+fmt(tDue)+'</td><td class="n" style="font-weight:800">'+fmt(tIn)+'</td><td>'+(Math.abs(gap)<0.01?'<span style="color:var(--in);font-weight:800">✓ reconciled</span>':'<span style="color:var(--out);font-weight:800">gap '+fmt(gap)+'</span>')+'</td></tr></tfoot></table></div>'
+    +'<div class="mfoot"><button class="btn" id="rcClose">Close</button><button class="btn pri" id="rcPush">⇪ Push all now</button></div></div></div>';
+  document.getElementById('modalHost').innerHTML=html;
+  document.getElementById('rcClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
+  document.getElementById('rcPush').onclick=function(){openPushAll();};
+}
 function openPushAll(){
   var ym=YM;var packs=STATE.map(function(o){var p=ownerLedgerPack(o,ym);return {oid:o.id,name:o.name,inc:p.inc,exp:p.exp,mt:p.mt};}).filter(function(p){return p.inc.length||p.exp.length;});
   var incTot=r2(packs.reduce((s,p)=>s+p.inc.reduce((a,l)=>a+l.amt,0),0));
@@ -536,6 +557,7 @@ async function start(){
   document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();};
   document.getElementById('addOwner').onclick=()=>{snap();var no={id:uid('o_'),name:'',cadence:'monthly',day:25,weekday:5,tag:'Owners Programme',cars:[]};STATE.unshift(no);OPEN.add(no.id);scheduleSave();render();var _f=document.querySelector('.owner:first-child .oname');if(_f){_f.focus();_f.scrollIntoView({block:'center'});}};
   document.getElementById('pushAll').onclick=openPushAll;
+  document.getElementById('reconcileBtn').onclick=openReconcile;
   document.getElementById('undoBtn').onclick=undo;
   document.getElementById('expandAll').onclick=()=>{STATE.forEach(o=>OPEN.add(o.id));render();};
   document.getElementById('collapseAll').onclick=()=>{OPEN.clear();render();};
