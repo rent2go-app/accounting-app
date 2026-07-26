@@ -37,6 +37,17 @@
 #lindaBubble li.warn{color:#8a6d1e}#lindaBubble li.red{color:var(--out);font-weight:700}#lindaBubble li.ok{color:var(--in)}
 #lindaBubble .x{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--muted);font-weight:800}
 @media(max-width:700px){#lindaFace{width:52px;height:52px}#lindaBubble{width:220px}}
+.hero{display:flex;gap:26px;align-items:center;background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 12%,var(--surface)),var(--surface));border:1px solid var(--line);border-radius:20px;padding:24px 26px;margin-bottom:18px;box-shadow:var(--shadow)}
+.heroimg{width:min(40vw,340px);aspect-ratio:1;object-fit:cover;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.24);flex:0 0 auto}
+.herotext{flex:1;min-width:0}
+.heroeyebrow{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+#greeting{font-size:clamp(24px,3.4vw,34px);margin:6px 0 4px;line-height:1.1;text-wrap:balance}
+.herosub{color:var(--muted);margin:0 0 14px;font-size:15px}
+.dryrun{margin-top:14px;font-size:12px;color:#8a6d1e;background:color-mix(in srgb,var(--gold) 14%,var(--surface));border:1px solid var(--gold);border-radius:10px;padding:8px 12px}
+#heroBubble h3{margin:0 0 6px;font-size:14px}
+#heroBubble ul{margin:0;padding-left:18px}#heroBubble li{font-size:13px;margin:5px 0;line-height:1.45}
+#heroBubble li.warn{color:#8a6d1e}#heroBubble li.red{color:var(--out);font-weight:700}#heroBubble li.ok{color:var(--in)}
+@media(max-width:720px){.hero{flex-direction:column;text-align:center}.heroimg{width:min(74vw,300px)}.herotext{text-align:center}#heroBubble{text-align:left}}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .card .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
@@ -75,9 +86,17 @@ h2{font-size:15px;margin:18px 0 8px}
 
 <div id="appwrap" style="display:none">
 <div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda.png" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
-<div id="lindaWidget"><img src="assets/linda.png" alt="Linda" id="lindaFace" title="Linda — click for suggestions"><span id="lindaTag">Linda</span><div id="lindaBubble"></div></div>
 <main class="wrap">
-<div class="banner">🧪 DRY RUN — Linda prepares drafts for your approval. Nothing is charged or emailed until you approve &amp; send. Email sending requires the rentaride2go.com domain to be verified in Resend.</div>
+<div class="hero">
+  <img src="assets/linda.png" alt="Linda" class="heroimg">
+  <div class="herotext">
+    <div class="heroeyebrow">🤖 Your Billing Agent</div>
+    <h1 id="greeting">Hello 👋</h1>
+    <p class="herosub">I'm Linda. Here's what needs your attention today.</p>
+    <div id="heroBubble"></div>
+    <div class="dryrun">🧪 Dry run — nothing is charged or emailed until you approve &amp; send. (Customer email needs rentaride2go.com verified in Resend.)</div>
+  </div>
+</div>
 <div class="cards" id="lsum"></div>
 <h2>🔴 Red flags — action required</h2>
 <div id="lflags"></div>
@@ -123,8 +142,11 @@ function render(){
   }).join('');
   wire();
   renderSuggestions();
-  document.getElementById('lindaFace').onclick=function(){document.getElementById('lindaWidget').classList.toggle('open');};
 }
+const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
+function greetWord(){var h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+function niceName(email){email=(email||'').toLowerCase();if(NAMES[email])return NAMES[email];var lp=email.split('@')[0].replace(/[0-9._-]+/g,' ').trim();return lp?lp.charAt(0).toUpperCase()+lp.slice(1):'there';}
+function setGreeting(email){var el=document.getElementById('greeting');if(el)el.textContent=greetWord()+', '+niceName(email)+' 👋';}
 function renderSuggestions(){
   var s=[];
   var draftN=DRAFTS.filter(x=>x.status==='draft').length;
@@ -137,10 +159,8 @@ function renderSuggestions(){
   if(draftN)s.push({c:'',t:draftN+' draft notice(s) awaiting your review. Approve to queue, then send.'});
   s.push({c:'',t:'To email customers, verify rentaride2go.com in Resend.'});
   if(!draftN&&!disc&&!rec)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
-  var el=document.getElementById('lindaBubble');
-  el.innerHTML='<span class="x" id="lindaClose">✕</span><h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
-  document.getElementById('lindaClose').onclick=function(e){e.stopPropagation();document.getElementById('lindaWidget').classList.remove('open');};
-  if(!window._lo){document.getElementById('lindaWidget').classList.add('open');window._lo=true;}
+  var el=document.getElementById('heroBubble');
+  el.innerHTML='<h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
 }
 function card(l,v,cls){return '<div class="card"><div class="l">'+l+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>';}
 function wire(){
@@ -164,7 +184,7 @@ async function send(id,btn){
 document.getElementById('li_form').addEventListener('submit',async function(e){e.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error){er.textContent=r.error.message;return;}boot();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
 document.getElementById('refresh').onclick=load;
-async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('li_err').textContent='This account is not authorised for Linda.';await sb.auth.signOut();return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';load();}
+async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('li_err').textContent='This account is not authorised for Linda.';await sb.auth.signOut();return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';setGreeting(u.email);load();}
 boot();
 </script>
 </html>
