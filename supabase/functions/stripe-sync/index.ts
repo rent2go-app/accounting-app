@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     for (const a of accounts) {
       if (!a || !a.key || !a.label) { results.push({ label: a?.label || "?", error: "missing key/label" }); continue; }
-      let gross = 0, fee = 0, net = 0, txns = 0, payout = 0, startingAfter: string | null = null, more = true, guard = 0, err: string | undefined;
+      let gross = 0, fee = 0, net = 0, txns = 0, payout = 0, finIn = 0, finOut = 0, startingAfter: string | null = null, more = true, guard = 0, err: string | undefined;
       while (more && guard++ < 25) {
         const url = new URL("https://api.stripe.com/v1/balance_transactions");
         url.searchParams.set("limit", "100");
@@ -50,12 +50,16 @@ Deno.serve(async (req) => {
         for (const t of rows) {
           if (t.type === "charge" || t.type === "payment") { gross += (t.amount || 0); fee += (t.fee || 0); net += (t.net || 0); txns++; }
           else if (t.type === "payout") { payout += Math.abs(t.amount || 0); }
+          // Stripe Capital: financing_payout = loan cash received (liability, not income);
+          // financing_paydown = repayments out. Kept separate so payouts reconcile.
+          else if (t.type === "financing_payout") { finIn += Math.abs(t.amount || 0); }
+          else if (t.type === "financing_paydown") { finOut += Math.abs(t.amount || 0); }
         }
         more = !!d.has_more && rows.length > 0;
         if (more) startingAfter = rows[rows.length - 1].id;
       }
       if (err) { results.push({ label: a.label, error: err }); continue; }
-      const row = { day, label: a.label, gross: gross / 100, fee: fee / 100, net: net / 100, txns, payout: payout / 100, updated_at: new Date().toISOString() };
+      const row = { day, label: a.label, gross: gross / 100, fee: fee / 100, net: net / 100, txns, payout: payout / 100, fin_in: finIn / 100, fin_out: finOut / 100, updated_at: new Date().toISOString() };
       const up = await sb.from("stripe_income").upsert(row, { onConflict: "day,label" });
       results.push({ label: a.label, gross: row.gross, fee: row.fee, net: row.net, txns, error: up.error ? up.error.message : undefined });
     }
