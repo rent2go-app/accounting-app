@@ -34,7 +34,8 @@ async function sbPost(path: string, body: unknown, prefer: string) { await fetch
 async function stripe(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}`, "User-Agent": "linda" } }); return await r.json(); }
 async function stripeAll(base: string, key: string) { let out: any[] = [], sa: string | null = null; while (true) { const d = await stripe(base + (sa ? `&starting_after=${sa}` : ""), key); const rows = d.data || []; out = out.concat(rows); if (d.has_more && rows.length) sa = rows[rows.length - 1].id; else break; } return out; }
 
-function isLateFee(i: any) { const md = i.metadata || {}; const ln = (i.lines?.data || [{}])[0] || {}; const txt = ((i.description || "") + " " + (ln.description || "")).toLowerCase(); return i.amount_due === 1000 && (txt.includes("late fee") || md.linda_late_fee); }
+// A $10 invoice is a late fee (rentals are ~$70+). Description text varies ("late fee", "Past Due", etc.) so amount is the reliable signal.
+function isLateFee(i: any) { return i.amount_due === 1000; }
 function isPastDue(i: any) { const dd = i.due_date; return dd ? (dd < now) : ((now - (i.created || now)) > 86400); }
 function cleanlbl(s: string) { s = (s || "Rental").trim(); if (s.includes("×")) s = s.split("×")[1].trim(); const p = s.indexOf("(at "); if (p > 0) s = s.slice(0, p).trim(); return s; }
 function invline(i: any, icon: string) { const lbl = isLateFee(i) ? "Late fee" : cleanlbl((i.lines?.data || [{}])[0]?.description || i.description || "Rental"); const gen = i.created ? etMD(i.created) : "—"; const url = i.hosted_invoice_url || ""; return `${icon} ${gen} · ${lbl.slice(0, 34)} · ${m((i.amount_remaining || 0) / 100)}${url ? ` · [Pay now](${url})` : ""}`; }
@@ -51,10 +52,13 @@ async function scanAccount(acc: any) {
   await sbDel(`linda_drafts?${aL}&status=neq.skipped&sent_at=is.null&created_at=lt.${MID}`);     // yesterday's unsent (draft/reviewed)
   await sbDel(`linda_drafts?${aL}&status=eq.draft&reviewed_at=is.null&created_at=gte.${MID}`);   // today's untouched -> regenerate fresh
   await sbDel(`linda_fees?${aL}&status=eq.proposed`);
+  await sbDel(`linda_fees?${aL}&status=eq.dismissed&dismissed_at=lt.${MID}`);   // yesterday's dismissals expire -> fee can return today if still past due
   await sbDel(`linda_drafts?${aL}&status=eq.skipped&skipped_at=lt.${enc(cutoffISO)}`);
   await sbDel(`linda_drafts?${aL}&status=eq.skipped&skipped_at=is.null`);
   const skipset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&status=eq.skipped`)).map((r: any) => r.customer_id));
   const keepset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&or=(sent_at.gte.${enc(midnightISO)},reviewed_at.gte.${enc(midnightISO)})`)).map((r: any) => r.customer_id));
+  const planmap: Record<string, string> = {};
+  (await sbGet(`linda_customers?select=customer_id,plan_terms&${aL}&on_plan=eq.true`)).forEach((r: any) => { planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day"; });
 
   const subs = await stripeAll(`https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.customer`, SKEY);
   const active = subs.filter((s: any) => ["active", "past_due", "unpaid", "trialing"].includes(s.status));
@@ -96,12 +100,19 @@ async function scanAccount(acc: any) {
     const curSorted = current_open.sort((a: any, b: any) => (a.created || 0) - (b.created || 0));
     const parts: string[] = [];
     if (pdRent.length) parts.push("Past-due rental invoices:\n\n" + pdRent.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due rentals subtotal: " + m(pdRentAmt));
-    if (pdLF.length) parts.push("Past-due late fees:\n\n" + pdLF.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due late fees subtotal: " + m(pdLFAmt));
+    if (pdLF.length) parts.push(pdLF.length <= 2
+      ? "Past-due late fees:\n\n" + pdLF.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due late fees subtotal: " + m(pdLFAmt)
+      : "Past-due late fees: ❌ " + pdLF.length + " unpaid late fees ($10 each) = " + m(pdLFAmt) + " — please clear these any time in your Customer Portal (link below).");
     if (curSorted.length) parts.push("Current — coming due today (not yet late):\n\n" + curSorted.map((i: any) => invline(i, "✅")).join("\n\n") + "\n\nCurrent subtotal: " + m(current_amt));
     parts.push("💰 Total balance: " + m(grandtot));
     const pd_lines = parts.join("\n\n");
     let subj = "", intro = "", closing = "", kind = "reminder", state = "reminder", flag = "none", dnote: string | null = null;
-    if (disc) {
+    if (planmap[cid]) {
+      subj = "Your Rent 2 Go payment plan — today’s step";
+      intro = `Good morning ${nm} 👋\n\nThank you for staying on your payment plan — we truly appreciate it. To keep your plan on track and your rental active, today’s step is to pay ${planmap[cid]}.`;
+      closing = "Keeping up your daily plan payment steadily clears your balance and keeps you on the road. Tap Pay now above, or manage everything in your Customer Portal.";
+      kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
+    } else if (disc) {
       subj = "Action needed today to keep your Rent 2 Go rental active — " + m(pd_total) + " outstanding";
       intro = `Good morning ${nm},\n\nWe'd love to keep you on the road. Our records show ${m(pd_total)} is currently outstanding on your Rent 2 Go rental, which unfortunately places it at risk of being paused later today.`;
       closing = "To avoid any interruption, we kindly ask that the balance be settled by 1:00 PM today — simply tap Pay now above. If you've already paid, or you'd like to arrange a payment plan, just reply and we'll be glad to help.";
