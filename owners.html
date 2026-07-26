@@ -86,6 +86,38 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .mbreak .mbh{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:10px}
 .mbreak .mbt{color:var(--out);font-variant-numeric:tabular-nums}
 .mbreak .mbchips{display:flex;gap:8px;flex-wrap:wrap}
+/* invoice / statement documents */
+.docmc{width:760px;max-width:100%}
+.docmc .printdoc{flex:1 1 auto;min-height:0;overflow:auto;padding:26px 30px;background:#fff;color:#131820}
+.dhdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f8a4d;padding-bottom:14px;margin-bottom:18px}
+.dbrand{display:flex;gap:12px;align-items:center}
+.dlogo{height:42px}
+.dtitle{font-size:25px;font-weight:800;letter-spacing:.05em;color:#0f8a4d}
+.dmeta{font-size:12px;color:#5c6a7a;margin-top:2px;font-variant-numeric:tabular-nums}
+.ddate{text-align:right;font-size:12px;color:#5c6a7a}
+.ddate b{display:block;color:#131820;font-size:13px;margin-top:2px}
+.dparties{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:18px;font-size:13px;color:#131820;line-height:1.45}
+.dpl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5c6a7a;margin-bottom:3px}
+.dpn{font-weight:800;font-size:14px}
+.dtbl{width:100%;border-collapse:collapse;font-size:13px;color:#131820}
+.dtbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#5c6a7a;padding:8px;border-bottom:1px solid #c9d2de}
+.dtbl td{padding:8px;border-bottom:1px solid #e4e9f0}
+.dtbl td.n,.dtbl th.n{text-align:right;font-variant-numeric:tabular-nums}
+.dtbl td.neg{color:#c22a2a}
+.dtbl tr.sec td{background:#f2f5f9;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5c6a7a}
+.dtbl tr.tot td{font-weight:800;border-top:2px solid #c9d2de}
+.dtbl tfoot td.tl{font-weight:800;font-size:15px;padding-top:12px;border-top:2px solid #0f8a4d;color:#0f8a4d}
+.dtbl.small{margin-top:4px}
+.dsub{margin-top:18px;margin-bottom:2px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5c6a7a}
+.dnote{margin-top:18px;font-size:11px;color:#5c6a7a;line-height:1.5;border-top:1px dashed #c9d2de;padding-top:10px}
+@media print{
+ body>*{display:none!important}
+ #modalHost,#modalHost *{display:revert!important}
+ #modalHost .modal{position:static;background:#fff;padding:0;display:block}
+ #modalHost .mcard{box-shadow:none;border:none;max-height:none;width:100%;background:#fff}
+ #modalHost .printdoc{overflow:visible;padding:0}
+ .noprint{display:none!important}
+}
 .mdel{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--muted);font-weight:800;font-family:inherit}
 .mdel:hover{border-color:var(--out);color:var(--out)}
 .btn.small{padding:5px 10px;font-size:12px}
@@ -238,7 +270,7 @@ function render(){
     var body='<div class="obody">'+odetails(o)+stripeStrip(o)
       +'<div class="cars">'+(nc?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
       +maintHTML(o)
-      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div></div>';
+      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn" data-doc="statement|'+oi+'">📄 Statement</button><button class="btn" data-doc="invoice|'+oi+'">🧾 Invoice</button><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div></div>';
     return '<div class="owner'+(open?'':' collapsed')+'"><div class="ohead"><button class="otoggle" data-otog="'+esc(o.id)+'" title="'+(open?'Collapse':'Expand')+'">'+(open?'▾':'▸')+'</button><span class="oflag" title="'+esc(o.country||'')+'">'+flagOf(o.country)+'</span>'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
       +(open?controls:'')
@@ -265,6 +297,7 @@ function wire(){
   document.querySelectorAll('[data-ocountry]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.ocountry].country=el.value;scheduleSave();render();});
   document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
   document.querySelectorAll('[data-pushowner]').forEach(el=>el.onclick=()=>openPushOwner(+el.dataset.pushowner));
+  document.querySelectorAll('[data-doc]').forEach(el=>el.onclick=()=>{var p=el.dataset.doc.split('|');openDoc(+p[1],p[0]);});
   document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-cp]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cp.split('|');STATE[+p[0]].cars[+p[1]].plate=el.value;scheduleSave();});
   document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
@@ -306,6 +339,58 @@ function openPushOwner(oi){
   document.getElementById('modalHost').innerHTML=html;
   document.getElementById('pxCancel').onclick=()=>document.getElementById('modalHost').innerHTML='';
   document.getElementById('pxGo').onclick=()=>doPushOwner(o,ym,lines);
+}
+// R2G letterhead — fill addr/email/phone/reg to complete the invoice header
+const R2G_BIZ={name:'RENT 2 GO LLC',addr:'',email:'',phone:'',reg:''};
+function docNo(kind,oi){return (kind==='invoice'?'INV':'STMT')+'-'+YM+'-'+pad(oi+1);}
+function maintRowsYM(o){return (o.maint||[]).filter(function(x){return String(x.date||'').slice(0,7)===YM;});}
+function carName(o,id){var c=(o.cars||[]).find(function(cc){return cc.id===id;});return c?(c.name||c.plate||'Car'):'Unassigned';}
+function openDoc(oi,kind){
+  var o=STATE[oi];var s=stripeFor(o.stripeLabel||'');var weekly=o.cadence==='weekly';
+  var plat=r2(ownerMonthTotal(o,YM));
+  var mrows=maintRowsYM(o);var mtot=r2(mrows.reduce(function(a,x){return a+(+x.cost||0);},0));
+  var today=new Date();var todayStr=today.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  var ctry=(COUNTRIES.find(function(c){return c[0]===o.country;})||['',''])[1];
+  function party(cls,lbl,name,lines){return '<div class="dparty"><div class="dpl">'+lbl+'</div><div class="dpn">'+esc(name)+'</div>'+lines.filter(Boolean).map(function(l){return '<div>'+l+'</div>';}).join('')+'</div>';}
+  var fromP=party('','From',R2G_BIZ.name,[R2G_BIZ.addr&&esc(R2G_BIZ.addr),R2G_BIZ.email&&esc(R2G_BIZ.email),R2G_BIZ.phone&&esc(R2G_BIZ.phone),R2G_BIZ.reg&&('Reg: '+esc(R2G_BIZ.reg))]);
+  var billP=party('','Bill to',o.bizName||o.name||'Owner',[o.ownerName&&esc(o.ownerName),o.email&&esc(o.email),o.phone&&esc(o.phone),o.country&&(flagOf(o.country)+' '+esc(ctry))]);
+  var body,title,totVal;
+  if(kind==='invoice'){
+    title='INVOICE';
+    var pfRows='';
+    if(weekly){pfRows='<tr><td>Programme fee — weekly (×4 payments)</td><td class="n">'+fmt(plat)+'</td></tr>';}
+    else{(o.cars||[]).forEach(function(c){var f=carFee(c,YM);if(f>0)pfRows+='<tr><td>Platform fee — '+esc(c.name||c.plate||'car')+' · '+carDays(c,YM)+'/'+dim(YM)+' days</td><td class="n">'+fmt(f)+'</td></tr>';});if(!pfRows)pfRows='<tr><td>Platform fees</td><td class="n">'+fmt(plat)+'</td></tr>';}
+    var mRowsH=mrows.map(function(x){return '<tr><td>'+esc(x.date)+' · '+esc(carName(o,x.carId))+' — '+esc(x.cat||'Maintenance')+(x.desc?' ('+esc(x.desc)+')':'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('');
+    totVal=r2(plat+mtot);
+    body='<table class="dtbl"><thead><tr><th>Description</th><th class="n">Amount</th></tr></thead><tbody>'
+      +'<tr class="sec"><td colspan="2">Platform fees — '+fmtYM(YM)+'</td></tr>'+pfRows
+      +(mrows.length?'<tr class="sec"><td colspan="2">Fleet maintenance — '+fmtYM(YM)+'</td></tr>'+mRowsH:'')
+      +'</tbody><tfoot><tr><td class="tl">Total due (USD)</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
+      +'<div class="dnote">Payment due within 7 days of issue. Amounts in USD. Owner rental earnings are collected in and paid out from the owner\'s own Stripe account; this invoice covers Rent 2 Go platform fees and fleet maintenance for the period only.</div>';
+  }else{
+    title='STATEMENT';
+    var netPos=r2(s.n-plat-mtot);totVal=r2(plat+mtot);
+    body='<table class="dtbl"><tbody>'
+      +'<tr class="sec"><td colspan="2">Earnings · '+esc(o.stripeLabel||'no Stripe account linked')+' — '+fmtYM(YM)+'</td></tr>'
+      +'<tr><td>Gross earnings (GMV)</td><td class="n">'+fmt(s.g)+'</td></tr>'
+      +'<tr><td>Less: Stripe processing fees</td><td class="n neg">-'+fmt(s.f)+'</td></tr>'
+      +'<tr><td>Net earnings</td><td class="n">'+fmt(s.n)+'</td></tr>'
+      +'<tr><td>Payouts received by owner</td><td class="n">'+fmt(s.p)+'</td></tr>'
+      +'<tr class="sec"><td colspan="2">Rent 2 Go charges — '+fmtYM(YM)+'</td></tr>'
+      +'<tr><td>Platform fee</td><td class="n neg">-'+fmt(plat)+'</td></tr>'
+      +'<tr><td>Fleet maintenance ('+mrows.length+' item'+(mrows.length===1?'':'s')+')</td><td class="n neg">-'+fmt(mtot)+'</td></tr>'
+      +'<tr class="tot"><td>Net position (net earnings less R2G charges)</td><td class="n">'+fmt(netPos)+'</td></tr>'
+      +'</tbody><tfoot><tr><td class="tl">Payable to Rent 2 Go</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
+      +(mrows.length?'<div class="dsub">Maintenance detail</div><table class="dtbl small"><thead><tr><th>Date</th><th>Car</th><th>Type</th><th>Detail</th><th class="n">Cost</th></tr></thead><tbody>'+mrows.map(function(x){return '<tr><td>'+esc(x.date)+'</td><td>'+esc(carName(o,x.carId))+'</td><td>'+esc(x.cat||'')+'</td><td>'+esc(x.desc||'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('')+'</tbody></table>':'')
+      +'<div class="dnote">Owner earnings are collected in and paid out from the owner\'s own Stripe account. This statement summarises the period; Rent 2 Go charges (platform fee + maintenance) are billed on the matching invoice '+docNo('invoice',oi)+'.</div>';
+  }
+  var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
+    +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.svg" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
+    +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
+    +'<div class="mfoot noprint"><button class="btn" id="dxClose">Close</button><button class="btn pri" id="dxPrint">🖨 Print / Save PDF</button></div></div></div>';
+  document.getElementById('modalHost').innerHTML=html;
+  document.getElementById('dxClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
+  document.getElementById('dxPrint').onclick=function(){window.print();};
 }
 async function doPushOwner(o,ym,lines){
   var go=document.getElementById('pxGo');go.disabled=true;go.textContent='Writing…';
