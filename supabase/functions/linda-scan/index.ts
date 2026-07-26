@@ -143,6 +143,7 @@ async function scanAccount(acc: any) {
   if (fees.length) await sbPost(`linda_fees?on_conflict=invoice_id`, fees, "resolution=ignore-duplicates,return=minimal");
   if (payments.length) await sbPost(`linda_payments?on_conflict=invoice_id`, payments, "resolution=merge-duplicates,return=minimal");
   if (drafts.length) await sbPost(`linda_drafts`, drafts, "return=minimal");
+  await sbPost(`linda_accounts?on_conflict=label`, [{ label: LABEL, active: custs.length, notices: drafts.length, scanned_at: nowISO }], "resolution=merge-duplicates,return=minimal");
   return { account: LABEL, active: custs.length, notices: drafts.length, disc: drafts.filter((d) => d.kind === "disconnect").length, fees: fees.length, payments: payments.length };
 }
 

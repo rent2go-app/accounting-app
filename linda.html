@@ -189,7 +189,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -240,6 +240,7 @@ async function load(){
   try{var p=await sb.from('linda_payments').select('*').order('paid_at',{ascending:false});PAY=p.data||[];}catch(e){PAY=[];}
   try{var nt=await sb.from('linda_notes').select('*');NOTES=nt.data||[];}catch(e){NOTES=[];}
   try{var df=await sb.from('linda_fees').select('*').eq('status','dismissed');DISM=df.data||[];}catch(e){DISM=[];}
+  try{var am=await sb.from('linda_accounts').select('*');ACCTMETA=am.data||[];}catch(e){ACCTMETA=[];}
   render();
 }
 function render(){
@@ -278,11 +279,16 @@ function render(){
     +(recPend?'<span class="pill red">⚠ '+recPend+' recovery to action</span>':'')
     +(discPend?'<span class="pill red">⛔ '+discPend+' disconnection'+(discPend==1?'':'s')+' pending</span>':'')
     +'</div>';
-  var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)))).filter(Boolean).sort();
+  var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)).concat(ACCTMETA.map(a=>a.label)))).filter(Boolean).sort();
   var host=document.getElementById('laccounts');
   host.innerHTML=accs.map(function(acc){
     var af=CUSTS.filter(c=>c.account_label===acc&&c.flag&&c.flag!=='none').sort((a,b)=>b.pastdue_count-a.pastdue_count);
     var ad=DRAFTS.filter(d=>d.account_label===acc&&d.status!=='skipped');
+    var meta=ACCTMETA.find(a=>a.label===acc);
+    var acctActive=CUSTS.filter(c=>c.account_label===acc).length;
+    if(!acctActive&&!ad.length&&!af.length){  // account with no active rentals — show it, nothing to bill
+      return '<details class="acct"><summary class="accttl">🏦 '+esc(acc)+'<span class="asum"><span class="apill done">Nothing to bill today</span>'+(meta&&meta.scanned_at?'<span class="apill">no active rentals</span>':'')+'</span></summary><div class="acctbody"><p class="hint">No active rentals on this account right now — nothing due. Linda is watching; it will appear here the moment a rental goes active'+(meta&&meta.scanned_at?' (last checked '+shortET(meta.scanned_at)+')':'')+'.</p></div></details>';
+    }
     var toSend=ad.filter(d=>d.status!=='sent').length;
     var discN=ad.filter(d=>d.kind==='disconnect').length;
     var acctOut=CUSTS.filter(c=>c.account_label===acc).reduce((s,c)=>s+(+c.outstanding||0),0);
