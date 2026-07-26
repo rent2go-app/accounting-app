@@ -275,7 +275,7 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 <div id="reports" class="repwrap" hidden>
 <div class="rephead"><h2>Management Accounts</h2><button class="btn" id="repClose">✕ Close</button></div>
 <div class="repctl"><label>From</label><input type="date" id="repFrom"><label>To</label><input type="date" id="repTo"><button class="qchip" data-rp="2026">2026</button><button class="qchip" data-rp="2027">2027 Q1</button><button class="qchip" data-rp="all">All</button><div class="spacer"></div><button class="btn" id="repCSV">⬇ Download CSV</button><button class="btn" id="repPrint">🖨 Print / PDF</button></div>
-<div class="reptabs"><button class="rtab on" data-r="pl">Profit &amp; Loss</button><button class="rtab" data-r="exp">Expenses by Category</button><button class="rtab" data-r="draw">Owner&#39;s Drawings</button><button class="rtab" data-r="cash">Cash Flow</button><button class="rtab" data-r="trend">Monthly Trend</button><button class="rtab" data-r="bva">Budget vs Actual</button><button class="rtab" data-r="pay">Payroll</button><button class="rtab" data-r="ap">Payables</button></div>
+<div class="reptabs"><button class="rtab on" data-r="pl">Profit &amp; Loss</button><button class="rtab" data-r="proj">📈 Projections</button><button class="rtab" data-r="exp">Expenses by Category</button><button class="rtab" data-r="draw">Owner&#39;s Drawings</button><button class="rtab" data-r="cash">Cash Flow</button><button class="rtab" data-r="trend">Monthly Trend</button><button class="rtab" data-r="bva">Budget vs Actual</button><button class="rtab" data-r="pay">Payroll</button><button class="rtab" data-r="ap">Payables</button></div>
 <div id="repBody"></div></div><p class="hint">One unbroken chain: <b>Carried forward</b> of each day = <b>Starting balance</b> of the next, across every month. Edit deposits, income or expenses and it cascades down through every following day. Type over the <b>Running total</b> (or a Starting balance) to reconcile to the bank — it books a visible <b>Balance adjustment</b>, kept out of the income/expense totals. Expenses split into <b>Operating (blue) · Home (yellow) · MMF (grey) · Other (sky)</b>.</p></main></div>
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
@@ -526,7 +526,37 @@ function buildTrend(days){var by={};days.forEach(function(d){(by[d.slice(0,7)]=b
 function buildAP(days){var by={},tot=0;days.forEach(function(d){(MD[d].e||[]).forEach(function(l){if(!l[3]){var c=l[2]||'Other';by[c]=(by[c]||0)+(+l[1]||0);tot+=(+l[1]||0);}});});var arr=[];for(var c in by)arr.push([c,r2(by[c])]);arr.sort(function(a,b){return b[1]-a[1];});var rows=[{cls:'hd',cells:['Unpaid / upcoming by category','']}];arr.forEach(function(x){rows.push({cls:'',cells:[x[0],x[1]]});});if(!arr.length)rows.push({cls:'',cells:['Nothing unpaid in this period','']});rows.push({cls:'big',cells:['Total unpaid / upcoming',r2(tot)]});return {cap:'Payables \u2014 unpaid & upcoming bills',cols:null,rows:rows};}
 function buildPay(days){var by={},tot=0;days.forEach(function(d){(MD[d].e||[]).forEach(function(l){var c=l[2]||'';if(c==='Staff & Payroll'||c==='SA Salaries'){var nm=l[0]||'(unnamed)';by[nm]=(by[nm]||0)+(+l[1]||0);tot+=(+l[1]||0);}});});var arr=[];for(var n in by)arr.push([n,r2(by[n])]);arr.sort(function(a,b){return b[1]-a[1];});var rows=arr.map(function(x){return {cls:'',cells:[x[0],x[1]]};});rows.push({cls:'big',cells:['Total payroll',r2(tot)]});return {cap:'Payroll \u00b7 Staff & Salaries',cols:['Person / staff line','Total paid'],rows:rows};}
 function buildBVA(days){var by={};days.forEach(function(d){(by[d.slice(0,7)]=by[d.slice(0,7)]||[]).push(d);});var ms=Object.keys(by).sort();var ai=0,ae=0,bi=0,be=0;var rows=ms.map(function(m){var ds=by[m],inc=0,exp=0;ds.forEach(function(d){inc+=M[d].incReal;exp+=M[d].exp;});var type=ds[ds.length-1]<=TODAY?'Actual':(ds[0]>TODAY?'Budget':'In progress');if(type==='Budget'){bi+=inc;be+=exp;}else{ai+=inc;ae+=exp;}var nm=new Date(m+'-01T00:00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'});return {cls:'',cells:[nm,type,r2(inc),r2(exp),r2(inc-exp)]};});rows.push({cls:'tot',cells:['Actual to date','',r2(ai),r2(ae),r2(ai-ae)]});rows.push({cls:'tot',cells:['Budget (remaining)','',r2(bi),r2(be),r2(bi-be)]});rows.push({cls:'big',cells:['Full-period forecast','',r2(ai+bi),r2(ae+be),r2(ai+bi-ae-be)]});return {cap:'Budget vs Actual',cols:['Month','Type','Income','Expenses','Net'],rows:rows};}
-function renderReport(){var days=repDays();var rep=repType==='pl'?buildPL(days):repType==='exp'?buildExp(days):repType==='draw'?buildDraw(days):repType==='cash'?buildCash(days):repType==='trend'?buildTrend(days):repType==='ap'?buildAP(days):repType==='pay'?buildPay(days):buildBVA(days);repCurrent=rep;var html='<div class="repcap">'+rep.cap+' · '+repFrom+' to '+repTo+'</div><table class="reptab">';if(rep.cols)html+='<tr class="hd">'+rep.cols.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';rep.rows.forEach(function(rr){html+='<tr'+(rr.cls?' class="'+rr.cls+'"':'')+'>'+rr.cells.map(function(c){return '<td>'+((typeof c==='number')?fmt(c):(c||''))+'</td>';}).join('')+'</tr>';});html+='</table>';document.getElementById('repBody').innerHTML=html;}
+function buildProj(){
+  var months={};DK.forEach(function(d){months[d.slice(0,7)]=1;});
+  var mk=Object.keys(months).sort();var last7=mk.slice(-7);
+  if(!last7.length)return {cap:'2-Year Projections',cols:null,rows:[{cls:'',cells:['No data to project from yet','']}]};
+  var rev=0,opex=0,mset={};
+  last7.forEach(function(m){mset[m]=1;});
+  DK.forEach(function(d){if(!mset[d.slice(0,7)])return;
+    rev+=depSum(d);(MD[d].j||[]).forEach(function(l){if(!isAdj(l))rev+=(+l[1]||0);});
+    (MD[d].e||[]).forEach(function(l){var s=segOf(l[2]||'Other');if(s==='blue'||s==='other')opex+=(+l[1]||0);});
+  });
+  var n=last7.length;var mRev=rev/n,mOpex=opex/n,mProf=mRev-mOpex;
+  var aRev=mRev*12,aOpex=mOpex*12,aProf=aRev-aOpex;var margin=aRev?Math.round(aProf/aRev*100):0;
+  function pj(base,g,yr){return r2(base*Math.pow(1+g,yr));}
+  var scen=[['Flat (0% growth)',0],['+10% / year',0.10],['+20% / year',0.20]];
+  var rows=[];
+  rows.push({cls:'hd',cells:['Baseline — last '+n+' months ('+last7[0]+' → '+last7[n-1]+')','','']});
+  rows.push({cls:'',cells:['  Avg monthly revenue',r2(mRev),'']});
+  rows.push({cls:'',cells:['  Avg monthly operating expenses',r2(mOpex),'']});
+  rows.push({cls:'',cells:['  Avg monthly operating profit',r2(mProf),'']});
+  rows.push({cls:'tot',cells:['  Annualised run-rate revenue (×12)',r2(aRev),'']});
+  rows.push({cls:'',cells:['  Operating margin',margin+'%','']});
+  rows.push({cls:'hd',cells:['Projected REVENUE','Year 1','Year 2']});
+  scen.forEach(function(s){rows.push({cls:'',cells:['  '+s[0],pj(aRev,s[1],1),pj(aRev,s[1],2)]});});
+  rows.push({cls:'hd',cells:['Projected OPERATING EXPENSES','Year 1','Year 2']});
+  scen.forEach(function(s){rows.push({cls:'',cells:['  '+s[0],pj(aOpex,s[1],1),pj(aOpex,s[1],2)]});});
+  rows.push({cls:'hd',cells:['Projected OPERATING PROFIT','Year 1','Year 2']});
+  scen.forEach(function(s){rows.push({cls:'big',cells:['  '+s[0],pj(aProf,s[1],1),pj(aProf,s[1],2)]});});
+  rows.push({cls:'',cells:['Method: run-rate = avg of last '+n+' months ×12, compounded by the annual growth rate. Costs assumed to scale with revenue (constant margin). Cash-basis; excludes tax, depreciation and one-offs.','','']});
+  return {cap:'2-Year Projections (base: last '+n+' months)',cols:['Scenario / metric','Year 1','Year 2'],rows:rows};
+}
+function renderReport(){var days=repDays();var rep=repType==='proj'?buildProj():repType==='pl'?buildPL(days):repType==='exp'?buildExp(days):repType==='draw'?buildDraw(days):repType==='cash'?buildCash(days):repType==='trend'?buildTrend(days):repType==='ap'?buildAP(days):repType==='pay'?buildPay(days):buildBVA(days);repCurrent=rep;var html='<div class="repcap">'+rep.cap+' · '+repFrom+' to '+repTo+'</div><table class="reptab">';if(rep.cols)html+='<tr class="hd">'+rep.cols.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';rep.rows.forEach(function(rr){html+='<tr'+(rr.cls?' class="'+rr.cls+'"':'')+'>'+rr.cells.map(function(c){return '<td>'+((typeof c==='number')?fmt(c):(c||''))+'</td>';}).join('')+'</tr>';});html+='</table>';document.getElementById('repBody').innerHTML=html;}
 function repCSV(){if(!repCurrent)return;var L=[];if(repCurrent.cols)L.push(repCurrent.cols);repCurrent.rows.forEach(function(rr){L.push(rr.cells.map(function(c){return typeof c==='number'?c:(c||'');}));});var csv=L.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var b=new Blob([csv],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='r2g-'+repType+'-'+repFrom+'_'+repTo+'.csv';a.click();}
 document.getElementById('repBtn').onclick=function(){document.getElementById('repFrom').value=repFrom;document.getElementById('repTo').value=repTo;document.getElementById('reports').hidden=false;renderReport();};
 document.getElementById('repClose').onclick=function(){document.getElementById('reports').hidden=true;};
