@@ -149,6 +149,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
   </div>
 </div>
 <div class="cards" id="lsum"></div>
+<div id="lpaid"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div class="dayprog" id="ldayprog"></div>
@@ -161,7 +162,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -209,6 +210,7 @@ async function load(){
   var c=await sb.from('linda_customers').select('*');CUSTS=c.data||[];
   var f=await sb.from('linda_fees').select('*').eq('status','proposed');FEES=f.data||[];
   try{var lr=await sb.from('linda_learnings').select('*').order('kind',{ascending:true});LEARN=lr.data||[];}catch(e){LEARN=[];}
+  try{var p=await sb.from('linda_payments').select('*').order('paid_at',{ascending:false});PAY=p.data||[];}catch(e){PAY=[];}
   render();
 }
 function render(){
@@ -225,6 +227,8 @@ function render(){
     card(IC_FEE+'$10 invoices to raise',feeCount+' · '+fmt(feeTotal),'')+
     card('Red flags',flags,flags?'red':'');
   renderFeeLedger();
+  renderPaid();
+  var pt=paidToday(),paidAmt=pt.reduce((s,p)=>s+(+p.amount||0),0);
   var active=DRAFTS.filter(d=>d.status!=='skipped'),tot=active.length;
   var revN=active.filter(d=>d.reviewed_at||d.status==='sent').length,sentN=active.filter(d=>d.status==='sent').length;
   var discPend=active.filter(d=>d.kind==='disconnect'&&d.status!=='sent').length;
@@ -234,6 +238,7 @@ function render(){
     +'<span class="pill'+(sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
     +'<span class="pill'+(revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'
     +(sentN>=tot?'<span class="pill alldone">🎉 All today’s notices sent</span>':'<span class="pill">'+(tot-sentN)+' still to send</span>')
+    +(pt.length?'<span class="pill done">💰 Paid today <b>'+pt.length+' · '+fmt(paidAmt)+'</b></span>':'')
     +(recPend?'<span class="pill red">⚠ '+recPend+' recovery to action</span>':'')
     +(discPend?'<span class="pill red">⛔ '+discPend+' disconnection'+(discPend==1?'':'s')+' pending</span>':'')):'';
   var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)))).filter(Boolean).sort();
@@ -327,6 +332,19 @@ function greetWord(){var h=parseInt(new Date().toLocaleString('en-US',{timeZone:
 function dynBody(d){return d.status==='sent'?d.body:d.body.replace(/^Good (morning|afternoon|evening)/,greetWord());}
 function etStamp(){return new Date().toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}
 function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
+function etDate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/New_York'});}catch(e){return '';}}
+function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
+function timeET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function renderPaid(){
+  var el=document.getElementById('lpaid');if(!el)return;
+  var pt=paidToday().slice().sort((a,b)=>a.paid_at<b.paid_at?1:-1);
+  var tot=pt.reduce((s,p)=>s+(+p.amount||0),0);
+  if(!pt.length){el.innerHTML='<details class="feewrap"><summary>💰 Payments today — <b>0</b> <span class="hint">(no payments recorded yet today)</span></summary><p class="hint">As customers pay, Linda logs them here at each scan (1am · 6am · 12pm · 6pm · 9pm ET).</p></details>';return;}
+  var rows=pt.map(function(p){return '<tr><td>'+esc(p.customer_name||p.customer_id)+'</td><td>'+esc(p.account_label)+'</td><td>'+esc(p.invoice_number||'')+(p.kind==='latefee'?' <span class="hint">(late fee)</span>':'')+'</td><td class="n">'+fmt(p.amount)+'</td><td>'+timeET(p.paid_at)+'</td></tr>';}).join('');
+  el.innerHTML='<details class="feewrap" open><summary>💰 Payments today — <b>'+pt.length+'</b> · '+fmt(tot)+' <span class="hint">(who has paid so far today — click to collapse)</span></summary>'
+    +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Amount</td><td>Paid (ET)</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total received today</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table></details>';
+}
 function markSent(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{status:'sent',sent_at:new Date().toISOString(),sent_via:'manual',body:dynBody(d)});}
 function toggleReviewed(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{reviewed_at:d.reviewed_at?null:new Date().toISOString()});}
 function unsend(id){upd(id,{status:'draft',sent_at:null,sent_via:null});}
