@@ -153,8 +153,9 @@ function bodyToHtml(t,br){
     return h;});
   return br?lines.join('<br>'):lines.join('\n');
 }
-// Soften dashboard status markers for the customer-facing copy (❌/✅ -> neutral bullet).
-function softenMarkers(t){return t.replace(/^([ \t]*)[❌✅]\s+/gm,'$1• ');}
+// Copy-friendly status markers: swap the dashboard's ❌/✅ for emoji dots that render
+// (and copy) everywhere — 🔴 past due, 🟢 current — softer than a red ❌ but still clear.
+function softenMarkers(t){return t.replace(/^([ \t]*)❌\s+/gm,'$1🔴 ').replace(/^([ \t]*)✅\s+/gm,'$1🟢 ');}
 // Clean, customer-facing HTML for copy/paste (live links, no dashboard highlight boxes).
 function bodyToClean(t){
   t=softenMarkers(t);
