@@ -17,6 +17,26 @@
 .btn.small{padding:4px 9px;font-size:12px}
 .wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
 .banner{background:color-mix(in srgb,var(--gold) 18%,var(--surface));border:1px solid var(--gold);color:#7a5c12;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;margin-bottom:14px}
+.lavatar{width:30px;height:30px;border-radius:50%;vertical-align:middle}
+.says{display:flex;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:16px;align-items:flex-start}
+.says img{width:56px;height:56px;border-radius:50%;flex:0 0 auto}
+.says .bubble{flex:1}
+.says .bubble h3{margin:0 0 6px;font-size:14px}
+.says .bubble h3 span{color:var(--muted);font-weight:600;font-size:12px}
+.says ul{margin:0;padding-left:18px}
+.says li{font-size:13px;margin:4px 0;line-height:1.4}
+.says li.warn{color:#8a6d1e}.says li.red{color:var(--out);font-weight:700}.says li.ok{color:var(--in)}
+#lindaWidget{position:fixed;left:18px;bottom:22px;z-index:40}
+#lindaFace{width:64px;height:64px;border-radius:50%;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;border:3px solid var(--surface);transition:transform .15s}
+#lindaFace:hover{transform:scale(1.06)}
+#lindaTag{position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;background:var(--brand);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
+#lindaBubble{position:absolute;left:78px;bottom:0;width:290px;max-width:70vw;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,.24);padding:13px 15px;display:none}
+#lindaWidget.open #lindaBubble{display:block}
+#lindaBubble h3{margin:0 0 7px;font-size:13px}
+#lindaBubble ul{margin:0;padding-left:17px}#lindaBubble li{font-size:12.5px;margin:5px 0;line-height:1.4}
+#lindaBubble li.warn{color:#8a6d1e}#lindaBubble li.red{color:var(--out);font-weight:700}#lindaBubble li.ok{color:var(--in)}
+#lindaBubble .x{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--muted);font-weight:800}
+@media(max-width:700px){#lindaFace{width:52px;height:52px}#lindaBubble{width:220px}}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .card .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
@@ -51,10 +71,11 @@ h2{font-size:15px;margin:18px 0 8px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 </head>
-<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><h1>🤖 Linda</h1><p class="hint">Automated billing — admin sign in.</p><input id="li_email" type="email" autocomplete="username" placeholder="Email" required><input id="li_pass" type="password" autocomplete="current-password" placeholder="Password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda.svg" alt="Linda" style="width:86px;height:86px;border-radius:50%;box-shadow:0 6px 18px rgba(0,0,0,.18)"></div><h1 style="text-align:center;margin-top:10px">Linda</h1><p class="hint" style="text-align:center">Your billing agent — admin sign in.</p><input id="li_email" type="email" autocomplete="username" placeholder="Email" required><input id="li_pass" type="password" autocomplete="current-password" placeholder="Password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· 🤖 Linda — Automated Billing</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda.svg" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div id="lindaWidget"><img src="assets/linda.svg" alt="Linda" id="lindaFace" title="Linda — click for suggestions"><span id="lindaTag">Linda</span><div id="lindaBubble"></div></div>
 <main class="wrap">
 <div class="banner">🧪 DRY RUN — Linda prepares drafts for your approval. Nothing is charged or emailed until you approve &amp; send. Email sending requires the rentaride2go.com domain to be verified in Resend.</div>
 <div class="cards" id="lsum"></div>
@@ -101,6 +122,25 @@ function render(){
       +'</div></div>';
   }).join('');
   wire();
+  renderSuggestions();
+  document.getElementById('lindaFace').onclick=function(){document.getElementById('lindaWidget').classList.toggle('open');};
+}
+function renderSuggestions(){
+  var s=[];
+  var draftN=DRAFTS.filter(x=>x.status==='draft').length;
+  var disc=CUSTS.filter(c=>c.flag==='disconnect').length;
+  var rec=CUSTS.filter(c=>c.flag==='recovery').length;
+  var near=CUSTS.filter(c=>c.flag==='none'&&c.pastdue_count===2);
+  if(rec)s.push({c:'red',t:rec+' customer(s) at RECOVERY — notify the administrator to schedule collection.'});
+  if(disc)s.push({c:'red',t:disc+' customer(s) under disconnection — recovery follows in 12h if uncured.'});
+  near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
+  if(draftN)s.push({c:'',t:draftN+' draft notice(s) awaiting your review. Approve to queue, then send.'});
+  s.push({c:'',t:'To email customers, verify rentaride2go.com in Resend.'});
+  if(!draftN&&!disc&&!rec)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
+  var el=document.getElementById('lindaBubble');
+  el.innerHTML='<span class="x" id="lindaClose">✕</span><h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
+  document.getElementById('lindaClose').onclick=function(e){e.stopPropagation();document.getElementById('lindaWidget').classList.remove('open');};
+  if(!window._lo){document.getElementById('lindaWidget').classList.add('open');window._lo=true;}
 }
 function card(l,v,cls){return '<div class="card"><div class="l">'+l+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>';}
 function wire(){

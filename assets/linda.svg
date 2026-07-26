@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Linda">
+  <defs>
+    <linearGradient id="lbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eafaf0"/><stop offset="1" stop-color="#cbe9d6"/></linearGradient>
+    <linearGradient id="lskin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a06f47"/><stop offset="1" stop-color="#7c5233"/></linearGradient>
+    <linearGradient id="lloc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#33231a"/><stop offset="1" stop-color="#1d130d"/></linearGradient>
+  </defs>
+  <clipPath id="lc"><circle cx="100" cy="100" r="100"/></clipPath>
+  <g clip-path="url(#lc)">
+    <rect width="200" height="200" fill="url(#lbg)"/>
+    <!-- long locs framing -->
+    <g fill="url(#lloc)">
+      <rect x="30" y="58" width="13" height="140" rx="6.5"/>
+      <rect x="44" y="66" width="12" height="132" rx="6"/>
+      <rect x="56" y="74" width="11" height="126" rx="5.5"/>
+      <rect x="133" y="74" width="11" height="126" rx="5.5"/>
+      <rect x="144" y="66" width="12" height="132" rx="6"/>
+      <rect x="157" y="58" width="13" height="140" rx="6.5"/>
+    </g>
+    <!-- shoulders / blazer -->
+    <path d="M34 200 v-16 a66 46 0 0 1 132 0 v16 z" fill="#28323f"/>
+    <path d="M100 168 l-15 32 h30 z" fill="#f4f6fa"/>
+    <path d="M100 170 l-13 30 M100 170 l13 30" stroke="#28323f" stroke-width="2" fill="none"/>
+    <!-- neck -->
+    <path d="M86 138 h28 v18 q-14 12 -28 0 z" fill="#6c4830"/>
+    <!-- face -->
+    <ellipse cx="100" cy="98" rx="40" ry="47" fill="url(#lskin)"/>
+    <!-- ears + gold hoops -->
+    <circle cx="61" cy="103" r="7" fill="#7c5233"/><circle cx="139" cy="103" r="7" fill="#7c5233"/>
+    <circle cx="61" cy="113" r="6" fill="none" stroke="#e8b84b" stroke-width="2.6"/>
+    <circle cx="139" cy="113" r="6" fill="none" stroke="#e8b84b" stroke-width="2.6"/>
+    <!-- crown of locs over hairline -->
+    <path d="M58 92 q-4 -60 42 -66 q46 6 42 66 q-10 -20 -42 -22 q-32 2 -42 22 z" fill="url(#lloc)"/>
+    <g fill="url(#lloc)">
+      <rect x="60" y="40" width="11" height="30" rx="5.5"/>
+      <rect x="72" y="33" width="11" height="26" rx="5.5"/>
+      <rect x="85" y="30" width="11" height="24" rx="5.5"/>
+      <rect x="98" y="29" width="11" height="24" rx="5.5"/>
+      <rect x="111" y="31" width="11" height="25" rx="5.5"/>
+      <rect x="123" y="35" width="11" height="27" rx="5.5"/>
+    </g>
+    <!-- eyebrows -->
+    <path d="M76 81 q9 -6 20 -1" stroke="#241610" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path d="M124 81 q-9 -6 -20 -1" stroke="#241610" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <!-- eyes -->
+    <ellipse cx="84" cy="92" rx="7.5" ry="4.8" fill="#fff"/><circle cx="85" cy="92" r="3.4" fill="#3a2414"/><circle cx="85" cy="92" r="1.3" fill="#1a0f08"/>
+    <ellipse cx="116" cy="92" rx="7.5" ry="4.8" fill="#fff"/><circle cx="115" cy="92" r="3.4" fill="#3a2414"/><circle cx="115" cy="92" r="1.3" fill="#1a0f08"/>
+    <path d="M76.5 89.5 q7.5 -5 15.5 -1" stroke="#241610" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <path d="M123.5 89.5 q-7.5 -5 -15.5 -1" stroke="#241610" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- nose -->
+    <path d="M100 96 v9 q-4 3 -7 2.5" stroke="#5c3c25" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- red lips -->
+    <path d="M87 117 q6 -4 13 -3.5 q7 -0.5 13 3.5 q-6 3 -13 3 q-7 0 -13 -3 z" fill="#b81a2c"/>
+    <path d="M87 117 q13 4 26 0" stroke="#7d0f1e" stroke-width="1.1" fill="none"/>
+    <ellipse cx="94" cy="115.5" rx="2.2" ry="0.9" fill="#e05266" opacity=".7"/>
+    <!-- cheek warmth -->
+    <ellipse cx="74" cy="106" rx="6" ry="4" fill="#8a4a3a" opacity=".25"/>
+    <ellipse cx="126" cy="106" rx="6" ry="4" fill="#8a4a3a" opacity=".25"/>
+  </g>
+  <circle cx="100" cy="100" r="98.5" fill="none" stroke="#0f8a4d" stroke-width="2.5"/>
+</svg>
