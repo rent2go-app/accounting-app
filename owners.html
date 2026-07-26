@@ -31,6 +31,14 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
 .pill{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .oflag{font-size:22px;line-height:1;margin-right:2px}
+.odash{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin-top:14px}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
+.dcard .dl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.dcard .dv{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:-.01em}.dcard .dv.pos{color:var(--in)}.dcard .dv.brand{color:var(--brand)}
+.dcard .ds{font-size:11px;color:var(--muted);margin-top:2px}
+.otoggle{border:1px solid var(--line);background:var(--surface);border-radius:7px;width:28px;height:28px;cursor:pointer;color:var(--muted);font-weight:800;font-family:inherit;flex:none}
+.otoggle:hover{border-color:var(--brand);color:var(--brand)}
+.owner.collapsed .ohead{border-bottom:none}
 .odetails{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
 .odetails label{display:flex;flex-direction:column;gap:3px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .odetails input,.odetails select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;text-transform:none;letter-spacing:0}
@@ -97,10 +105,14 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 <main class="wrap">
 <div class="ctl">
   <label>Working month</label><input type="month" id="ym">
-  <label>Standard fee</label><span class="pill">$500 / car · Preferred $350 / $250</span>
   <button class="btn" id="addOwner">+ Add owner</button>
-  <div class="grand"><div class="l">Programme total · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div></div>
+  <button class="btn" id="undoBtn" disabled>↶ Undo</button>
+  <button class="btn" id="expandAll">Expand all</button>
+  <button class="btn" id="collapseAll">Collapse all</button>
+  <span class="pill">Fees: $500 / car · Preferred $350 / $300 / $250</span>
+  <div class="grand"><div class="l">Platform fees · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div></div>
 </div>
+<div class="odash" id="odash"></div>
 <div id="owners"></div>
 <p class="hint" style="margin-top:18px"><b>Monthly</b> owners: total = sum of their cars' fees, prorated daily by <b>days available ÷ days in the month</b>, paid once on the 25th or 30th. <b>Weekly</b> owners: the monthly total is <b>split 4 ways</b> and paid on the chosen weekday (4 payments a month). Each owner has its own <b>⇪ Preview &amp; push</b> — it writes only that owner's lines for the selected month, tagged with a hidden source ref so re-pushing <b>updates</b> instead of duplicating. Other owners and the rest of your ledger are never touched.</p>
 </main>
@@ -128,7 +140,10 @@ function weeklyMonthly(o){return r2((o.cars||[]).reduce((s,c)=>s+(+c.rate||0),0)
 function weeklySplit(total){var w=r2(total/4);return [w,w,w,r2(total-w*3)];}
 function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o):ownerTotal(o,ym);}
 
-let STATE=[];let YM='';let SAVET=null;let STRIPEROWS=[];
+let STATE=[];let YM='';let SAVET=null;let STRIPEROWS=[];let HIST=[];let OPEN=new Set();
+function snap(){try{HIST.push(JSON.stringify(STATE));if(HIST.length>60)HIST.shift();updateUndo();}catch(e){}}
+function undo(){if(!HIST.length)return;STATE=JSON.parse(HIST.pop());scheduleSave();updateUndo();render();}
+function updateUndo(){var b=document.getElementById('undoBtn');if(b)b.disabled=!HIST.length;}
 function stripeFor(label){var g=0,f=0,n=0;if(label)STRIPEROWS.forEach(function(r){if(r.label===label&&String(r.day).slice(0,7)===YM){g+=+r.gross||0;f+=+r.fee||0;n+=+r.net||0;}});return {g:r2(g),f:r2(f),n:r2(n)};}
 function stripeStrip(o){var sl=o.stripeLabel||'';var s=stripeFor(sl);var oi=STATE.indexOf(o);var labels=[];STRIPEROWS.forEach(function(r){if(labels.indexOf(r.label)<0)labels.push(r.label);});labels.sort();var opts='<option value="">— link Stripe account —</option>'+labels.map(function(L){return '<option value="'+esc(L)+'"'+(L===sl?' selected':'')+'>'+esc(L)+'</option>';}).join('');if(sl&&labels.indexOf(sl)<0)opts+='<option value="'+esc(sl)+'" selected>'+esc(sl)+' (no data)</option>';return '<div class="ostripe"><span class="pill">🔗 Stripe</span><select class="slabel" data-slabel="'+oi+'">'+opts+'</select><div class="sgrid"><div class="sfig"><div class="l">Gross · '+fmtYM(YM)+'</div><div class="v tnum">'+fmt(s.g)+'</div></div><div class="sfig"><div class="l">Stripe fees</div><div class="v tnum neg">'+fmt(s.f)+'</div></div><div class="sfig"><div class="l">Net earnings</div><div class="v tnum pos">'+fmt(s.n)+'</div></div></div></div>';}
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
@@ -142,9 +157,11 @@ function curYM(){var n=new Date();return n.getFullYear()+'-'+pad(n.getMonth()+1)
 function flagOf(cc){cc=(cc||'').toUpperCase();if(!/^[A-Z]{2}$/.test(cc))return '';try{return String.fromCodePoint(...cc.split('').map(c=>127397+c.charCodeAt(0)));}catch(e){return '';}}
 const COUNTRIES=[['','—'],['ZA','South Africa'],['AE','United Arab Emirates'],['US','United States'],['GB','United Kingdom'],['ZW','Zimbabwe'],['NG','Nigeria'],['KE','Kenya'],['GH','Ghana'],['NA','Namibia'],['BW','Botswana'],['MZ','Mozambique'],['ZM','Zambia'],['MW','Malawi'],['TZ','Tanzania'],['EG','Egypt'],['CA','Canada'],['AU','Australia'],['DE','Germany'],['FR','France'],['NL','Netherlands'],['IN','India'],['SA','Saudi Arabia'],['QA','Qatar'],['SG','Singapore']];
 function odetails(o){var oi=STATE.indexOf(o);function f(field,label,ph,type){return '<label>'+label+'<input type="'+(type||'text')+'" data-of="'+oi+'|'+field+'" value="'+esc(o[field]||'')+'" placeholder="'+ph+'"></label>';}var copts=COUNTRIES.map(function(c){return '<option value="'+c[0]+'"'+((o.country||'')===c[0]?' selected':'')+'>'+(c[0]?flagOf(c[0])+' ':'')+esc(c[1])+'</option>';}).join('');return '<div class="odetails">'+f('bizName','Business name','Registered business')+f('ownerName','Account owner name','Full name')+f('stripeBizId','Stripe Business ID','acct_… / business id')+f('email','Email','name@email.com','email')+f('phone','Phone','+…','tel')+'<label>Country of residence<select data-ocountry="'+oi+'">'+copts+'</select></label></div>';}
+function renderDash(){var yr=YM.slice(0,4);var ytdG=0,ytdN=0,mG=0,mN=0;STRIPEROWS.forEach(function(r){var d=String(r.day);if(d.slice(0,4)===yr){ytdG+=+r.gross||0;ytdN+=+r.net||0;}if(d.slice(0,7)===YM){mG+=+r.gross||0;mN+=+r.net||0;}});var plat=STATE.reduce(function(s,o){return s+ownerMonthTotal(o,YM);},0);var el=document.getElementById('odash');if(!el)return;function card(l,v,sub,cls){return '<div class="dcard"><div class="dl">'+l+'</div><div class="dv tnum '+(cls||'')+'">'+fmt(v)+'</div><div class="ds">'+sub+'</div></div>';}el.innerHTML=card('YTD gross earnings (GMV)',r2(ytdG),yr+' · all accounts','')+card('YTD net earnings',r2(ytdN),yr+' · after Stripe','pos')+card('GMV · '+fmtYM(YM),r2(mG),'this month, gross','')+card('Distributions to owners',r2(mN),'net paid out · '+fmtYM(YM),'pos')+card('Platform fees charged',r2(plat),'R2G revenue · '+fmtYM(YM),'brand');}
 function render(){
   var host=document.getElementById('owners');
   document.getElementById('ymlbl').textContent=fmtYM(YM);
+  renderDash();
   if(!STATE.length){host.innerHTML='<div class="owner"><div class="empty">No owners yet.<br><br><button class="btn pri" onclick="document.getElementById(\'addOwner\').click()">+ Add your first owner</button></div></div>';document.getElementById('grand').textContent='$0.00';return;}
   var grand=0;
   host.innerHTML=STATE.map(function(o,oi){
@@ -175,16 +192,18 @@ function render(){
     var hdr=weekly
       ? '<div class="chdr wk"><span>Fleet / description</span><span>$ / month</span><span></span></div>'
       : '<div class="chdr"><span>Car / plate</span><span>Discount / pays</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
-    return '<div class="owner"><div class="ohead"><span class="oflag" title="'+esc(o.country||'')+'">'+flagOf(o.country)+'</span>'
+    var open=OPEN.has(o.id);var s=stripeFor(o.stripeLabel||'');var nc=(o.cars||[]).length;
+    var summary='<div class="otot"><div class="l">Platform fees /mo</div><div class="v tnum">'+fmt(ot)+'</div><div class="l" style="margin-top:3px;text-transform:none">Net earnings '+fmt(s.n)+' · '+nc+' car'+(nc===1?'':'s')+'</div></div>';
+    var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">';
+    var body='<div class="obody">'+odetails(o)+stripeStrip(o)
+      +'<div class="cars">'+(nc?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
+      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div></div>';
+    return '<div class="owner'+(open?'':' collapsed')+'"><div class="ohead"><button class="otoggle" data-otog="'+esc(o.id)+'" title="'+(open?'Collapse':'Expand')+'">'+(open?'▾':'▸')+'</button><span class="oflag" title="'+esc(o.country||'')+'">'+flagOf(o.country)+'</span>'
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
-      +cadSeg+whenCtl
-      +'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">'
-      +'<div class="otot">'+totLine+'</div>'
+      +(open?controls:'')
+      +summary
       +'</div>'
-      +odetails(o)
-      +stripeStrip(o)
-      +'<div class="cars">'+((o.cars||[]).length?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
-      +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div>'
+      +(open?body:'')
       +'</div>';
   }).join('');
   document.getElementById('grand').textContent=fmt(r2(grand));
@@ -194,25 +213,26 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function fmtYM(ym){if(!ym)return '—';var p=ym.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en',{month:'long',year:'numeric'});}
 
 function wire(){
-  document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.on].name=el.value;scheduleSave();});
-  document.querySelectorAll('[data-oday]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.oday].day=+el.value;scheduleSave();});
-  document.querySelectorAll('[data-owd]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.owd].weekday=+el.value;scheduleSave();render();});
-  document.querySelectorAll('[data-cad]').forEach(el=>el.onclick=()=>{var p=el.dataset.cad.split('|');var o=STATE[+p[0]];o.cadence=p[1];if(p[1]==='weekly'&&o.weekday==null)o.weekday=5;scheduleSave();render();});
-  document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
-  document.querySelectorAll('[data-slabel]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.slabel].stripeLabel=el.value.trim();scheduleSave();render();});
-  document.querySelectorAll('[data-of]').forEach(el=>el.onchange=()=>{var p=el.dataset.of.split('|');STATE[+p[0]][p[1]]=el.value;scheduleSave();});
-  document.querySelectorAll('[data-ocountry]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.ocountry].country=el.value;scheduleSave();render();});
-  document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
+  document.querySelectorAll('[data-otog]').forEach(el=>el.onclick=()=>{var id=el.dataset.otog;if(OPEN.has(id))OPEN.delete(id);else OPEN.add(id);render();});
+  document.querySelectorAll('[data-on]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.on].name=el.value;scheduleSave();});
+  document.querySelectorAll('[data-oday]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.oday].day=+el.value;scheduleSave();});
+  document.querySelectorAll('[data-owd]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.owd].weekday=+el.value;scheduleSave();render();});
+  document.querySelectorAll('[data-cad]').forEach(el=>el.onclick=()=>{snap();var p=el.dataset.cad.split('|');var o=STATE[+p[0]];o.cadence=p[1];if(p[1]==='weekly'&&o.weekday==null)o.weekday=5;scheduleSave();render();});
+  document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
+  document.querySelectorAll('[data-slabel]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.slabel].stripeLabel=el.value.trim();scheduleSave();render();});
+  document.querySelectorAll('[data-of]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.of.split('|');STATE[+p[0]][p[1]]=el.value;scheduleSave();});
+  document.querySelectorAll('[data-ocountry]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.ocountry].country=el.value;scheduleSave();render();});
+  document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
   document.querySelectorAll('[data-pushowner]').forEach(el=>el.onclick=()=>openPushOwner(+el.dataset.pushowner));
-  document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
-  document.querySelectorAll('[data-cp]').forEach(el=>el.onchange=()=>{var p=el.dataset.cp.split('|');STATE[+p[0]].cars[+p[1]].plate=el.value;scheduleSave();});
-  document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
-  document.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{var p=el.dataset.cd.split('|');var c=STATE[+p[0]].cars[+p[1]];c.days=c.days||{};c.days[YM]=Math.max(0,Math.min(+el.value||0,dim(YM)));scheduleSave();render();});
-  document.querySelectorAll('[data-cdisc]').forEach(el=>el.onchange=()=>{var p=el.dataset.cdisc.split('|');var c=STATE[+p[0]].cars[+p[1]];if(el.value==='custom'){if([500,350,300,250].indexOf(+c.rate)>=0)c.rate=0;}else c.rate=+el.value;scheduleSave();render();});
-  document.querySelectorAll('[data-ccustom]').forEach(el=>el.onchange=()=>{var p=el.dataset.ccustom.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
-  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('c_'),name:'',plate:'',vin:'',rate:500,days:{}});scheduleSave();render();});
-  document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
-  document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
+  document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
+  document.querySelectorAll('[data-cp]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cp.split('|');STATE[+p[0]].cars[+p[1]].plate=el.value;scheduleSave();});
+  document.querySelectorAll('[data-cv]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cv.split('|');STATE[+p[0]].cars[+p[1]].vin=el.value;scheduleSave();});
+  document.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cd.split('|');var c=STATE[+p[0]].cars[+p[1]];c.days=c.days||{};c.days[YM]=Math.max(0,Math.min(+el.value||0,dim(YM)));scheduleSave();render();});
+  document.querySelectorAll('[data-cdisc]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.cdisc.split('|');var c=STATE[+p[0]].cars[+p[1]];if(el.value==='custom'){if([500,350,300,250].indexOf(+c.rate)>=0)c.rate=0;}else c.rate=+el.value;scheduleSave();render();});
+  document.querySelectorAll('[data-ccustom]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.ccustom.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
+  document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{snap();var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('c_'),name:'',plate:'',vin:'',rate:500,days:{}});scheduleSave();render();});
+  document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;snap();STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
+  document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;snap();STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
 }
 
 // ---- push to ledger (per owner) ----
@@ -282,7 +302,10 @@ function showApp(){document.getElementById('loginwrap').style.display='none';doc
 async function start(){
   YM=curYM();document.getElementById('ym').value=YM;
   document.getElementById('ym').onchange=e=>{YM=e.target.value||curYM();render();};
-  document.getElementById('addOwner').onclick=()=>{STATE.unshift({id:uid('o_'),name:'',cadence:'monthly',day:25,weekday:5,tag:'Owners Programme',cars:[]});scheduleSave();render();var _f=document.querySelector('.owner:first-child .oname');if(_f){_f.focus();_f.scrollIntoView({block:'center'});}};
+  document.getElementById('addOwner').onclick=()=>{snap();var no={id:uid('o_'),name:'',cadence:'monthly',day:25,weekday:5,tag:'Owners Programme',cars:[]};STATE.unshift(no);OPEN.add(no.id);scheduleSave();render();var _f=document.querySelector('.owner:first-child .oname');if(_f){_f.focus();_f.scrollIntoView({block:'center'});}};
+  document.getElementById('undoBtn').onclick=undo;
+  document.getElementById('expandAll').onclick=()=>{STATE.forEach(o=>OPEN.add(o.id));render();};
+  document.getElementById('collapseAll').onclick=()=>{OPEN.clear();render();};
   await load();showApp();render();setStatus('saved');
 }
 async function gate(){
