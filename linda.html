@@ -242,14 +242,15 @@ function wire(){
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
-  if(!ADMIN_EMAIL){alert('No admin email found for this session.');return;}
+  var to=prompt('Send this TEST to which email?\n\nUntil rentaride2go.com is verified in Resend, delivery only works to your Resend account email:\nmail.rent2go@gmail.com','mail.rent2go@gmail.com');
+  if(!to)return;to=to.trim();
   var t=btn.textContent;btn.disabled=true;btn.textContent='Sending test…';
   try{
     var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;line-height:1.55"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST PREVIEW — this is the notice for <b>'+esc(d.customer_name)+'</b>. It was sent to you only, not the customer.</p>'+bodyToHtml(d.body,true)+'</div>';
-    var r=await sb.functions.invoke('send-doc',{body:{to:ADMIN_EMAIL,subject:'[TEST] '+d.subject,html:html}});
+    var r=await sb.functions.invoke('send-doc',{body:{to:to,subject:'[TEST] '+d.subject,html:html}});
     if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
-    btn.textContent='Test sent ✓';toast('Test sent to '+ADMIN_EMAIL);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2500);
-  }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e)+'\n\nNote: in Resend test mode, delivery only works to your own Resend account email until rentaride2go.com is verified.');}
+    btn.textContent='Test sent ✓';toast('Test sent to '+to);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2500);
+  }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e)+'\n\nNote: in Resend test mode you can ONLY send to mail.rent2go@gmail.com (your Resend account email). To send anywhere else, verify rentaride2go.com in Resend.');}
 }
 async function upd(id,patch){var r=await sb.from('linda_drafts').update(patch).eq('id',id);if(r.error){alert(r.error.message);return;}var d=DRAFTS.find(x=>x.id==id);Object.assign(d,patch);render();}
 async function send(id,btn){
