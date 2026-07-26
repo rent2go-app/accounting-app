@@ -153,6 +153,30 @@ function bodyToHtml(t,br){
     return h;});
   return br?lines.join('<br>'):lines.join('\n');
 }
+// Clean, customer-facing HTML for copy/paste (live links, no dashboard highlight boxes).
+function bodyToClean(t){
+  function lk(s){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(s))){out+=esc(s.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" style="color:#0a7d44;font-weight:bold;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(s.slice(last));return out;}
+  return t.split('\n').map(function(ln){var h=lk(ln);return ln.trim().indexOf('💰')===0?'<b>'+h+'</b>':h;}).join('<br>');
+}
+// Plain-text version: spell out links as "Text: URL" so SMS/plain paste stays usable.
+function bodyToPlain(t){return t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,function(m,tx,u){return tx+': '+u;});}
+function copyDraft(id,btn){
+  var d=DRAFTS.find(x=>x.id==id);if(!d)return;
+  var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">'+bodyToClean(d.body)+'</div>';
+  var plain=bodyToPlain(d.body);
+  var done=function(ok){var o=btn.getAttribute('data-lbl')||btn.textContent;if(!btn.getAttribute('data-lbl'))btn.setAttribute('data-lbl',o);btn.textContent=ok?'✓ Copied':'Copy failed';setTimeout(function(){btn.textContent=btn.getAttribute('data-lbl');},1600);};
+  if(navigator.clipboard&&window.ClipboardItem){
+    try{
+      var item=new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})});
+      navigator.clipboard.write([item]).then(function(){done(true);},function(){plainCopy(plain,done);});
+    }catch(e){plainCopy(plain,done);}
+  }else{plainCopy(plain,done);}
+}
+function plainCopy(text,done){
+  var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.top='-9999px';document.body.appendChild(ta);ta.focus();ta.select();
+  var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);done(ok);
+}
 async function load(){
   var d=await sb.from('linda_drafts').select('*').order('kind',{ascending:true});DRAFTS=d.data||[];
   var c=await sb.from('linda_customers').select('*');CUSTS=c.data||[];
@@ -214,6 +238,7 @@ function draftCard(d){
     +'<div class="dsubj">'+esc(d.subject)+'</div>'
     +'<div class="dbody">'+bodyToHtml(d.body,false)+'</div>'
     +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
+    +'<button class="btn small pri" data-copy="'+d.id+'" title="Copy with live links — paste into email, WhatsApp or SMS">📋 Copy</button>'
     +(d.status!=='sent'?'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button><button class="btn small" data-test="'+d.id+'">🧪 Test to me</button>':'')
     +(d.status==='draft'?'<button class="btn small pri" data-approve="'+d.id+'">✓ Approve</button><button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
     +(d.status==='approved'?'<button class="btn small pri" data-send="'+d.id+'"'+(d.email?'':' disabled title="no email"')+'>📧 Send</button><button class="btn small" data-unapprove="'+d.id+'">Undo</button>':'')
@@ -274,6 +299,7 @@ function wire(){
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send(b.dataset.send,b));
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editDraft(b.dataset.edit));
   document.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>sendTest(b.dataset.test,b));
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyDraft(b.dataset.copy,b));
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
