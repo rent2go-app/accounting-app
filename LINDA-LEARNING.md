@@ -64,3 +64,4 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 ### YYYY-MM-DD
 - **What went wrong.** → Fix: what was changed.
 -->
+- **Invoice fetch capped at 100 (no pagination)** — customers with 200+ invoices (Essence had 244) had older open late fees missed (notice showed 5 of 6). → Fix: paginate all invoices via `has_more`/`starting_after`. Always paginate Stripe list calls.
