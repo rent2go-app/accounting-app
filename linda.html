@@ -57,9 +57,20 @@
 h2{font-size:15px;margin:18px 0 8px}
 .ic{width:16px;height:16px;vertical-align:-3px;margin-right:5px;flex:0 0 auto}
 .icfee{width:24px;height:24px;vertical-align:-7px;margin-right:7px;flex:0 0 auto}
-.acct{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
-.accttl{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 10px}
+.acct{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.accttl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:15px;font-weight:800;margin:0;padding:14px 16px;cursor:pointer;list-style:none;user-select:none}
+.accttl::-webkit-details-marker{display:none}
+.accttl::before{content:'▸';color:var(--muted);font-size:13px;transition:transform .18s;display:inline-block}
+details.acct[open] .accttl::before{transform:rotate(90deg)}
+.accttl:hover{background:var(--surface-2)}
+.acctbody{padding:0 16px 14px}
+.asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.apill.warn{background:color-mix(in srgb,#eab54e 20%,var(--surface));color:#8a6516}
+.apill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.apill.done{background:color-mix(in srgb,var(--brand) 15%,var(--surface));color:var(--brand)}
 .accmeta{font-size:11px;color:var(--muted);font-weight:600}
+.foldbar{display:flex;gap:8px;align-items:center;margin:6px 0 2px}
 .feetbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .feetbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
 .feetbl tr.hd td{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;background:var(--surface-2)}
@@ -137,7 +148,7 @@ h2{font-size:15px;margin:18px 0 8px}
 </div>
 <div class="cards" id="lsum"></div>
 <div id="lfeeledger"></div>
-<h2 style="margin-top:22px">📋 Notices by account</h2>
+<div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div class="dayprog" id="ldayprog"></div>
 <div id="laccounts"></div>
 <div id="lskipped"></div>
@@ -223,9 +234,19 @@ function render(){
   host.innerHTML=accs.map(function(acc){
     var af=CUSTS.filter(c=>c.account_label===acc&&c.flag&&c.flag!=='none').sort((a,b)=>b.pastdue_count-a.pastdue_count);
     var ad=DRAFTS.filter(d=>d.account_label===acc&&d.status!=='skipped');
+    var toSend=ad.filter(d=>d.status!=='sent').length;
+    var discN=ad.filter(d=>d.kind==='disconnect').length;
+    var acctOut=CUSTS.filter(c=>c.account_label===acc).reduce((s,c)=>s+(+c.outstanding||0),0);
     var flagsH=af.length?af.map(function(c){return '<div class="draft '+(c.flag==='recovery'?'recovery':'disc')+'"><div class="dhead"><span class="kind '+c.flag+'">'+c.flag.toUpperCase()+'</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'';
     var draftsH=ad.length?ad.map(draftCard).join(''):'<p class="hint">No past-due notices for this account. 🎉</p>';
-    return '<section class="acct"><h2 class="accttl">🏦 '+esc(acc)+' <span class="accmeta">'+ad.length+' notice(s) · '+af.length+' red flag(s)</span></h2>'+flagsH+draftsH+'</section>';
+    var pills=ad.length?('<span class="apill">'+ad.length+' notice'+(ad.length==1?'':'s')+'</span>'
+        +(toSend?'<span class="apill warn">'+toSend+' to send</span>':'<span class="apill done">all sent ✓</span>'))
+      :'<span class="apill done">all current 🎉</span>';
+    if(discN)pills+='<span class="apill red">'+discN+' disconnect</span>';
+    if(af.length)pills+='<span class="apill red">'+af.length+' red flag'+(af.length==1?'':'s')+'</span>';
+    if(acctOut)pills+='<span class="apill">'+fmt(acctOut)+' outstanding</span>';
+    var openAttr=(toSend>0||af.length>0)?' open':'';  // auto-open accounts that still need action
+    return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span></summary><div class="acctbody">'+flagsH+draftsH+'</div></details>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
   renderSkipped();
   renderLearnings();
@@ -334,6 +355,9 @@ function wire(){
   document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>toggleReviewed(b.dataset.review));
   document.querySelectorAll('[data-sent]').forEach(b=>b.onclick=()=>markSent(b.dataset.sent));
   document.querySelectorAll('[data-unsent]').forEach(b=>b.onclick=()=>unsend(b.dataset.unsent));
+  var ea=document.getElementById('expandAll'),ca=document.getElementById('collapseAll');
+  if(ea)ea.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=true);
+  if(ca)ca.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=false);
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
