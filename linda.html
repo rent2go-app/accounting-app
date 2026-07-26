@@ -71,6 +71,9 @@ h2{font-size:15px;margin:18px 0 8px}
 .skrow .dmail{color:var(--muted);font-size:12px}
 .skrow .amt{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
 .skrow .skre{font-size:11px;color:var(--muted);font-weight:700}
+.learnwrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.learnwrap summary{cursor:pointer;font-weight:800;font-size:13px;padding:6px 0}
+.learnlist{margin:4px 0 8px;padding-left:18px}.learnlist li{font-size:12.5px;margin:6px 0;line-height:1.45}
 .draft{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .draft.disc{border-color:var(--out);border-left:5px solid var(--out)}
 .draft.recovery{border-color:#8a1c1c;border-left:5px solid #8a1c1c}
@@ -122,12 +125,14 @@ h2{font-size:15px;margin:18px 0 8px}
 <h2 style="margin-top:22px">📋 Notices by account</h2>
 <div id="laccounts"></div>
 <div id="lskipped"></div>
+<h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
+<div id="llearn"></div>
 </main></div>
 
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='';
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function bodyToHtml(t,br){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(t))){out+=esc(t.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" target="_blank" rel="noopener" style="color:#0f8a4d;font-weight:700;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(t.slice(last));return br?out.replace(/\n/g,'<br>'):out;}
@@ -135,6 +140,7 @@ async function load(){
   var d=await sb.from('linda_drafts').select('*').order('kind',{ascending:true});DRAFTS=d.data||[];
   var c=await sb.from('linda_customers').select('*');CUSTS=c.data||[];
   var f=await sb.from('linda_fees').select('*').eq('status','proposed');FEES=f.data||[];
+  try{var lr=await sb.from('linda_learnings').select('*').order('kind',{ascending:true});LEARN=lr.data||[];}catch(e){LEARN=[];}
   render();
 }
 function render(){
@@ -161,8 +167,18 @@ function render(){
     return '<section class="acct"><h2 class="accttl">🏦 '+esc(acc)+' <span class="accmeta">'+ad.length+' notice(s) · '+af.length+' red flag(s)</span></h2>'+flagsH+draftsH+'</section>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
   renderSkipped();
+  renderLearnings();
   wire();
   renderSuggestions();
+}
+function renderLearnings(){
+  var el=document.getElementById('llearn');if(!el)return;
+  if(!LEARN.length){el.innerHTML='<p class="hint">No learnings recorded yet.</p>';return;}
+  var rules=LEARN.filter(x=>x.kind==='rule'),mis=LEARN.filter(x=>x.kind==='mistake');
+  function li(x){return '<li><b>'+esc(x.title)+'</b> — '+esc(x.detail)+(x.day?' <span class="hint">('+esc(x.day)+')</span>':'')+'</li>';}
+  el.innerHTML='<details class="learnwrap" open><summary>📏 Rules Linda follows ('+rules.length+')</summary><ul class="learnlist">'+rules.map(li).join('')+'</ul></details>'
+    +'<details class="learnwrap"><summary>🩹 Mistakes logged &amp; fixed ('+mis.length+')</summary><ul class="learnlist">'+mis.map(li).join('')+'</ul></details>'
+    +'<p class="hint">Full detail lives in LINDA-LEARNING.md. Every new mistake is logged here so Linda never repeats it.</p>';
 }
 function renderSkipped(){
   var el=document.getElementById('lskipped');if(!el)return;
