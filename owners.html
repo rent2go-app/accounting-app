@@ -30,6 +30,11 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .disc select,.disc .ccustom{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px}
 .ohead .oname:focus{border-color:var(--line);background:var(--surface);outline:none}
 .pill{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.ostripe{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 18px;background:color-mix(in srgb,var(--brand) 4%,var(--surface));border-bottom:1px solid var(--line)}
+.ostripe .slabel{padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:12.5px;font-family:inherit;min-width:150px}
+.ostripe .sgrid{display:flex;gap:20px;margin-left:auto;flex-wrap:wrap}
+.ostripe .sfig .l{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ostripe .sfig .v{font-size:16px;font-weight:800}.ostripe .sfig .v.pos{color:var(--in)}.ostripe .sfig .v.neg{color:var(--out)}
 .otot{margin-left:auto;text-align:right}.otot .l{font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted)}.otot .v{font-size:20px;font-weight:800;color:var(--in)}
 .cars{padding:6px 12px 12px}
 .crow{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)}
@@ -118,7 +123,9 @@ function weeklyMonthly(o){return r2((o.cars||[]).reduce((s,c)=>s+(+c.rate||0),0)
 function weeklySplit(total){var w=r2(total/4);return [w,w,w,r2(total-w*3)];}
 function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o):ownerTotal(o,ym);}
 
-let STATE=[];let YM='';let SAVET=null;
+let STATE=[];let YM='';let SAVET=null;let STRIPEROWS=[];
+function stripeFor(label){var g=0,f=0,n=0;if(label)STRIPEROWS.forEach(function(r){if(r.label===label&&String(r.day).slice(0,7)===YM){g+=+r.gross||0;f+=+r.fee||0;n+=+r.net||0;}});return {g:r2(g),f:r2(f),n:r2(n)};}
+function stripeStrip(o){var sl=o.stripeLabel||'';var s=stripeFor(sl);var oi=STATE.indexOf(o);return '<div class="ostripe"><span class="pill">🔗 Stripe</span><input class="slabel" data-slabel="'+oi+'" value="'+esc(sl)+'" placeholder="account label (e.g. acct1)" title="Must match a label in STRIPE_ACCOUNTS"><div class="sgrid"><div class="sfig"><div class="l">Gross · '+fmtYM(YM)+'</div><div class="v tnum">'+fmt(s.g)+'</div></div><div class="sfig"><div class="l">Stripe fees</div><div class="v tnum neg">'+fmt(s.f)+'</div></div><div class="sfig"><div class="l">Net earnings</div><div class="v tnum pos">'+fmt(s.n)+'</div></div></div></div>';}
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(msg){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+msg+'</div>';setTimeout(()=>{h.innerHTML='';},2600);}
 
@@ -166,6 +173,7 @@ function render(){
       +'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">'
       +'<div class="otot">'+totLine+'</div>'
       +'</div>'
+      +stripeStrip(o)
       +'<div class="cars">'+((o.cars||[]).length?hdr:'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+carsHTML+'</div>'
       +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div>'
       +'</div>';
@@ -182,6 +190,7 @@ function wire(){
   document.querySelectorAll('[data-owd]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.owd].weekday=+el.value;scheduleSave();render();});
   document.querySelectorAll('[data-cad]').forEach(el=>el.onclick=()=>{var p=el.dataset.cad.split('|');var o=STATE[+p[0]];o.cadence=p[1];if(p[1]==='weekly'&&o.weekday==null)o.weekday=5;scheduleSave();render();});
   document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
+  document.querySelectorAll('[data-slabel]').forEach(el=>el.onchange=()=>{STATE[+el.dataset.slabel].stripeLabel=el.value.trim();scheduleSave();render();});
   document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
   document.querySelectorAll('[data-pushowner]').forEach(el=>el.onclick=()=>openPushOwner(+el.dataset.pushowner));
   document.querySelectorAll('[data-cn]').forEach(el=>el.onchange=()=>{var p=el.dataset.cn.split('|');STATE[+p[0]].cars[+p[1]].name=el.value;scheduleSave();});
@@ -254,8 +263,9 @@ async function load(){
   var r=await sb.from('owners_program').select('owners').eq('id',1).single();
   if(r.error){console.error(r.error);}
   STATE=(r.data&&r.data.owners)||[];
+  try{var si=await sb.from('stripe_income').select('day,label,gross,fee,net');STRIPEROWS=si.data||[];}catch(e){STRIPEROWS=[];}
   // normalise
-  STATE.forEach(o=>{o.id=o.id||uid('o_');o.cadence=o.cadence==='weekly'?'weekly':'monthly';o.day=+o.day===25?25:(+o.day===30?30:25);o.weekday=(o.weekday!=null)?+o.weekday:5;o.tag=o.tag||'Owners Programme';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',rate:+c.rate||0,days:c.days||{}}));});
+  STATE.forEach(o=>{o.id=o.id||uid('o_');o.cadence=o.cadence==='weekly'?'weekly':'monthly';o.day=+o.day===25?25:(+o.day===30?30:25);o.weekday=(o.weekday!=null)?+o.weekday:5;o.tag=o.tag||'Owners Programme';o.stripeLabel=o.stripeLabel||'';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',rate:+c.rate||0,days:c.days||{}}));});
 }
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}
 async function start(){
