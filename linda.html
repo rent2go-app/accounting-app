@@ -127,7 +127,7 @@ h2{font-size:15px;margin:18px 0 8px}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='';
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function bodyToHtml(t,br){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(t))){out+=esc(t.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" target="_blank" rel="noopener" style="color:#0f8a4d;font-weight:700;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(t.slice(last));return br?out.replace(/\n/g,'<br>'):out;}
@@ -181,7 +181,7 @@ function draftCard(d){
     +'<div class="dsubj">'+esc(d.subject)+'</div>'
     +'<div class="dbody">'+bodyToHtml(d.body,false)+'</div>'
     +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
-    +(d.status!=='sent'?'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>':'')
+    +(d.status!=='sent'?'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button><button class="btn small" data-test="'+d.id+'">🧪 Test to me</button>':'')
     +(d.status==='draft'?'<button class="btn small pri" data-approve="'+d.id+'">✓ Approve</button><button class="btn small" data-skip="'+d.id+'">Skip</button>':'')
     +(d.status==='approved'?'<button class="btn small pri" data-send="'+d.id+'"'+(d.email?'':' disabled title="no email"')+'>📧 Send</button><button class="btn small" data-unapprove="'+d.id+'">Undo</button>':'')
     +'</div></div>';
@@ -238,6 +238,18 @@ function wire(){
   document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>upd(b.dataset.restore,{status:'draft',skipped_at:null}));
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send(b.dataset.send,b));
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editDraft(b.dataset.edit));
+  document.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>sendTest(b.dataset.test,b));
+}
+async function sendTest(id,btn){
+  var d=DRAFTS.find(x=>x.id==id);if(!d)return;
+  if(!ADMIN_EMAIL){alert('No admin email found for this session.');return;}
+  var t=btn.textContent;btn.disabled=true;btn.textContent='Sending test…';
+  try{
+    var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;line-height:1.55"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST PREVIEW — this is the notice for <b>'+esc(d.customer_name)+'</b>. It was sent to you only, not the customer.</p>'+bodyToHtml(d.body,true)+'</div>';
+    var r=await sb.functions.invoke('send-doc',{body:{to:ADMIN_EMAIL,subject:'[TEST] '+d.subject,html:html}});
+    if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
+    btn.textContent='Test sent ✓';toast('Test sent to '+ADMIN_EMAIL);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2500);
+  }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e)+'\n\nNote: in Resend test mode, delivery only works to your own Resend account email until rentaride2go.com is verified.');}
 }
 async function upd(id,patch){var r=await sb.from('linda_drafts').update(patch).eq('id',id);if(r.error){alert(r.error.message);return;}var d=DRAFTS.find(x=>x.id==id);Object.assign(d,patch);render();}
 async function send(id,btn){
@@ -253,7 +265,7 @@ async function send(id,btn){
 document.getElementById('li_form').addEventListener('submit',async function(e){e.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error){er.textContent=r.error.message;return;}boot();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
 document.getElementById('refresh').onclick=load;
-async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('li_err').textContent='This account is not authorised for Linda.';await sb.auth.signOut();return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';setGreeting(u.email);load();}
+async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('li_err').textContent='This account is not authorised for Linda.';await sb.auth.signOut();return;}ADMIN_EMAIL=(u.email||'').toLowerCase();document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';setGreeting(u.email);load();}
 boot();
 </script>
 </html>
