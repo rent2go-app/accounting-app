@@ -25,6 +25,7 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - A **one-time $10 late fee** applies to each **past-due RENTAL invoice** (rental = amount > $10).
 - **Never** charge a fee on a late-fee invoice (no fee-on-fee). **Never** compound (one fee per invoice, once).
 - Each $10 fee is **attached to the specific rental invoice** that triggered it, with a memo naming that invoice.
+- **Never double-bill.** Before proposing a $10 fee for a past-due rental, check the customer's existing late-fee invoices (**open OR paid**). If a late fee already exists dated the rental's due date or the day after, **skip the fee and just notify**. (Customers may pay a late fee but not the rental — don't add another fee, only remind.)
 
 **Reminders**
 - Base reminders on **past-due amounts only** (past-due rentals + unpaid late fees). Exclude not-yet-due invoices.
@@ -56,6 +57,8 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **Proposed $10 fees accumulated across scans (stale/incorrect fees persisted).** → Fix: clear `proposed` fees for the account at the start of every scan and re-derive fresh.
 - **Skipped notice with a null `skipped_at` was suppressed forever** (Penny's disconnection disappeared). → Fix: null or >3-day-old skips **re-table**; only skips within the last 3 days are suppressed.
 - **Large avatar image (1.4 MB) slowed the ledger.** → Fix: 700px `linda.png` + 43 KB `linda-sm.png` for small icons.
+- **Proposed a new $10 fee for every past-due rental without checking whether a late fee already existed** — would double-bill, since these accounts already run a daily late-fee process (Jada had already been fee'd; some customers pay the late fee but not the rental). → Fix: collect existing late-fee created-dates (open + paid) per customer; skip proposing if a fee already exists on the rental's due date or the day after — notify only. (Cut proposed fees from 11 to 3 on the live data.)
+- **Resend test-mode 403 on "Test to me"** — sent to the login email, but Resend only delivers to the account owner (`mail.rent2go@gmail.com`) until a domain is verified. → Fix: let the tester choose the recipient; documented that only that address works pre-verification.
 
 <!-- Append new mistakes above this line, newest date first. Format:
 ### YYYY-MM-DD
