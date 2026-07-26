@@ -48,11 +48,18 @@
 #heroBubble ul{margin:0;padding-left:18px}#heroBubble li{font-size:13px;margin:5px 0;line-height:1.45}
 #heroBubble li.warn{color:#8a6d1e}#heroBubble li.red{color:var(--out);font-weight:700}#heroBubble li.ok{color:var(--in)}
 @media(max-width:720px){.hero{flex-direction:column;text-align:center}.heroimg{width:min(74vw,300px)}.herotext{text-align:center}#heroBubble{text-align:left}}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
-.card .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
-.card .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:3px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.ctop{display:flex;align-items:center;gap:11px}
+.cicon{flex:none}.cicon svg{width:42px;height:42px;display:block}
+.card .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:9px}
+.card .v{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;margin-left:auto}
+.card .v small{font-size:15px;font-weight:800;color:var(--muted)}
 .card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}.card .v.pink{color:#d6336c}
+.card .cd{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;line-height:1.3;min-height:14px}
+.card .cd b{color:var(--text)}
+.reauditbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.btn.big{font-size:14px;font-weight:800;padding:11px 18px;border-radius:11px}
 #heroBubble li.pink{color:#d6336c;font-weight:700}
 h2{font-size:15px;margin:18px 0 8px}
 .ic{width:16px;height:16px;vertical-align:-3px;margin-right:5px;flex:0 0 auto}
@@ -77,6 +84,10 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .feetbl td.n{text-align:right;font-variant-numeric:tabular-nums}
 .feetbl tr.tot td{font-weight:800;background:var(--surface-2)}
 .feetbl tr.memorow td{background:var(--surface-2);color:var(--muted);font-size:11.5px;line-height:1.4;border-bottom:2px solid var(--line)}
+.paygrp{margin:10px 0}
+.paygrphd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:5px}
+.paygrpt{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.paygrpt b{color:var(--out)}
 .feewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px;margin-bottom:16px;box-shadow:var(--shadow)}
 .feewrap summary{cursor:pointer;font-weight:800;font-size:14px;padding:9px 0;list-style:none}
 .feewrap summary::-webkit-details-marker{display:none}
@@ -123,6 +134,16 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .dayprog .pill.alldone{background:var(--brand);color:#fff}.dayprog .pill.alldone b{color:#fff}
 .dayprog .pill.brief{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .dayprog .pill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.briefbar{background:color-mix(in srgb,#7a5cff 8%,var(--surface));border:1px solid color-mix(in srgb,#7a5cff 35%,var(--line));border-left:4px solid #7a5cff;border-radius:12px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.briefhd{font-size:12px;font-weight:900;letter-spacing:.05em;color:#7a5cff;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.briefts{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0}
+.briefpills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.briefpills .pill{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.briefpills .pill b{color:var(--text)}
+.briefpills .pill.alldone{background:var(--brand);color:#fff}.briefpills .pill.alldone b{color:#fff}
+.briefpills .pill.done{background:color-mix(in srgb,var(--brand) 15%,var(--surface));color:var(--brand)}.briefpills .pill.done b{color:var(--brand)}
+.briefpills .pill.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.briefpills .pill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}.briefpills .pill.red b{color:var(--out)}
 .loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
 .logincard h1{margin:0 0 4px;font-size:20px}.logincard input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:var(--surface);color:var(--text)}
@@ -148,11 +169,12 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
     <div class="dryrun">🧪 Dry run — nothing is charged or emailed until you approve &amp; send. (Customer email needs rentaride2go.com verified in Resend.)</div>
   </div>
 </div>
+<div class="reauditbar"><button class="btn pri big" id="reaudit">🔄 RE-AUDIT — sweep all accounts for payments &amp; updates</button><span class="hint" id="lastscan"></span></div>
+<div id="lbrief" class="briefbar"></div>
 <div class="cards" id="lsum"></div>
 <div id="lpaid"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
-<div class="dayprog" id="ldayprog"></div>
 <div id="laccounts"></div>
 <div id="lskipped"></div>
 <h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
@@ -218,29 +240,37 @@ function render(){
   var out=CUSTS.reduce((s,c)=>s+(+c.outstanding||0),0);
   var flags=CUSTS.filter(c=>c.flag&&c.flag!=='none').length;
   var feeCount=FEES.length,feeTotal=FEES.reduce((s,f)=>s+(+f.fee||0),0);
-  document.getElementById('lsum').innerHTML=
-    card('Active rentals',CUSTS.length,'')+
-    card('Reminders',rem,'','')+
-    card('Disconnections',disc,'red')+
-    card('Recovery',rec,'red')+
-    card('Outstanding',fmt(out),'')+
-    card(IC_FEE+'$10 invoices to raise',feeCount+' · '+fmt(feeTotal),'')+
-    card('Red flags',flags,flags?'red':'');
-  renderFeeLedger();
-  renderPaid();
   var pt=paidToday(),paidAmt=pt.reduce((s,p)=>s+(+p.amount||0),0);
   var active=DRAFTS.filter(d=>d.status!=='skipped'),tot=active.length;
   var revN=active.filter(d=>d.reviewed_at||d.status==='sent').length,sentN=active.filter(d=>d.status==='sent').length;
   var discPend=active.filter(d=>d.kind==='disconnect'&&d.status!=='sent').length;
   var recPend=active.filter(d=>d.kind==='recovery'&&d.status!=='sent').length;
-  var dp=document.getElementById('ldayprog');
-  if(dp)dp.innerHTML=tot?('<span class="pill brief">🔔 Briefing · '+etStamp()+'</span>'
-    +'<span class="pill'+(sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
-    +'<span class="pill'+(revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'
-    +(sentN>=tot?'<span class="pill alldone">🎉 All today’s notices sent</span>':'<span class="pill">'+(tot-sentN)+' still to send</span>')
+  var nAccts=new Set(CUSTS.map(c=>c.account_label)).size;
+  var byAcctOut={};CUSTS.forEach(c=>{if(+c.outstanding>0)byAcctOut[c.account_label]=(byAcctOut[c.account_label]||0)+(+c.outstanding||0);});
+  var topAcct=Object.keys(byAcctOut).sort((a,b)=>byAcctOut[b]-byAcctOut[a])[0];
+  var feeCusts=new Set(FEES.map(f=>f.customer_id)).size;
+  var payAccts=new Set(pt.map(p=>p.account_label)).size;
+  document.getElementById('lsum').innerHTML=
+    card(CIC.car,'Active rentals',CUSTS.length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
+    card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+
+    card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase 🎉','')+
+    card(CIC.power,'Disconnections',disc,disc?nm3(CUSTS.filter(c=>c.flag==='disconnect').map(c=>c.name)):'none','red')+
+    card(CIC.warn,'Recovery',rec,rec?nm3(CUSTS.filter(c=>c.flag==='recovery').map(c=>c.name)):'none','red')+
+    card(CIC.cash,'Outstanding',fmt(out),topAcct?('biggest: <b>'+esc(topAcct)+'</b> '+fmt(byAcctOut[topAcct])):'all clear 🎉','')+
+    card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
+    card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
+  renderFeeLedger();
+  renderPaid();
+  var lb=document.getElementById('lbrief');
+  if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">as of '+etStamp()+'</span></div>'
+    +'<div class="briefpills">'
+    +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
+    +'<span class="pill'+(tot&&revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'
+    +(tot?(sentN>=tot?'<span class="pill alldone">🎉 All today’s notices sent</span>':'<span class="pill warn">'+(tot-sentN)+' still to send</span>'):'<span class="pill alldone">🎉 Nothing to chase today</span>')
     +(pt.length?'<span class="pill done">💰 Paid today <b>'+pt.length+' · '+fmt(paidAmt)+'</b></span>':'')
     +(recPend?'<span class="pill red">⚠ '+recPend+' recovery to action</span>':'')
-    +(discPend?'<span class="pill red">⛔ '+discPend+' disconnection'+(discPend==1?'':'s')+' pending</span>':'')):'';
+    +(discPend?'<span class="pill red">⛔ '+discPend+' disconnection'+(discPend==1?'':'s')+' pending</span>':'')
+    +'</div>';
   var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)))).filter(Boolean).sort();
   var host=document.getElementById('laccounts');
   host.innerHTML=accs.map(function(acc){
@@ -338,12 +368,36 @@ function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
 function timeET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function renderPaid(){
   var el=document.getElementById('lpaid');if(!el)return;
-  var pt=paidToday().slice().sort((a,b)=>a.paid_at<b.paid_at?1:-1);
-  var tot=pt.reduce((s,p)=>s+(+p.amount||0),0);
-  if(!pt.length){el.innerHTML='<details class="feewrap"><summary>💰 Payments today — <b>0</b> <span class="hint">(no payments recorded yet today)</span></summary><p class="hint">As customers pay, Linda logs them here at each scan (1am · 6am · 12pm · 6pm · 9pm ET).</p></details>';return;}
-  var rows=pt.map(function(p){return '<tr><td>'+esc(p.customer_name||p.customer_id)+'</td><td>'+esc(p.account_label)+'</td><td>'+esc(p.invoice_number||'')+(p.kind==='latefee'?' <span class="hint">(late fee)</span>':'')+'</td><td class="n">'+fmt(p.amount)+'</td><td>'+timeET(p.paid_at)+'</td></tr>';}).join('');
-  el.innerHTML='<details class="feewrap" open><summary>💰 Payments today — <b>'+pt.length+'</b> · '+fmt(tot)+' <span class="hint">(who has paid so far today — click to collapse)</span></summary>'
-    +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Amount</td><td>Paid (ET)</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total received today</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table></details>';
+  var pt=paidToday();
+  var totAll=pt.reduce((s,p)=>s+(+p.amount||0),0);
+  var byAcc={};pt.forEach(function(p){(byAcc[p.account_label]=byAcc[p.account_label]||[]).push(p);});
+  var paidIds=new Set(pt.map(p=>p.customer_id));
+  var stillByAcc={};CUSTS.forEach(function(c){if(+c.outstanding>0&&!paidIds.has(c.customer_id)){(stillByAcc[c.account_label]=stillByAcc[c.account_label]||[]).push(c);}});
+  var accs=Array.from(new Set(Object.keys(byAcc).concat(Object.keys(stillByAcc)))).sort();
+  if(!accs.length){el.innerHTML='<details class="feewrap"><summary>💰 Payments today — <b>0</b> <span class="hint">(none logged yet)</span></summary><p class="hint">As customers pay, Linda logs them here at each scan (1am · 6am · 12pm · 6pm · 9pm ET).</p></details>';return;}
+  var stillTotal=Object.values(stillByAcc).reduce((s,a)=>s+a.length,0);
+  var groups=accs.map(function(acc){
+    var ps=(byAcc[acc]||[]).slice().sort((a,b)=>a.paid_at<b.paid_at?1:-1);
+    var sub=ps.reduce((s,p)=>s+(+p.amount||0),0);
+    var still=stillByAcc[acc]||[];
+    var rows=ps.map(function(p){return '<tr><td>'+esc(p.customer_name||p.customer_id)+'</td><td>'+esc(p.invoice_number||'')+(p.kind==='latefee'?' <span class="hint">(late fee)</span>':'')+'</td><td class="n">'+fmt(p.amount)+'</td><td>'+timeET(p.paid_at)+'</td></tr>';}).join('');
+    var stillRow=still.length?'<tr class="memorow"><td colspan="4">⏳ <b>Still to pay ('+still.length+'):</b> '+still.map(c=>esc((c.name||'').split(' ')[0])).join(' · ')+'</td></tr>':'';
+    return '<div class="paygrp"><div class="paygrphd">🏦 '+esc(acc)+'<span class="paygrpt">'+(ps.length?ps.length+' paid · '+fmt(sub):'0 paid')+(still.length?' · <b>'+still.length+' to go</b>':(ps.length?' · all in ✓':''))+'</span></div>'
+      +'<table class="feetbl">'+(rows||'<tr><td colspan="4" class="hint">No payments yet today</td></tr>')+stillRow+'</table></div>';
+  }).join('');
+  el.innerHTML='<details class="feewrap" open><summary>💰 Payments today — <b>'+pt.length+'</b> · '+fmt(totAll)+(stillTotal?' <span class="hint">· '+stillTotal+' still to pay</span>':'')+' <span class="hint">(by owner · click to collapse)</span></summary>'+groups+'</details>';
+}
+async function reaudit(btn){
+  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='⏳ Re-auditing all accounts… (~30–60s)';
+  try{
+    var r=await sb.functions.invoke('linda-scan');
+    if(r.error)throw r.error;
+    await load();
+    var t=(r.data&&r.data.total)||{};
+    var ls=document.getElementById('lastscan');if(ls)ls.textContent='Last audit '+etStamp()+' — '+(t.payments||0)+' paid today · '+(t.notices||0)+' notices';
+    btn.innerHTML='✓ Updated';
+  }catch(e){alert('Re-audit failed: '+(e.message||e));btn.innerHTML=o;}
+  finally{btn.disabled=false;setTimeout(function(){btn.innerHTML=o;},3000);}
 }
 function markSent(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{status:'sent',sent_at:new Date().toISOString(),sent_via:'manual',body:dynBody(d)});}
 function toggleReviewed(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{reviewed_at:d.reviewed_at?null:new Date().toISOString()});}
@@ -366,7 +420,20 @@ function renderSuggestions(){
   var el=document.getElementById('heroBubble');
   el.innerHTML='<h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
 }
-function card(l,v,cls){return '<div class="card"><div class="l">'+l+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>';}
+// big bold custom card icons (colored circle + white glyph)
+function cIcon(bg,glyph){return '<span class="cicon"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="'+bg+'"/>'+glyph+'</svg></span>';}
+const CIC={
+  car:cIcon('#0b6b3a','<g fill="#fff"><path d="M10 21l1.8-5.2a2 2 0 0 1 1.9-1.3h8.6a2 2 0 0 1 1.9 1.3L26 21v6a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-1H12.6v1a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1z"/><circle cx="13.5" cy="26" r="1.9" fill="#0b6b3a"/><circle cx="24.5" cy="26" r="1.9" fill="#0b6b3a"/></g>'),
+  bell:cIcon('#2563eb','<path d="M20 11a5 5 0 0 0-5 5c0 5-2 6-2 8h14c0-2-2-3-2-8a5 5 0 0 0-5-5zm0 19a2.5 2.5 0 0 0 2.4-2h-4.8a2.5 2.5 0 0 0 2.4 2z" fill="#fff"/>'),
+  power:cIcon('#c22a2a','<g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M20 12v7"/><path d="M14.3 15.2a7 7 0 1 0 11.4 0"/></g>'),
+  warn:cIcon('#8a1c1c','<path d="M20 11.5l9 16.5H11z" fill="#fff"/><rect x="19" y="18" width="2" height="6" rx="1" fill="#8a1c1c"/><circle cx="20" cy="26" r="1.2" fill="#8a1c1c"/>'),
+  cash:cIcon('#0d9488','<text x="20" y="27.5" text-anchor="middle" font-size="21" font-weight="900" fill="#fff">$</text>'),
+  flag:cIcon('#c22a2a','<g fill="#fff"><rect x="13.5" y="11" width="2" height="18" rx="1"/><path d="M15.5 12h11l-2.7 3.6L26.5 19h-11z"/></g>'),
+  pay:cIcon('#0b6b3a','<g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 20.2l4.6 4.6L27 14.8"/></g>'),
+  fee:cIcon('#eab54e','<text x="20" y="27.5" text-anchor="middle" font-size="21" font-weight="900" fill="#5c4708">$</text>')
+};
+function card(icon,l,v,detail,cls){return '<div class="card"><div class="ctop">'+(icon||'')+'<div class="v '+(cls||'')+'">'+v+'</div></div><div class="l">'+l+'</div><div class="cd">'+(detail||'')+'</div></div>';}
+function nm3(arr){if(!arr||!arr.length)return '—';var a=arr.slice(0,2).map(function(x){return esc(String(x).split(' ')[0]);});return a.join(' · ')+(arr.length>2?' · +'+(arr.length-2)+' more':'');}
 function wire(){
   document.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=()=>document.getElementById('d'+b.dataset.toggle).classList.toggle('open'));
   document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>upd(b.dataset.approve,{status:'approved',approved_at:new Date().toISOString()}));
@@ -383,6 +450,7 @@ function wire(){
   var ea=document.getElementById('expandAll'),ca=document.getElementById('collapseAll');
   if(ea)ea.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=true);
   if(ca)ca.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=false);
+  var ra=document.getElementById('reaudit');if(ra)ra.onclick=()=>reaudit(ra);
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
