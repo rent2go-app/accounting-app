@@ -387,6 +387,28 @@ function editDraft(id){
 }
 function dismissFee(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'dismissed',dismissed_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='dismissed';f.dismissed_at=new Date().toISOString();DISM.push(f);}render();});}
 function markFeeDone(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'raised',raised_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='raised';f.raised_at=new Date().toISOString();RAISED.push(f);}render();});}
+async function raiseFee(invId,btn){
+  var f=FEES.find(x=>x.invoice_id===invId);if(!f)return;
+  if(!confirm('Create a $10 DRAFT late-fee invoice in Stripe for this customer?\n\nDraft only — NOT sent. You finalize/send it yourself in Stripe.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Raising…';
+  try{
+    var r=await sb.functions.invoke('linda-raise-fee',{body:{invoice_id:f.invoice_id,account_label:f.account_label,customer_id:f.customer_id,memo:f.memo}});
+    if(r.error)throw r.error;
+    var res=(r.data&&r.data.results&&r.data.results[0])||{};
+    if(res.error)throw new Error(res.error);
+    toast('Draft $10 invoice created in Stripe ✓');await load();
+  }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+}
+async function raiseAllFees(btn){
+  if(!FEES.length){alert('No fees to raise.');return;}
+  if(!confirm('Create '+FEES.length+' DRAFT $10 late-fee invoices in Stripe (one per customer)?\n\nDrafts only — NOT sent. You finalize/send each yourself in Stripe.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Raising '+FEES.length+'… (~'+FEES.length+'s)';
+  try{
+    var r=await sb.functions.invoke('linda-raise-fee',{body:{all:true}});
+    if(r.error)throw r.error;
+    toast('Raised '+((r.data&&r.data.raised)||0)+' draft invoice(s) ✓'+((r.data&&r.data.failed)?' · '+r.data.failed+' failed':''));await load();
+  }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+}
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
@@ -397,15 +419,16 @@ function renderFeeLedger(){
   var rows=FEES.slice().sort(function(a,b){return (a.account_label+(nameOf[a.account_label+'|'+a.customer_id]||''))<(b.account_label+(nameOf[b.account_label+'|'+b.customer_id]||''))?-1:1;}).map(function(f){
     var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
     var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
-    return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="I have raised this $10 invoice in Stripe">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Don’t penalise this customer today">✕ Dismiss</button></td></tr>'
+    return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><button class="btn small pri" data-raisefee="'+esc(f.invoice_id)+'" title="Create this $10 as a DRAFT invoice in Stripe (not sent — you finalize)">📝 Raise draft</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done — I raised it myself in Stripe">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Don’t penalise this customer today">✕ Dismiss</button></td></tr>'
       +(f.memo?'<tr class="memorow"><td colspan="5">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
   }).join('');
   var tot=FEES.reduce(function(s,f){return s+(+f.fee||0);},0);
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
   var main=FEES.length?('<details class="feewrap"><summary>'+IC_FEE+'$10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+(doneToday?' <span class="hint">· '+doneToday+' ✓ done today</span>':'')+' <span class="hint">(who &amp; when — click to expand)</span></summary>'
+    +'<div style="margin:2px 0 10px"><button class="btn small pri" id="raiseAllFees" title="Create all as DRAFT invoices in Stripe — not sent">📝 Raise all '+FEES.length+' as drafts in Stripe</button></div>'
     +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Attached to rental invoice</td><td>Fee</td><td>Action</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total to raise</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table>'
-    +'<p class="hint">Each $10 late fee is attached to the specific past-due <b>rental</b> invoice shown, and will be created in Stripe on go-live. <b>Dismiss</b> spares that customer the fee for today; it can return tomorrow if still past due. Nothing is charged in dry-run.</p></details>')
+    +'<p class="hint"><b>📝 Raise draft</b> creates the $10 as a <b>draft</b> invoice in Stripe (not sent, deletable) — you review &amp; finalize/send it in Stripe. <b>✓ Done</b> = you raised it yourself. <b>✕ Dismiss</b> spares the customer today (returns tomorrow if still past due).</p></details>')
     :'<p class="hint">No $10 late-fee invoices pending. 🎉</p>';
   el.innerHTML=main+dismBlock;
 }
@@ -508,6 +531,8 @@ function wire(){
   document.querySelectorAll('[data-dismissfee]').forEach(b=>b.onclick=()=>dismissFee(b.dataset.dismissfee));
   document.querySelectorAll('[data-undismissfee]').forEach(b=>b.onclick=()=>undismissFee(b.dataset.undismissfee));
   document.querySelectorAll('[data-donefee]').forEach(b=>b.onclick=()=>markFeeDone(b.dataset.donefee));
+  document.querySelectorAll('[data-raisefee]').forEach(b=>b.onclick=()=>raiseFee(b.dataset.raisefee,b));
+  var raf=document.getElementById('raiseAllFees');if(raf)raf.onclick=()=>raiseAllFees(raf);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
 async function sendTest(id,btn){
