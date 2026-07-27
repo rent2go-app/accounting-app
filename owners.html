@@ -79,6 +79,19 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .lpost{margin:6px 16px 2px;font-size:12px;color:var(--muted)}
 .lpost b{color:var(--text);font-variant-numeric:tabular-nums}
 .lpost .no{color:var(--out);font-weight:700}
+.fleetfin{margin:6px 16px 4px;border-top:1px dashed var(--line);padding-top:10px}
+.ffh{font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:8px}
+.fflegend{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.ffcar{margin:8px 0;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.ffcarhd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:7px}
+.ffstat{margin-left:auto;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:12px;font-variant-numeric:tabular-nums}
+.ffstat.good{background:#e6f4ea;color:#0a7d44}.ffstat.mid{background:#fff3cd;color:#8a6516}.ffstat.bad{background:#fdecea;color:#c22a2a}
+.fstrip{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px}
+.fday{width:13px;height:13px;border-radius:3px;background:var(--surface-2);display:inline-block;vertical-align:middle}
+.fday.p{background:#2ea36a}.fday.u{background:#e05555}.fday.n{background:var(--surface-2);border:1px solid var(--line)}
+.ffnote{display:flex;gap:6px;flex-wrap:wrap}
+.ffnote select,.ffnote input{padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:var(--surface);color:var(--text);font-family:inherit}
+.ffnote input{flex:1;min-width:180px}
 .maint{margin:6px 16px 4px;border-top:1px dashed var(--line);padding-top:10px}
 .maint .mh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:6px}
 .mrow{display:grid;grid-template-columns:120px 116px 132px 1fr 78px 92px 30px;gap:8px;align-items:center;padding:3px 0}
@@ -243,7 +256,7 @@ function weeklyMonthly(o){return r2((o.cars||[]).reduce((s,c)=>s+(+c.rate||0),0)
 function weeklySplit(total){var w=r2(total/4);return [w,w,w,r2(total-w*3)];}
 function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o):ownerTotal(o,ym);}
 
-let STATE=[];let YM='';let SAVET=null;let STRIPEROWS=[];let HIST=[];let OPEN=new Set();let LEDGERPOSTED={};
+let STATE=[];let YM='';let SAVET=null;let STRIPEROWS=[];let HIST=[];let OPEN=new Set();let LEDGERPOSTED={};let FLEET=[];
 async function loadLedgerPosted(){try{var last=dim(YM),from=YM+'-01',to=YM+'-'+pad(last);var res=await sb.from('day_blocks').select('day,income').gte('day',from).lte('day',to);LEDGERPOSTED={};(res.data||[]).forEach(function(r){(r.income||[]).forEach(function(l){var ref=(l&&l[4])||'';if(ref.indexOf('op:')===0){(LEDGERPOSTED[ref]=LEDGERPOSTED[ref]||[]).push({day:r.day,amt:+l[1]||0});}});});}catch(e){LEDGERPOSTED={};}}
 function ledgerBadge(o,due){if(due<0.01)return '';var arr=LEDGERPOSTED['op:'+o.id]||[];var tot=arr.reduce(function(s,x){return s+(+x.amt||0);},0);if(!arr.length||tot<0.01)return '<span class="lbadge no" title="'+esc(o.name||'This owner')+"'s "+esc(fmtYM(YM))+' platform fee is NOT posted to the ledger yet — click Preview & push">⚑ Not in ledger</span>';var days=arr.map(function(x){return x.day;}).sort();var match=Math.abs(tot-due)<0.01;return '<span class="lbadge '+(match?'ok':'diff')+'" title="Posted to the ledger on: '+esc(days.join(", "))+'">'+(match?'✓':'≠')+' In ledger '+fmt(r2(tot))+'</span>';}
 function ledgerPostings(o){var due=r2(ownerMonthTotal(o,YM));var arr=(LEDGERPOSTED['op:'+o.id]||[]).slice().sort(function(a,b){return a.day<b.day?-1:1;});if(due<0.01)return '';if(!arr.length)return '<div class="lpost"><span class="no">⚑ Not pushed to the ledger for '+esc(fmtYM(YM))+'</span> — fee due '+fmt(due)+'. Use ⇪ Preview &amp; push.</div>';var items=arr.map(function(x){return '<b>'+esc(x.day)+'</b> '+fmt(r2(x.amt));}).join(' · ');var tot=r2(arr.reduce(function(s,x){return s+(+x.amt||0);},0));return '<div class="lpost">📗 In ledger ('+esc(fmtYM(YM))+'): '+items+' &nbsp;=&nbsp; <b>'+fmt(tot)+'</b>'+(Math.abs(tot-due)>0.01?' <span class="no">(due '+fmt(due)+' — differs)</span>':'')+'</div>';}
@@ -278,6 +291,36 @@ function renderDash(){var yr=YM.slice(0,4);var ytdG=0,ytdN=0,ytdP=0,ytdFi=0,ytdF
   var mMaint=0,ytdMaint=0,catAgg={};STATE.forEach(function(o){(o.maint||[]).forEach(function(x){var d=String(x.date||'');var c=+x.cost||0;if(d.slice(0,4)===yr)ytdMaint+=c;if(d.slice(0,7)===YM){mMaint+=c;var k=x.cat||'Uncategorised';catAgg[k]=(catAgg[k]||0)+c;}});});
   var el=document.getElementById('odash');if(!el)return;function card(l,v,sub,cls){return '<div class="dcard"><div class="dl">'+l+'</div><div class="dv tnum '+(cls||'')+'">'+fmt(v)+'</div><div class="ds">'+sub+'</div></div>';}el.innerHTML=card('YTD gross earnings (GMV)',r2(ytdG),yr+' · all accounts','')+card('YTD net earnings',r2(ytdN),yr+' · after Stripe fees','pos')+card('YTD paid out to owners',ytdPn,yr+(ytdFi>0?' · excl. Capital loan':' · payouts'),'pos')+(ytdFi>0?card('Stripe Capital loan',r2(ytdFi),fmt(ytdFo)+' repaid · liability, not income','neg'):'')+card('GMV · '+fmtYM(YM),r2(mG),'gross this month','')+card('Net earnings · '+fmtYM(YM),r2(mN),'after Stripe','pos')+card('Owner payouts · '+fmtYM(YM),mPn,'distributions'+(mFi>0?' · excl. loan':' paid out'),'pos')+card('Platform fees · '+fmtYM(YM),r2(plat),'R2G revenue','brand')+card('Maintenance costs · '+fmtYM(YM),r2(mMaint),'YTD '+fmt(r2(ytdMaint))+' · fleet upkeep','neg');
   var mb=document.getElementById('omaintbreak');if(mb){var ks=Object.keys(catAgg);mb.innerHTML=ks.length?'<div class="mbh">🔧 Maintenance by type · '+fmtYM(YM)+' <span class="mbt">'+fmt(r2(mMaint))+' total</span></div><div class="mbchips">'+ks.sort(function(a,b){return catAgg[b]-catAgg[a];}).map(function(k){return '<span class="mchip">'+esc(k)+' <b>'+fmt(r2(catAgg[k]))+'</b></span>';}).join('')+'</div>':'';}}
+// ── FLEET FINANCIALS (per-car daily payment, bill-driven from Stripe via Linda) ──
+function fleetStrip(days,ym){
+  var n=dim(ym),out='';
+  for(var d=1;d<=n;d++){var k=ym+'-'+pad(d);var c=days[k];var cls=c?(c.p?'p':'u'):'n';var t=k+(c?(c.p?' · paid $'+(c.a||0):' · billed, unpaid'):' · no rental');out+='<span class="fday '+cls+'" title="'+t+'"></span>';}
+  return out;
+}
+function fleetHTML(o){
+  var sl=o.stripeLabel||'';if(!sl)return '';
+  var rows=FLEET.filter(function(f){return f.account_label===sl&&f.month===YM;});
+  if(!rows.length)return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+'</div><div class="hint" style="padding:4px 2px">No billed rentals recorded this month for this fleet yet — Linda fills this in at each scan.</div></div>';
+  rows=rows.slice().sort(function(a,b){return (b.days_paid||0)-(a.days_paid||0);});
+  var REASONS=['','Customer defaulted','Not rented','Off-fleet — accident repair','Other'];
+  var body=rows.map(function(f){
+    var pct=f.days_billed?Math.round(f.days_paid/f.days_billed*100):0;var perf=pct>=80?'good':pct>=50?'mid':'bad';
+    var key=esc((f.account_label||'')+'|'+(f.vehicle||'')+'|'+(f.customer_id||''));
+    var ropts=REASONS.map(function(rr){return '<option value="'+esc(rr)+'"'+((f.note_reason||'')===rr?' selected':'')+'>'+(rr||'— reason for gaps —')+'</option>';}).join('');
+    return '<div class="ffcar"><div class="ffcarhd"><b>'+esc(f.vehicle)+'</b> <span class="hint">'+esc(f.customer_name||'')+'</span><span class="ffstat '+perf+'">paid '+(f.days_paid||0)+'/'+(f.days_billed||0)+' · '+fmt(+f.income||0)+'</span></div>'
+      +'<div class="fstrip">'+fleetStrip(f.days||{},YM)+'</div>'
+      +'<div class="ffnote"><select data-ffr="'+key+'">'+ropts+'</select><input type="text" data-ffn="'+key+'" value="'+esc(f.note||'')+'" placeholder="Note explaining the gaps (defaulted / not rented / repair…)"></div></div>';
+  }).join('');
+  var totInc=rows.reduce(function(s,f){return s+(+f.income||0);},0);
+  return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+' <span class="hint">'+rows.length+' car'+(rows.length===1?'':'s')+' billed · '+fmt(r2(totInc))+' collected</span></div>'
+    +'<div class="fflegend"><span class="fday p"></span> paid &nbsp; <span class="fday u"></span> billed, unpaid &nbsp; <span class="fday n"></span> not rented</div>'+body+'</div>';
+}
+function saveFleetNote(key,patch){
+  var p=key.split('|');var acc=p[0],veh=p.slice(1,-1).join('|'),cid=p[p.length-1];
+  var f=FLEET.find(function(x){return x.account_label===acc&&x.vehicle===veh&&x.customer_id===cid&&x.month===YM;});
+  if(f)Object.assign(f,patch);
+  sb.from('fleet_performance').update(patch).eq('account_label',acc).eq('vehicle',veh).eq('customer_id',cid).eq('month',YM).then(function(r){if(r.error)console.error(r.error);else setStatus('saved');});
+}
 function render(){
   var host=document.getElementById('owners');
   document.getElementById('ymlbl').textContent=fmtYM(YM);
@@ -317,6 +360,7 @@ function render(){
     var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">';
     var body='<div class="obody">'+odetails(o)+stripeStrip(o)
       +'<div class="cars">'+(nc?'<div class="rowscroll">'+hdr+carsHTML+'</div>':'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+'</div>'
+      +fleetHTML(o)
       +maintHTML(o)
       +ledgerPostings(o)
       +'<div class="ofoot"><button class="btn" data-addcar="'+oi+'">+ Add '+(weekly?'entry':'car')+'</button><span class="spacer"></span><button class="btn" data-doc="statement|'+oi+'">📄 Statement</button><button class="btn" data-doc="invoice|'+oi+'">🧾 Invoice</button><button class="btn pri" data-pushowner="'+oi+'">⇪ Preview &amp; push</button><button class="btn danger" data-delowner="'+oi+'">Remove</button></div></div>';
@@ -343,6 +387,8 @@ function wire(){
   document.querySelectorAll('[data-cad]').forEach(el=>el.onclick=()=>{snap();var p=el.dataset.cad.split('|');var o=STATE[+p[0]];o.cadence=p[1];if(p[1]==='weekly'&&o.weekday==null)o.weekday=5;scheduleSave();render();});
   document.querySelectorAll('[data-otag]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.otag].tag=el.value.trim()||'Owners Programme';scheduleSave();});
   document.querySelectorAll('[data-slabel]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.slabel].stripeLabel=el.value.trim();scheduleSave();render();});
+  document.querySelectorAll('[data-ffr]').forEach(el=>el.onchange=()=>saveFleetNote(el.dataset.ffr,{note_reason:el.value}));
+  document.querySelectorAll('[data-ffn]').forEach(el=>el.onchange=()=>saveFleetNote(el.dataset.ffn,{note:el.value}));
   document.querySelectorAll('[data-of]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.of.split('|');STATE[+p[0]][p[1]]=el.value;scheduleSave();});
   document.querySelectorAll('[data-ocountry]').forEach(el=>el.onchange=()=>{snap();STATE[+el.dataset.ocountry].country=el.value;scheduleSave();render();});
   document.querySelectorAll('[data-crate]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.crate.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
@@ -564,6 +610,7 @@ async function load(){
   try{STRIPEROWS=await loadStripeRows('day,label,gross,fee,net,payout,fin_in,fin_out');}catch(e){try{STRIPEROWS=await loadStripeRows('day,label,gross,fee,net,payout');}catch(e2){STRIPEROWS=[];}}
   // normalise
   STATE.forEach(o=>{o.id=o.id||uid('o_');o.cadence=o.cadence==='weekly'?'weekly':'monthly';o.day=+o.day===25?25:(+o.day===30?30:25);o.weekday=(o.weekday!=null)?+o.weekday:5;o.tag=o.tag||'Owners Programme';o.stripeLabel=o.stripeLabel||'';o.bizName=o.bizName||'';o.ownerName=o.ownerName||'';o.stripeBizId=o.stripeBizId||'';o.email=o.email||'';o.phone=o.phone||'';o.country=o.country||'';o.addr=o.addr||'';o.cars=(o.cars||[]).map(c=>({id:c.id||uid('c_'),name:c.name||'',plate:c.plate||'',vin:c.vin||'',rate:+c.rate||0,days:c.days||{}}));o.maint=(o.maint||[]).map(m=>({id:m.id||uid('m_'),date:m.date||'',carId:m.carId||'',cat:m.cat||'',desc:m.desc||'',mileage:(m.mileage!=null&&m.mileage!==''?+m.mileage:null),cost:+m.cost||0}));});
+  try{var fp=await sb.from('fleet_performance').select('*');FLEET=fp.data||[];}catch(e){FLEET=[];}
   await loadLedgerPosted();
 }
 function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';document.getElementById('appwrap').style.display='block';}

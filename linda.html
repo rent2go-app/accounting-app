@@ -133,6 +133,8 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .status.skipped{background:var(--surface-2);color:var(--muted)}
 .status.reviewed{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .status.plan{background:color-mix(in srgb,#0d9488 16%,var(--surface));color:#0d9488}
+.ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
+.ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .btn.on{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff;border-color:#7a5cff}
 .btn.ok{background:color-mix(in srgb,var(--brand) 14%,var(--surface));color:var(--brand);border-color:var(--brand);font-weight:800}
 .draft.done{opacity:.62}.draft.done:hover{opacity:1}
@@ -470,6 +472,7 @@ function etStamp(){return new Date().toLocaleString('en-US',{timeZone:'America/N
 function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
 function etDate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/New_York'});}catch(e){return '';}}
+function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
 function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
 function timeET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function renderPaid(){
