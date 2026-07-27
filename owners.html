@@ -91,6 +91,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .ffcar.review{border-color:#e05555;box-shadow:0 0 0 1px rgba(224,85,85,.25)}
 .ffline{font-size:12px;color:var(--muted);margin-bottom:7px;font-variant-numeric:tabular-nums}.ffline b{color:var(--text)}
 .lfinc{color:#8a6516;font-weight:700}
+.rcount{background:var(--surface-2);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px}
 .ffrule{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.4}
 .fstrip{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px}
 .fday{width:13px;height:13px;border-radius:3px;background:var(--surface-2);display:inline-block;vertical-align:middle}
@@ -315,27 +316,45 @@ function noPayGap(days,ym){
   var gap=0;for(var d=last;d>=firstD;d--){var c=days[ym+'-'+pad(d)];if(c&&c.p)break;gap++;}
   return gap;
 }
+// merge fleet_performance rows into ONE entry per physical car (a car can change hands mid-month)
+function mergeByCar(rows){
+  var byV={};
+  rows.forEach(function(f){
+    var v=byV[f.vehicle]=byV[f.vehicle]||{vehicle:f.vehicle,days:{},income:0,lf_income:0,renters:[],primary:null,primaryN:-1};
+    var fd=f.days||{};
+    Object.keys(fd).forEach(function(k){var c=fd[k];var m=v.days[k]=v.days[k]||{p:0,a:0,lf:0};if(c.p)m.p=1;m.a=Math.max(m.a||0,c.a||0);if(c.lf)m.lf=(m.lf||0)+c.lf;});
+    v.income+=(+f.income||0);v.lf_income+=(+f.lf_income||0);
+    var first=Object.keys(fd).length?Math.min.apply(null,Object.keys(fd).map(function(k){return +k.slice(8,10);})):99;
+    if(f.customer_name&&!v.renters.some(function(r){return r.name===f.customer_name;}))v.renters.push({name:f.customer_name,first:first});
+    var n=Object.keys(fd).length;if(n>v.primaryN){v.primaryN=n;v.primary=f;}
+  });
+  return Object.values(byV);
+}
 function fleetHTML(o){
   var sl=o.stripeLabel||'';if(!sl)return '';
   var rows=FLEET.filter(function(f){return f.account_label===sl&&f.month===YM;});
   if(!rows.length)return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+'</div><div class="hint" style="padding:4px 2px">No billed rentals recorded this month for this fleet yet — Linda fills this in at each scan.</div></div>';
-  rows=rows.slice().sort(function(a,b){return noPayGap(b.days||{},YM)-noPayGap(a.days||{},YM);});
-  var body=rows.map(function(f){
-    var days=f.days||{};var gap=noPayGap(days,YM);var review=gap>3;
+  var cars=mergeByCar(rows).sort(function(a,b){return noPayGap(b.days,YM)-noPayGap(a.days,YM);});
+  var body=cars.map(function(v){
+    var days=v.days;var gap=noPayGap(days,YM);var review=gap>3;
+    var dv=Object.keys(days).map(function(k){return days[k];});
+    var daysPaid=dv.filter(function(d){return d.p;}).length,daysBilled=dv.length,lfDays=dv.filter(function(d){return (d.lf||0)>0;}).length;
+    var bottom=r2(v.income+v.lf_income);
     var tag=review?'<span class="fftag rev">⚑ PLEASE REVIEW · '+gap+' days no payment</span>':'<span class="fftag ok">✅ ON TRACK</span>';
-    var lf=+f.lf_income||0;var bottom=r2((+f.income||0)+lf);
-    var key=esc((f.account_label||'')+'|'+(f.vehicle||'')+'|'+(f.customer_id||''));
-    var opts='<option value="">— reason for gaps —</option>'+allReasons().map(function(rr){return '<option value="'+esc(rr)+'"'+((f.note_reason||'')===rr?' selected':'')+'>'+esc(rr)+'</option>';}).join('')+'<option value="__add__">➕ Add a new reason…</option>';
-    return '<div class="ffcar'+(review?' review':'')+'"><div class="ffcarhd"><b>'+esc(f.vehicle)+'</b> <span class="hint">'+esc(f.customer_name||'')+'</span>'+tag+'</div>'
-      +'<div class="ffline">paid <b>'+(f.days_paid||0)+'/'+(f.days_billed||0)+'</b> days · rent '+fmt(+f.income||0)+(lf>0?' · <span class="lfinc">+'+fmt(lf)+' late fees ('+(f.lf_days||0)+'d)</span>':'')+' · <b>bottom line '+fmt(bottom)+'</b></div>'
+    var p=v.primary;var key=esc((p.account_label||'')+'|'+(p.vehicle||'')+'|'+(p.customer_id||''));
+    var opts='<option value="">— reason for gaps —</option>'+allReasons().map(function(rr){return '<option value="'+esc(rr)+'"'+((p.note_reason||'')===rr?' selected':'')+'>'+esc(rr)+'</option>';}).join('')+'<option value="__add__">➕ Add a new reason…</option>';
+    var renterNames=v.renters.slice().sort(function(a,b){return a.first-b.first;}).map(function(r){return esc(r.name);});
+    var renters=renterNames.join(' → ')+(renterNames.length>1?' <span class="rcount">'+renterNames.length+' renters</span>':'');
+    return '<div class="ffcar'+(review?' review':'')+'"><div class="ffcarhd"><b>'+esc(v.vehicle)+'</b> <span class="hint">'+renters+'</span>'+tag+'</div>'
+      +'<div class="ffline">paid <b>'+daysPaid+'/'+daysBilled+'</b> days · rent '+fmt(v.income)+(v.lf_income>0?' · <span class="lfinc">+'+fmt(v.lf_income)+' late fees ('+lfDays+'d)</span>':'')+' · <b>bottom line '+fmt(bottom)+'</b></div>'
       +'<div class="fstrip">'+fleetStrip(days,YM)+'</div>'
-      +'<div class="ffnote"><select data-ffr="'+key+'">'+opts+'</select><input type="text" data-ffn="'+key+'" value="'+esc(f.note||'')+'" placeholder="Note (e.g. down for repair 5 days — prorate)"></div></div>';
+      +'<div class="ffnote"><select data-ffr="'+key+'">'+opts+'</select><input type="text" data-ffn="'+key+'" value="'+esc(p.note||'')+'" placeholder="Note (e.g. down for repair 5 days — prorate)"></div></div>';
   }).join('');
-  var totInc=rows.reduce(function(s,f){return s+(+f.income||0)+(+f.lf_income||0);},0);
-  var reviewN=rows.filter(function(f){return noPayGap(f.days||{},YM)>3;}).length;
-  return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+' <span class="hint">'+rows.length+' car'+(rows.length===1?'':'s')+' · '+fmt(r2(totInc))+' collected'+(reviewN?' · <b style="color:#c22a2a">'+reviewN+' to review</b>':'')+'</span></div>'
+  var totInc=cars.reduce(function(s,v){return s+v.income+v.lf_income;},0);
+  var reviewN=cars.filter(function(v){return noPayGap(v.days,YM)>3;}).length;
+  return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+' <span class="hint">'+cars.length+' car'+(cars.length===1?'':'s')+' · '+fmt(r2(totInc))+' collected'+(reviewN?' · <b style="color:#c22a2a">'+reviewN+' to review</b>':'')+'</span></div>'
     +'<div class="fflegend"><span class="fday p"></span> paid &nbsp; <span class="fday u"></span> unpaid &nbsp; <span class="fday n"></span> not rented &nbsp; <span class="fday p lf"></span> late fee paid</div>'
-    +'<div class="ffrule">Prorate an owner only when a car is <b>down for maintenance/repair</b> or <b>unrented for 5+ days</b> — use the reason + note below to record why.</div>'+body+'</div>';
+    +'<div class="ffrule">One block per car — if a car changes hands mid-month the renters are overlapped (e.g. <i>Sondra → Nathaniel</i>). Prorate an owner only when a car is <b>down for maintenance/repair</b> or <b>unrented for 5+ days</b>.</div>'+body+'</div>';
 }
 function saveFleetNote(key,patch){
   var p=key.split('|');var acc=p[0],veh=p.slice(1,-1).join('|'),cid=p[p.length-1];
