@@ -107,9 +107,7 @@ async function scanAccount(acc: any) {
     const curSorted = current_open.sort((a: any, b: any) => (a.created || 0) - (b.created || 0));
     const parts: string[] = [];
     if (pdRent.length) parts.push("Past-due rental invoices:\n\n" + pdRent.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due rentals subtotal: " + m(pdRentAmt));
-    if (pdLF.length) parts.push(pdLF.length <= 2
-      ? "Past-due late fees:\n\n" + pdLF.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due late fees subtotal: " + m(pdLFAmt)
-      : "Past-due late fees: ❌ " + pdLF.length + " unpaid late fees ($10 each) = " + m(pdLFAmt) + " — please clear these any time in your Customer Portal (link below).");
+    if (pdLF.length) parts.push("Past-due late fees:\n\n" + pdLF.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due late fees subtotal: " + m(pdLFAmt));
     if (curSorted.length) parts.push("Current — coming due today (not yet late):\n\n" + curSorted.map((i: any) => invline(i, "✅")).join("\n\n") + "\n\nCurrent subtotal: " + m(current_amt));
     parts.push("💰 Total balance: " + m(grandtot));
     const pd_lines = parts.join("\n\n");
