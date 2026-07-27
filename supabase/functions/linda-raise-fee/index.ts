@@ -15,7 +15,11 @@ async function stripeForm(url: string, form: URLSearchParams, key: string) {
   return await r.json();
 }
 
-async function raiseOne(fee: any) {
+async function raiseOne(feeIn: any) {
+  // authoritative row from DB — guards against double-raising from a stale dashboard
+  const rows = await sbGet(`linda_fees?invoice_id=eq.${encodeURIComponent(feeIn.invoice_id)}&select=invoice_id,account_label,customer_id,memo,status,stripe_invoice_id`);
+  const fee = rows[0] || feeIn;
+  if (fee.status === "raised" && fee.stripe_invoice_id) return { invoice_id: fee.invoice_id, already: true, stripe_invoice_id: fee.stripe_invoice_id };
   const key = keyFor(fee.account_label);
   if (!key) return { invoice_id: fee.invoice_id, error: "no key for " + fee.account_label };
   if (!fee.customer_id) return { invoice_id: fee.invoice_id, error: "no customer_id" };

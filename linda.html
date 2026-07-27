@@ -402,7 +402,7 @@ async function raiseFee(invId,btn){
     if(r.error)throw r.error;
     var res=(r.data&&r.data.results&&r.data.results[0])||{};
     if(res.error)throw new Error(res.error);
-    toast('Draft $10 invoice created in Stripe ✓');await load();
+    toast(res.already?'Already raised — no duplicate created ✓':'Draft $10 invoice created in Stripe ✓');await load();
   }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 async function raiseAllFees(btn,acc){
