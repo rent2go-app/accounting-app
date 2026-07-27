@@ -189,7 +189,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -241,6 +241,7 @@ async function load(){
   try{var nt=await sb.from('linda_notes').select('*');NOTES=nt.data||[];}catch(e){NOTES=[];}
   try{var df=await sb.from('linda_fees').select('*').eq('status','dismissed');DISM=df.data||[];}catch(e){DISM=[];}
   try{var am=await sb.from('linda_accounts').select('*');ACCTMETA=am.data||[];}catch(e){ACCTMETA=[];}
+  try{var rf=await sb.from('linda_fees').select('*').eq('status','raised');RAISED=rf.data||[];}catch(e){RAISED=[];}
   render();
 }
 function render(){
@@ -384,22 +385,24 @@ function editDraft(id){
   el.querySelector('[data-canceledit]').onclick=function(){render();};
 }
 function dismissFee(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'dismissed',dismissed_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='dismissed';f.dismissed_at=new Date().toISOString();DISM.push(f);}render();});}
+function markFeeDone(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'raised',raised_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='raised';f.raised_at=new Date().toISOString();RAISED.push(f);}render();});}
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
   var nameOf={};CUSTS.forEach(function(c){nameOf[c.account_label+'|'+c.customer_id]=c.name;});
   var dismToday=DISM.filter(function(f){return etDate(f.dismissed_at)===todayET();});
-  if(!FEES.length&&!dismToday.length){el.innerHTML='<p class="hint">No $10 late-fee invoices pending. 🎉</p>';return;}
+  var doneToday=RAISED.filter(function(f){return etDate(f.raised_at)===todayET();}).length;
+  if(!FEES.length&&!dismToday.length&&!doneToday){el.innerHTML='<p class="hint">No $10 late-fee invoices pending. 🎉'+(doneToday?' ('+doneToday+' raised today)':'')+'</p>';return;}
   var rows=FEES.slice().sort(function(a,b){return (a.account_label+(nameOf[a.account_label+'|'+a.customer_id]||''))<(b.account_label+(nameOf[b.account_label+'|'+b.customer_id]||''))?-1:1;}).map(function(f){
     var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
     var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
-    return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Don’t penalise this customer today">✕ Dismiss</button></td></tr>'
+    return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="I have raised this $10 invoice in Stripe">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Don’t penalise this customer today">✕ Dismiss</button></td></tr>'
       +(f.memo?'<tr class="memorow"><td colspan="5">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
   }).join('');
   var tot=FEES.reduce(function(s,f){return s+(+f.fee||0);},0);
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
-  var main=FEES.length?('<details class="feewrap"><summary>'+IC_FEE+'$10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+' <span class="hint">(who &amp; when — click to expand)</span></summary>'
+  var main=FEES.length?('<details class="feewrap"><summary>'+IC_FEE+'$10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+(doneToday?' <span class="hint">· '+doneToday+' ✓ done today</span>':'')+' <span class="hint">(who &amp; when — click to expand)</span></summary>'
     +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Attached to rental invoice</td><td>Fee</td><td>Action</td></tr>'+rows+'<tr class="tot"><td colspan="3">Total to raise</td><td class="n">'+fmt(tot)+'</td><td></td></tr></table>'
     +'<p class="hint">Each $10 late fee is attached to the specific past-due <b>rental</b> invoice shown, and will be created in Stripe on go-live. <b>Dismiss</b> spares that customer the fee for today; it can return tomorrow if still past due. Nothing is charged in dry-run.</p></details>')
     :'<p class="hint">No $10 late-fee invoices pending. 🎉</p>';
@@ -503,6 +506,7 @@ function wire(){
   document.querySelectorAll('[data-reuse]').forEach(b=>b.onclick=()=>reuseNote(b.dataset.reuse));
   document.querySelectorAll('[data-dismissfee]').forEach(b=>b.onclick=()=>dismissFee(b.dataset.dismissfee));
   document.querySelectorAll('[data-undismissfee]').forEach(b=>b.onclick=()=>undismissFee(b.dataset.undismissfee));
+  document.querySelectorAll('[data-donefee]').forEach(b=>b.onclick=()=>markFeeDone(b.dataset.donefee));
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
 async function sendTest(id,btn){

@@ -25,6 +25,8 @@ function etISO(e: number) { const d = new Date(e * 1000); const hms = new Intl.D
 const todaystr = etYMD(now);
 const midnightISO = `${todaystr}T00:00:00${etOffset(new Date())}`;
 const cutoffISO = new Date((now - 3 * 86400) * 1000).toISOString();
+const monthKey = todaystr.slice(0, 7); // YYYY-MM (ET)
+const monthStart = Math.floor(new Date(`${monthKey}-01T00:00:00${etOffset(new Date())}`).getTime() / 1000);
 function m(x: number) { return "$" + x.toFixed(2); }
 const enc = encodeURIComponent;
 
@@ -77,17 +79,21 @@ async function scanAccount(acc: any) {
     const unpaid_latefees = latefee_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const pd_total = pdinv.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: s.status, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, updated_at: nowISO }); return; }
-    for (const i of rental_pd) {
+    // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
+    // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
+    const latestPd = rental_pd.slice().sort((a: any, b: any) => (b.created || 0) - (a.created || 0))[0];
+    if (latestPd) {
+      const i = latestPd;
       const dd = i.due_date || i.created || now;
       const feedays = [etYMD(dd), etYMD(dd + 86400)];
-      if (feedays.some((f) => existing_fee_dates.has(f))) continue;
-      feedays.forEach((f) => existing_fee_dates.add(f));
-      const ln = (i.lines?.data || [{}])[0] || {};
-      const rdesc = i.description || ln.description || "Rental";
-      const num = i.number || i.id;
-      const fdate = i.created ? etMDY(i.created) : "—";
-      const memo = `Late fee — rental invoice ${num} (generated ${fdate}) past due (${rdesc}). A one-time $10 late fee applies to each rental invoice not paid by its due date. If you plan to continue the rental with us today, please make sure you catch up your account today. — Rent 2 Go LLC`;
-      fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: rdesc.slice(0, 90), for_date: fdate, memo });
+      if (!feedays.some((f) => existing_fee_dates.has(f))) {   // skip if a late fee already exists for this rental
+        const ln = (i.lines?.data || [{}])[0] || {};
+        const rdesc = i.description || ln.description || "Rental";
+        const num = i.number || i.id;
+        const fdate = i.created ? etMDY(i.created) : "—";
+        const memo = `Late fee — rental invoice ${num} (generated ${fdate}) past due (${rdesc}). A one-time $10 late fee applies to the most recent past-due rental. If you plan to continue the rental with us today, please make sure you catch up your account today. — Rent 2 Go LLC`;
+        fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: rdesc.slice(0, 90), for_date: fdate, memo });
+      }
     }
     const disc = (rental_pd.length >= 3) || (unpaid_latefees >= 70 && rental_pd.length >= 2);
     const current_open = inv.filter((i: any) => !isPastDue(i));
@@ -144,7 +150,34 @@ async function scanAccount(acc: any) {
   if (payments.length) await sbPost(`linda_payments?on_conflict=invoice_id`, payments, "resolution=merge-duplicates,return=minimal");
   if (drafts.length) await sbPost(`linda_drafts`, drafts, "return=minimal");
   await sbPost(`linda_accounts?on_conflict=label`, [{ label: LABEL, active: custs.length, notices: drafts.length, scanned_at: nowISO }], "resolution=merge-duplicates,return=minimal");
-  return { account: LABEL, active: custs.length, notices: drafts.length, disc: drafts.filter((d) => d.kind === "disconnect").length, fees: fees.length, payments: payments.length };
+
+  // FLEET FINANCIALS — per-vehicle daily payment map for the current ET calendar month (bill-driven)
+  const finv = await stripeAll(`https://api.stripe.com/v1/invoices?created%5Bgte%5D=${monthStart}&limit=100&expand[]=data.customer`, SKEY);
+  const rentals: Record<string, any> = {};
+  for (const i of finv) {
+    if (isLateFee(i)) continue;               // rentals only, not late fees
+    if ((i.amount_due || 0) <= 0) continue;
+    const c = i.customer || {};
+    const cid = (typeof c === "object" ? c.id : c) || "?";
+    const nm = (typeof c === "object" ? (c.name || "") : "") || "(no name)";
+    const ln = (i.lines?.data || [{}])[0] || {};
+    const vehicle = cleanlbl(ln.description || i.description || "Rental");
+    if (/deposit|toll|late\s*fee|past\s*due|balance|\bcharge/i.test(vehicle)) continue;  // skip non-vehicle line items
+    const day = etYMD(i.created);
+    const paid = i.status === "paid";
+    const amt = (paid ? (i.amount_paid || 0) : (i.amount_due || 0)) / 100;
+    const key = cid + "|" + vehicle;
+    if (!rentals[key]) rentals[key] = { cid, nm, vehicle, days: {} as Record<string, any> };
+    const prev = rentals[key].days[day];
+    rentals[key].days[day] = { p: ((prev && prev.p) || paid) ? 1 : 0, a: Math.max(prev ? prev.a : 0, amt) };
+  }
+  const fleetRows = Object.values(rentals).map((r: any) => {
+    const dv = Object.values(r.days) as any[];
+    return { account_label: LABEL, vehicle: r.vehicle, customer_id: r.cid, customer_name: r.nm, month: monthKey, days: r.days, days_paid: dv.filter((d) => d.p).length, days_billed: dv.length, income: Math.round(dv.filter((d) => d.p).reduce((s, d) => s + d.a, 0) * 100) / 100, updated_at: nowISO };
+  });
+  if (fleetRows.length) await sbPost(`fleet_performance?on_conflict=account_label,vehicle,customer_id,month`, fleetRows, "resolution=merge-duplicates,return=minimal");
+
+  return { account: LABEL, active: custs.length, notices: drafts.length, disc: drafts.filter((d) => d.kind === "disconnect").length, fees: fees.length, payments: payments.length, fleet: fleetRows.length };
 }
 
 Deno.serve(async (req) => {
