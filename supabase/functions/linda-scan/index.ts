@@ -81,7 +81,7 @@ async function scanAccount(acc: any) {
     if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: s.status, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, updated_at: nowISO }); return; }
     // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
-    const latestPd = rental_pd.slice().sort((a: any, b: any) => (b.created || 0) - (a.created || 0))[0];
+    const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
     if (latestPd) {
       const i = latestPd;
       const dd = i.due_date || i.created || now;
