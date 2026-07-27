@@ -59,8 +59,9 @@ Deno.serve(async (req) => {
       if (fin.error) return new Response(JSON.stringify({ error: fin.error.message || JSON.stringify(fin.error) }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
       // email the invoice to the customer to pay (send for payment — we never auto-charge)
       await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/send`, new URLSearchParams({}), fkey);
-      await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}`, { status: "sent" });
-      return new Response(JSON.stringify({ ok: true, finalized: true, emailed: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
+      // sending completes the task — mark done automatically (no manual Done needed)
+      await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}`, { status: "done" });
+      return new Response(JSON.stringify({ ok: true, finalized: true, emailed: true, done: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
     let fees: any[] = [];
     if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);

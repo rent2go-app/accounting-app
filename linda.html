@@ -401,7 +401,7 @@ async function sendFee(invId,btn){
   try{
     var r=await sb.functions.invoke('linda-raise-fee',{body:{finalize:true,invoice_id:invId}});
     if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);
-    toast('Invoice finalized & sent ✓');await load();
+    toast('Invoice emailed to customer & marked done ✓');await load();
   }catch(e){alert('Send failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 async function raiseFee(invId,btn){
