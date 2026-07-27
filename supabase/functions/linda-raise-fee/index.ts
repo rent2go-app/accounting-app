@@ -24,8 +24,9 @@ async function raiseOne(feeIn: any) {
   if (!key) return { invoice_id: fee.invoice_id, error: "no key for " + fee.account_label };
   if (!fee.customer_id) return { invoice_id: fee.invoice_id, error: "no customer_id" };
   // 1) create an empty DRAFT invoice (exclude other pending items so only our $10 lands on it)
+  // collection_method=send_invoice → customer is EMAILED an invoice to pay; we never auto-pull their card
   const inv = await stripeForm("https://api.stripe.com/v1/invoices", new URLSearchParams({
-    customer: fee.customer_id, auto_advance: "false", collection_method: "charge_automatically",
+    customer: fee.customer_id, auto_advance: "false", collection_method: "send_invoice", days_until_due: "7",
     pending_invoice_items_behavior: "exclude", description: "Late fee", "metadata[linda_late_fee]": "true",
   }), key);
   if (inv.error) return { invoice_id: fee.invoice_id, error: inv.error.message || JSON.stringify(inv.error) };
@@ -56,8 +57,10 @@ Deno.serve(async (req) => {
       const fkey = keyFor(fee.account_label);
       const fin = await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/finalize`, new URLSearchParams({ auto_advance: "true" }), fkey);
       if (fin.error) return new Response(JSON.stringify({ error: fin.error.message || JSON.stringify(fin.error) }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      // email the invoice to the customer to pay (send for payment — we never auto-charge)
+      await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/send`, new URLSearchParams({}), fkey);
       await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}`, { status: "sent" });
-      return new Response(JSON.stringify({ ok: true, finalized: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, finalized: true, emailed: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
     let fees: any[] = [];
     if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);

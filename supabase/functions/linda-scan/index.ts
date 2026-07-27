@@ -88,11 +88,11 @@ async function scanAccount(acc: any) {
       const feedays = [etYMD(dd), etYMD(dd + 86400)];
       if (!feedays.some((f) => existing_fee_dates.has(f))) {   // skip if a late fee already exists for this rental
         const ln = (i.lines?.data || [{}])[0] || {};
-        const rdesc = i.description || ln.description || "Rental";
+        const veh = cleanlbl(ln.description || i.description || "your rental");
         const num = i.number || i.id;
         const fdate = i.created ? etMDY(i.created) : "—";
-        const memo = `Late fee — rental invoice ${num} (generated ${fdate}) past due (${rdesc}). A one-time $10 late fee applies to the most recent past-due rental. If you plan to continue the rental with us today, please make sure you catch up your account today. — Rent 2 Go LLC`;
-        fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: rdesc.slice(0, 90), for_date: fdate, memo });
+        const memo = `One-time $10 late fee for your ${veh} rental — invoice ${num} (${fdate}) was not settled by its due date. This applies once per past-due rental. Please clear your balance to keep your rental in good standing. Thank you — Rent 2 Go LLC`;
+        fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: veh.slice(0, 90), for_date: fdate, memo });
       }
     }
     const disc = (rental_pd.length >= 3) || (unpaid_latefees >= 70 && rental_pd.length >= 2);
