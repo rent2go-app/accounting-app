@@ -341,8 +341,9 @@ function draftCard(d){
     +'<div class="dsubj">'+esc(d.subject)+'</div>'
     +'<div class="dbody">'+bodyToHtml(dynBody(d),false)+'</div>'
     +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
-    +'<button class="btn small pri" data-copy="'+d.id+'" title="Copy with live links — paste into email, WhatsApp or SMS">📋 Copy</button>'
-    +(!isSent?'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>'
+    +'<button class="btn small pri" data-copy="'+d.id+'" title="Copy with live links — paste into WhatsApp/SMS/email">📋 Copy</button>'
+    +(!isSent?(d.email?'<button class="btn small ok" data-send="'+d.id+'" title="Email this notice to the customer now (from billing@rentaride2go.com)">📧 Send email</button>':'<span class="hint" style="align-self:center">⚠ no email — use Copy for SMS/WhatsApp</span>')
+        +'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>'
         +'<button class="btn small'+(d.reviewed_at?' on':'')+'" data-review="'+d.id+'">'+(d.reviewed_at?'✓ Reviewed':'👁 Mark reviewed')+'</button>'
         +'<button class="btn small ok" data-sent="'+d.id+'" title="I have sent this to the customer (email / WhatsApp / SMS)">✅ Mark sent</button>'
         +'<button class="btn small'+(onPlan?' on':'')+'" data-plan="'+d.id+'" title="Put this customer on a payment plan (softer, plan-continuation notice — no disconnection)">'+(onPlan?'✓ On plan':'📋 Plan')+'</button>'
@@ -511,26 +512,30 @@ function wire(){
 }
 async function sendTest(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
-  var to=prompt('Send this TEST to which email?\n\nUntil rentaride2go.com is verified in Resend, delivery only works to your Resend account email:\nmail.rent2go@gmail.com','mail.rent2go@gmail.com');
+  var to=prompt('Send a TEST copy of this notice to which email?','mail.rent2go@gmail.com');
   if(!to)return;to=to.trim();
   var t=btn.textContent;btn.disabled=true;btn.textContent='Sending test…';
   try{
-    var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;line-height:1.55"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST PREVIEW — this is the notice for <b>'+esc(d.customer_name)+'</b>. It was sent to you only, not the customer.</p>'+bodyToHtml(d.body,true)+'</div>';
-    var r=await sb.functions.invoke('send-doc',{body:{to:to,subject:'[TEST] '+d.subject,html:html}});
+    var b=dynBody(d);
+    var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.55"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST PREVIEW — this is the notice for <b>'+esc(d.customer_name)+'</b>, sent to you only, not the customer.</p>'+bodyToClean(b)+'</div>';
+    var r=await sb.functions.invoke('send-doc',{body:{to:to,subject:'[TEST] '+d.subject,html:html,text:bodyToPlain(b)}});
     if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
     btn.textContent='Test sent ✓';toast('Test sent to '+to);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2500);
-  }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e)+'\n\nNote: in Resend test mode you can ONLY send to mail.rent2go@gmail.com (your Resend account email). To send anywhere else, verify rentaride2go.com in Resend.');}
+  }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e));}
 }
 async function upd(id,patch){var r=await sb.from('linda_drafts').update(patch).eq('id',id);if(r.error){alert(r.error.message);return;}var d=DRAFTS.find(x=>x.id==id);Object.assign(d,patch);render();}
 async function send(id,btn){
-  var d=DRAFTS.find(x=>x.id==id);if(!d||!d.email){alert('No email on file for this customer.');return;}
-  btn.disabled=true;btn.textContent='Sending…';
+  var d=DRAFTS.find(x=>x.id==id);if(!d||!d.email){alert('No email on file for this customer — use 📋 Copy to send by WhatsApp/SMS instead.');return;}
+  if(!confirm('Email this notice to '+(d.customer_name||'customer')+' at '+d.email+' ?'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Sending…';
   try{
-    var html='<div style="font-family:Arial,sans-serif;font-size:14px;color:#131820;line-height:1.55">'+bodyToHtml(d.body,true)+'</div>';
-    var r=await sb.functions.invoke('send-doc',{body:{to:d.email,subject:d.subject,html:html}});
-    if(r.error)throw r.error; if(r.data&&r.data.error)throw new Error(JSON.stringify(r.data.error));
-    await upd(id,{status:'sent',sent_at:new Date().toISOString()});
-  }catch(e){alert('Send failed: '+(e.message||e)+'\\n(Domain must be verified in Resend to email customers.)');btn.disabled=false;btn.textContent='📧 Send';}
+    var b=dynBody(d);
+    var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222">'+bodyToClean(b)+'</div>';
+    var r=await sb.functions.invoke('send-doc',{body:{to:d.email,subject:d.subject,html:html,text:bodyToPlain(b)}});
+    if(r.error)throw r.error; if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
+    await upd(id,{status:'sent',sent_at:new Date().toISOString(),sent_via:'email',body:b});
+    toast('Emailed '+(d.customer_name||'')+' ✓');
+  }catch(e){alert('Send failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 document.getElementById('li_form').addEventListener('submit',async function(e){e.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var r=await sb.auth.signInWithPassword({email:em,password:pw});if(r.error){er.textContent=r.error.message;return;}boot();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
