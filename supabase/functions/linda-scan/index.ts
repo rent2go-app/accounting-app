@@ -127,9 +127,9 @@ async function scanAccount(acc: any) {
       intro = `Good morning ${nm},\n\nYour Rent 2 Go account now stands at ${m(pd_total)} past due — a balance that needs your prompt attention today.`;
       closing = "If you intend to continue the rental with us today, it is imperative that you catch up your account as soon as possible — to avoid service interruption as well as vehicle recovery. Please tap Pay now on any invoice above to settle without delay.";
     } else if (rental_pd.length >= 2) {
-      subj = "Your Rent 2 Go account is past due — " + m(pd_total) + " outstanding";
-      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is now ${m(pd_total)} past due across ${rental_pd.length} days. Please bring your account up to date today to keep your rental active and avoid additional late fees.`;
-      closing = "Please tap Pay now on any invoice above to settle. If you'd like to arrange a payment plan, just reply and we'll be glad to help.";
+      subj = "Past due — act today to avoid disconnection of your Rent 2 Go rental (" + m(pd_total) + ")";
+      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is now ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices${unpaid_latefees > 0 ? " plus " + m(unpaid_latefees) + " in unpaid late fees" : ""}). Please bring your account current today. ⚠️ If it reaches 3 past-due rentals or remains unpaid, your rental will be scheduled for disconnection and vehicle recovery.`;
+      closing = "Tap Pay now on every invoice above to settle. If you'd like to arrange a payment plan, reply and we'll gladly help — but continued non-payment will lead to disconnection.";
     } else if (rental_pd.length > 0) {
       subj = "A reminder about your Rent 2 Go balance — " + m(pd_total) + " past due";
       intro = `Good morning ${nm} 👋\n\nJust a quick reminder that ${m(pd_total)} is now past due on your rental. Settling it today keeps everything active and in good standing.`;
