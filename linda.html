@@ -282,12 +282,14 @@ function render(){
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   renderFeeLedger();
   renderPaid();
-  var opening=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;
-  var pct=opening>0?Math.round(paidAmt/opening*100):0;
+  var openingLate=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;  // past-due owed at the morning snapshot
+  var stillLate=out;                                              // past-due still owed now
+  var clearedLate=Math.max(0,Math.round((openingLate-stillLate)*100)/100);  // reduction = paid against the late balance
+  var pct=openingLate>0?Math.round(clearedLate/openingLate*100):0;
   var toNotify=CUSTS.filter(function(c){return (c.pastdue_count||0)>0;}).length;
   var lb=document.getElementById('lbrief');
   if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">as of '+etStamp()+'</span></div>'
-    +'<div class="briefday">📊 Owed this morning <b>'+fmt(opening)+'</b> &nbsp;·&nbsp; collected today <b class="pos">'+fmt(paidAmt)+'</b> <b>('+pct+'%)</b> &nbsp;·&nbsp; still outstanding <b>'+fmt(out)+'</b> &nbsp;·&nbsp; <b class="red">'+toNotify+'</b> late to notify'+(DAYSNAP?'':' <span class="hint">(morning snapshot sets at the 12 AM / 1:30 AM sweep)</span>')+'</div>'
+    +'<div class="briefday">📊 <b>Past-due</b> owed this morning <b>'+fmt(openingLate)+'</b> &nbsp;·&nbsp; cleared since <b class="pos">'+fmt(clearedLate)+'</b> <b>('+pct+'%)</b> &nbsp;·&nbsp; still past-due <b class="red">'+fmt(stillLate)+'</b> &nbsp;·&nbsp; <b class="red">'+toNotify+'</b> customers to notify'+(DAYSNAP?'':' <span class="hint">(morning snapshot sets at the 12 AM / 1:30 AM sweep)</span>')+'</div>'
     +'<div class="briefpills">'
     +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
     +'<span class="pill'+(tot&&revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'
