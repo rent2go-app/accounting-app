@@ -118,9 +118,9 @@ async function scanAccount(acc: any) {
       closing = "Keeping up your daily plan payment steadily clears your balance and keeps you on the road. Tap Pay now above, or manage everything in your Customer Portal.";
       kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
     } else if (disc) {
-      subj = "Action needed today to keep your Rent 2 Go rental active — " + m(pd_total) + " outstanding";
-      intro = `Good morning ${nm},\n\nWe'd love to keep you on the road. Our records show ${m(pd_total)} is currently outstanding on your Rent 2 Go rental, which unfortunately places it at risk of being paused later today.`;
-      closing = "To avoid any interruption, we kindly ask that the balance be settled by 1:00 PM today — simply tap Pay now above. If you've already paid, or you'd like to arrange a payment plan, just reply and we'll be glad to help.";
+      subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
+      intro = `${nm},\n\nThis is a FINAL NOTICE. Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices) and is scheduled for DISCONNECTION today. To keep your vehicle, your account must be brought fully current by 1:00 PM today.`;
+      closing = "If your balance is not cleared by 1:00 PM today, your rental will be disconnected and the vehicle scheduled for recovery. Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reply right away to arrange a payment plan — otherwise recovery will proceed.";
       kind = "disconnect"; state = "disconnect"; flag = "disconnect"; dnote = nowISO;
     } else if (rental_pd.length > 0 && pd_total > 250) {
       subj = "Important — your Rent 2 Go account needs prompt attention (" + m(pd_total) + " past due)";
