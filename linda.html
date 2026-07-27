@@ -89,6 +89,11 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .paygrphd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:5px}
 .paygrpt{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .paygrpt b{color:var(--out)}
+.ostag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:5px}
+.ostag.disc{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.ostag.rec{background:#8a1c1c;color:#fff}
+.ostag.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.ostag.paid{background:color-mix(in srgb,var(--brand) 16%,var(--surface));color:var(--brand)}
 .feegrp{margin:12px 0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
 .feegrphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:6px}
 .feegrpt{font-size:11.5px;font-weight:700;color:var(--out);font-variant-numeric:tabular-nums}
@@ -190,7 +195,9 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div id="laccounts"></div>
 <div id="lskipped"></div>
-<h2 style="margin-top:22px">💰 Payments made today</h2>
+<h2 style="margin-top:22px">💵 Outstanding register — who still owes</h2>
+<div id="loutstanding"></div>
+<h2 style="margin-top:22px">✅ Paid register — collected today</h2>
 <div id="lpaid"></div>
 <h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
 <div id="llearn"></div>
@@ -282,6 +289,7 @@ function render(){
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   renderFeeLedger();
   renderPaid();
+  renderOutstanding();
   var openingLate=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;  // past-due owed at the morning snapshot
   var stillLate=out;                                              // past-due still owed now
   var clearedLate=Math.max(0,Math.round((openingLate-stillLate)*100)/100);  // reduction = paid against the late balance
@@ -500,6 +508,19 @@ function etDate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZo
 function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
 function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
 function timeET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function renderOutstanding(){
+  var el=document.getElementById('loutstanding');if(!el)return;
+  var owing=CUSTS.filter(function(c){return (+c.outstanding||0)>0;}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  var tot=owing.reduce(function(s,c){return s+(+c.outstanding||0);},0);
+  if(!owing.length){el.innerHTML='<p class="hint">Nothing outstanding — everyone\'s paid up! 🎉</p>';return;}
+  var rows=owing.map(function(c){
+    var badge=c.flag==='disconnect'?'<span class="ostag disc">disconnect</span>':c.flag==='recovery'?'<span class="ostag rec">recovery</span>':(c.pastdue_count>=2?'<span class="ostag warn">'+c.pastdue_count+' days</span>':'');
+    var paidT=paidToday().some(function(p){return p.customer_id===c.customer_id&&p.account_label===c.account_label;});
+    return '<tr><td>'+esc(c.name)+(paidT?' <span class="ostag paid">↩ paid today</span>':'')+'</td><td>'+esc(c.account_label)+'</td><td>'+(c.pastdue_count||0)+' past-due</td><td>'+badge+'</td><td class="n">'+fmt(c.outstanding)+'</td></tr>';
+  }).join('');
+  el.innerHTML='<details class="feewrap" open><summary>🔴 <b>'+owing.length+'</b> customers still owe <b>'+fmt(tot)+'</b> <span class="hint">(this is what makes up the outstanding balance — they move to the Paid register as they pay)</span></summary>'
+    +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Past-due</td><td>Status</td><td>Owes</td></tr>'+rows+'<tr class="tot"><td colspan="4">Total still outstanding</td><td class="n">'+fmt(tot)+'</td></tr></table></details>';
+}
 function renderPaid(){
   var el=document.getElementById('lpaid');if(!el)return;
   var pt=paidToday();
