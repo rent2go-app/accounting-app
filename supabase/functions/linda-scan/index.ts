@@ -206,11 +206,14 @@ Deno.serve(async (req) => {
   if (!ok) { try { const p = JSON.parse(atob(tok.split(".")[1])); if (p.role === "service_role") ok = true; else if (p.email && ADMINS.includes(String(p.email).toLowerCase())) ok = true; } catch (_) { /* ignore */ } }
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
+    const body = await req.json().catch(() => ({}));
+    const only = body && body.account;                       // optional: sweep a SINGLE account
+    const list = only ? ACCTS.filter((a: any) => a.label === only) : ACCTS;
     const results = [];
-    for (const acc of ACCTS) { try { results.push(await scanAccount(acc)); } catch (e) { results.push({ account: acc.label, error: String(e) }); } }
+    for (const acc of list) { try { results.push(await scanAccount(acc)); } catch (e) { results.push({ account: acc.label, error: String(e) }); } }
     const total = results.reduce((a: any, r: any) => ({ active: a.active + (r.active || 0), notices: a.notices + (r.notices || 0), disc: a.disc + (r.disc || 0), fees: a.fees + (r.fees || 0), payments: a.payments + (r.payments || 0), outstanding: a.outstanding + (r.outstanding || 0), pastdue_cust: a.pastdue_cust + (r.pastdue_cust || 0) }), { active: 0, notices: 0, disc: 0, fees: 0, payments: 0, outstanding: 0, pastdue_cust: 0 });
-    // capture the MORNING snapshot once per ET day (first scan wins; later scans are ignored)
-    await sbPost(`linda_day?on_conflict=day`, [{ day: todaystr, opening_outstanding: Math.round(total.outstanding * 100) / 100, opening_pastdue_cust: total.pastdue_cust, opening_notices: total.notices, captured_at: nowISO }], "resolution=ignore-duplicates,return=minimal");
-    return new Response(JSON.stringify({ ok: true, ranAt: nowISO, total, accounts: results }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    // capture the MORNING snapshot once per ET day (full sweep only; first scan wins)
+    if (!only) await sbPost(`linda_day?on_conflict=day`, [{ day: todaystr, opening_outstanding: Math.round(total.outstanding * 100) / 100, opening_pastdue_cust: total.pastdue_cust, opening_notices: total.notices, captured_at: nowISO }], "resolution=ignore-duplicates,return=minimal");
+    return new Response(JSON.stringify({ ok: true, ranAt: nowISO, only: only || null, total, accounts: results }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (e) { return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }); }
 });

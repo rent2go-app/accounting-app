@@ -70,6 +70,7 @@ h2{font-size:15px;margin:18px 0 8px}
 .accttl::before{content:'▸';color:var(--muted);font-size:13px;transition:transform .18s;display:inline-block}
 details.acct[open] .accttl::before{transform:rotate(90deg)}
 .accttl:hover{background:var(--surface-2)}
+.accttl .btn.aud{margin-left:10px;flex:none}
 .acctbody{padding:0 16px 14px}
 .asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
@@ -303,7 +304,7 @@ function render(){
     var meta=ACCTMETA.find(a=>a.label===acc);
     var acctActive=CUSTS.filter(c=>c.account_label===acc).length;
     if(!acctActive&&!ad.length&&!af.length){  // account with no active rentals — show it, nothing to bill
-      return '<details class="acct"><summary class="accttl">🏦 '+esc(acc)+'<span class="asum"><span class="apill done">Nothing to bill today</span>'+(meta&&meta.scanned_at?'<span class="apill">no active rentals</span>':'')+'</span></summary><div class="acctbody"><p class="hint">No active rentals on this account right now — nothing due. Linda is watching; it will appear here the moment a rental goes active'+(meta&&meta.scanned_at?' (last checked '+shortET(meta.scanned_at)+')':'')+'.</p></div></details>';
+      return '<details class="acct"><summary class="accttl">🏦 '+esc(acc)+'<span class="asum"><span class="apill done">Nothing to bill today</span>'+(meta&&meta.scanned_at?'<span class="apill">no active rentals</span>':'')+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody"><p class="hint">No active rentals on this account right now — nothing due. Linda is watching; it will appear here the moment a rental goes active'+(meta&&meta.scanned_at?' (last checked '+shortET(meta.scanned_at)+')':'')+'.</p></div></details>';
     }
     var toSend=ad.filter(d=>d.status!=='sent').length;
     var discN=ad.filter(d=>d.kind==='disconnect').length;
@@ -317,7 +318,7 @@ function render(){
     if(af.length)pills+='<span class="apill red">'+af.length+' red flag'+(af.length==1?'':'s')+'</span>';
     if(acctOut)pills+='<span class="apill">'+fmt(acctOut)+' outstanding</span>';
     var openAttr=(toSend>0||af.length>0)?' open':'';  // auto-open accounts that still need action
-    return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span></summary><div class="acctbody">'+flagsH+draftsH+'</div></details>';
+    return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody">'+flagsH+draftsH+'</div></details>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
   renderSkipped();
   renderLearnings();
@@ -518,6 +519,14 @@ function renderPaid(){
   }).join('');
   el.innerHTML='<details class="feewrap" open><summary>💰 Payments today — <b>'+pt.length+'</b> · '+fmt(totAll)+(stillTotal?' <span class="hint">· '+stillTotal+' still to pay</span>':'')+' <span class="hint">(by owner · click to collapse)</span></summary>'+groups+'</details>';
 }
+async function auditOne(acc,btn){
+  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='⏳ sweeping…';
+  try{
+    var r=await sb.functions.invoke('linda-scan',{body:{account:acc}});
+    if(r.error)throw r.error;
+    await load();toast('Swept '+acc+' ✓');
+  }catch(e){alert('Audit Sweep failed: '+(e.message||e));btn.disabled=false;btn.innerHTML=o;}
+}
 async function reaudit(btn){
   var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='⏳ Re-auditing all accounts… (~30–60s)';
   try{
@@ -582,6 +591,7 @@ function wire(){
   if(ea)ea.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=true);
   if(ca)ca.onclick=()=>document.querySelectorAll('details.acct').forEach(d=>d.open=false);
   var ra=document.getElementById('reaudit');if(ra)ra.onclick=()=>reaudit(ra);
+  document.querySelectorAll('[data-auditacct]').forEach(b=>b.onclick=function(e){e.preventDefault();e.stopPropagation();auditOne(b.dataset.auditacct,b);});
   document.querySelectorAll('[data-reuse]').forEach(b=>b.onclick=()=>reuseNote(b.dataset.reuse));
   document.querySelectorAll('[data-dismissfee]').forEach(b=>b.onclick=()=>dismissFee(b.dataset.dismissfee));
   document.querySelectorAll('[data-undismissfee]').forEach(b=>b.onclick=()=>undismissFee(b.dataset.undismissfee));
