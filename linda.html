@@ -474,7 +474,7 @@ function renderFeeLedger(){
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
-  var main='<details class="feewrap" open><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
+  var main='<details class="feewrap"><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
     +groups
     +'<p class="hint"><b>📝 Raise draft</b> → $10 draft in Stripe (not sent). <b>📧 Send</b> → finalizes &amp; <b>emails the invoice</b> to the customer to pay (never auto-charged). <b>✓ Done</b> → clears it from this list. <b>✕ Dismiss</b> spares the customer today. Fees <b>stay through raise → send → done</b>.</p></details>';
   el.innerHTML=main+dismBlock;
