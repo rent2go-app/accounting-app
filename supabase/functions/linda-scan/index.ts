@@ -126,11 +126,15 @@ async function scanAccount(acc: any) {
       kind = "disconnect"; state = "disconnect"; flag = "disconnect"; dnote = nowISO;
     } else if (rental_pd.length > 0 && pd_total > 250) {
       subj = "Important — your Rent 2 Go account needs prompt attention (" + m(pd_total) + " past due)";
-      intro = `Good morning ${nm},\n\n${paidrecent ? "Thank you for your recent payment. " : ""}Your Rent 2 Go account now stands at ${m(pd_total)} past due — a balance that needs your prompt attention today.`;
+      intro = `Good morning ${nm},\n\nYour Rent 2 Go account now stands at ${m(pd_total)} past due — a balance that needs your prompt attention today.`;
       closing = "If you intend to continue the rental with us today, it is imperative that you catch up your account as soon as possible — to avoid service interruption as well as vehicle recovery. Please tap Pay now on any invoice above to settle without delay.";
+    } else if (rental_pd.length >= 2) {
+      subj = "Your Rent 2 Go account is past due — " + m(pd_total) + " outstanding";
+      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is now ${m(pd_total)} past due across ${rental_pd.length} days. Please bring your account up to date today to keep your rental active and avoid additional late fees.`;
+      closing = "Please tap Pay now on any invoice above to settle. If you'd like to arrange a payment plan, just reply and we'll be glad to help.";
     } else if (rental_pd.length > 0) {
-      subj = "A friendly reminder about your Rent 2 Go balance — " + m(pd_total) + " outstanding";
-      intro = `Good morning ${nm} 👋\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}We just wanted to gently let you know that ${m(pd_total)} is currently outstanding on your rental. Settling it at your earliest convenience will keep everything active and in good standing.`;
+      subj = "A reminder about your Rent 2 Go balance — " + m(pd_total) + " past due";
+      intro = `Good morning ${nm} 👋\n\nJust a quick reminder that ${m(pd_total)} is now past due on your rental. Settling it today keeps everything active and in good standing.`;
       closing = "Whenever you're ready, simply tap Pay now on any invoice above. If you have any questions, we're always happy to help.";
     } else if (unpaid_latefees >= 70) {
       subj = "A quick note about your Rent 2 Go account — " + m(unpaid_latefees) + " in late fees";
