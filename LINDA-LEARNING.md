@@ -22,10 +22,12 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **Never** notify or penalize an invoice that is **not yet due** (e.g. due later today / tonight at 11:59).
 
 **Late fees ($10)**
-- A **one-time $10 late fee** applies to each **past-due RENTAL invoice** (rental = amount > $10).
-- **Never** charge a fee on a late-fee invoice (no fee-on-fee). **Never** compound (one fee per invoice, once).
-- Each $10 fee is **attached to the specific rental invoice** that triggered it, with a memo naming that invoice.
-- **Never double-bill.** Before proposing a $10 fee for a past-due rental, check the customer's existing late-fee invoices (**open OR paid**). If a late fee already exists dated the rental's due date or the day after, **skip the fee and just notify**. (Customers may pay a late fee but not the rental — don't add another fee, only remind.)
+- A **late fee is any invoice with `amount_due` == $10** (rentals are ~$70+). Do **not** rely on the description — Stripe labels vary ("late fee", "Past Due", etc.); the **$10 amount** is the reliable signal.
+- **One $10 fee PER CUSTOMER, for the LATEST past-due rental only** (latest by **due date**). Do **not** bill one-per-rental and do **not** back-bill older past-due days ("we only bill one for the latest one").
+- **A rental's late fee is raised the DAY AFTER it goes past due**, so an existing fee for a rental lands on **due_date + 1** (not the due date). When de-duping, check for an existing late fee created on **due+1 / due+2** — NOT the due date. (Comparing to the due date wrongly treats yesterday's rental's fee as covering today's rental, skipping a fee that's genuinely owed.)
+- **Never** charge a fee on a late-fee invoice (no fee-on-fee). One fee per rental, once.
+- **Fees are `send_invoice`** (customer is **emailed** an invoice to pay, 7-day due) — **NEVER `charge_automatically`**. R2G does not pull customer cards; customers pay the emailed invoice.
+- Each $10 fee is **attached to the specific rental invoice** that triggered it, with a clean memo (vehicle + invoice + date; strip the raw "N × … (at $/day)" formatting).
 
 **Reminders**
 - Base reminders on **past-due amounts only** (past-due rentals + unpaid late fees). Exclude not-yet-due invoices.
@@ -40,10 +42,12 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **$70 late fees but 0–1 past-due rentals → NOT a disconnection** — it's a *strong* reminder that piling up late fees can cause a future service interruption.
 
 **Workflow**
-- Everything is **dry-run**: drafts are prepared for admin approval. Nothing is charged or emailed without approval.
-- **Skipped** notices move to a Skipped section and **auto re-table in 3 days**.
-- Notices are **editable** (subject + body) before sending.
-- Run cadence: **01:00 and 13:00 ET** (13:00 handles the 12-hour recovery check).
+- Admin-approved: drafts are prepared; nothing goes to a customer without the admin sending. Email is live (Resend, `billing@rentaride2go.com`); customers can be emailed via **📧 Send** or copied for WhatsApp/SMS.
+- **Fee lifecycle:** proposed → **📝 Raise draft** (creates a `send_invoice` DRAFT in Stripe, deletable) → **📧 Send** (finalizes + emails + **auto-marks Done**). Manual **✓ Done** for fees raised outside the app. Idempotent — never create a second draft if already raised. Fees **stay in the ledger** through the whole flow, **grouped by fleet**.
+- **Dismiss** spares a customer the fee for the day (returns next day if still past due). **Skipped** notices auto re-table in 3 days.
+- **Daily reset at midnight ET:** each day starts fresh; sent/reviewed marks and the "day" aggregate are per-day. Today's sent/reviewed are preserved across intraday scans; only yesterday's clear.
+- **Payment-plan customers** get a gentle plan-continuation notice, never a disconnection.
+- Run cadence: **12:00 AM (fee list) · 1:30 AM (reminders incl. today's invoices + late fees) · 6 AM · 12 PM · 6 PM · 9 PM ET.**
 
 ---
 
@@ -59,6 +63,16 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **Large avatar image (1.4 MB) slowed the ledger.** → Fix: 700px `linda.png` + 43 KB `linda-sm.png` for small icons.
 - **Proposed a new $10 fee for every past-due rental without checking whether a late fee already existed** — would double-bill, since these accounts already run a daily late-fee process (Jada had already been fee'd; some customers pay the late fee but not the rental). → Fix: collect existing late-fee created-dates (open + paid) per customer; skip proposing if a fee already exists on the rental's due date or the day after — notify only. (Cut proposed fees from 11 to 3 on the live data.)
 - **Resend test-mode 403 on "Test to me"** — sent to the login email, but Resend only delivers to the account owner (`mail.rent2go@gmail.com`) until a domain is verified. → Fix: let the tester choose the recipient; documented that only that address works pre-verification.
+
+### 2026-07-27
+- **Late-fee de-dup compared to the rental's DUE date, but a fee is raised the DAY AFTER.** A Jul-26 past-due rental is fee'd on Jul 27; the fee *created* Jul 26 was for the **Jul 25** rental. Comparing to the due date treated that earlier fee as covering the Jul 26 rental and **skipped a fee that was genuinely owed** (Robyn, Taesha, Rodney — proposed fees wrongly dropped from ~14 to 2). → Fix: de-dup against a fee created on **due+1 / due+2**, never the due date.
+- **Picked the "latest" past-due rental by CREATED date instead of DUE date.** A customer whose newest-*created* invoice was an older due-date got skipped. → Fix: choose the latest past-due rental by **due date**.
+- **Mis-classified $10 "Past Due"-labelled invoices as rentals** (only matched description text "late fee"). Inflated past-due-rental counts → **false disconnections** (Trevion flagged when most past-dues were $10 fees). → Fix: **any invoice with `amount_due` == $10 is a late fee**, regardless of description; rentals are >$10.
+- **Auto-charging late fees.** Draft $10 invoices were created `charge_automatically`. R2G never pulls customer cards — they email invoices to pay. → Fix: create/finalize as **`send_invoice`** (emailed, 7-day due); "Send" finalizes + emails, never charges.
+- **Daily-reset DELETE wiped ALL non-skipped notices every scan** — the `or=(...)` PostgREST filter was URL-encoded whole (including `=`), so it was ignored and the delete matched everything; sent/reviewed marks kept "unravelling". → Fix: use separate simple deletes and URL-encode only the timestamp value; today's sent/reviewed are preserved, only prior-day rows clear.
+- **Verbose late-fee memo leaked raw Stripe line** ("1 × NISSAN SENTRA (at $72.55/day)"). → Fix: clean memo (vehicle + invoice + date), strip the "N × … (at $/day)" formatting.
+- **`toast()` undefined in the dashboard** — Raise/Send/Test succeeded server-side but threw a false "failed" afterward. → Fix: define `toast()`. Also **`todayET()` was undefined in owners.html**, and the Fleet-Financials code threw and **blanked every owner block** → Fix: define the helper; runtime-test, not just syntax-check.
+- **Fleet Financials showed the same car twice when it changed hands mid-month**, with a false "21 days no payment" flag on the earlier renter. → Fix: **merge by car** (overlap renters into one block); compute the no-payment gap on the combined timeline.
 
 <!-- Append new mistakes above this line, newest date first. Format:
 ### YYYY-MM-DD
