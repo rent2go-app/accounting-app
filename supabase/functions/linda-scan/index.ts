@@ -85,8 +85,9 @@ async function scanAccount(acc: any) {
     if (latestPd) {
       const i = latestPd;
       const dd = i.due_date || i.created || now;
-      const feedays = [etYMD(dd), etYMD(dd + 86400)];
-      if (!feedays.some((f) => existing_fee_dates.has(f))) {   // skip if a late fee already exists for this rental
+      // a rental's late fee is raised the DAY AFTER it goes past due, so an existing fee lands on due+1 (allow +2 slack)
+      const feedays = [etYMD(dd + 86400), etYMD(dd + 2 * 86400)];
+      if (!feedays.some((f) => existing_fee_dates.has(f))) {   // skip only if THIS rental already has a fee
         const ln = (i.lines?.data || [{}])[0] || {};
         const veh = cleanlbl(ln.description || i.description || "your rental");
         const num = i.number || i.id;
