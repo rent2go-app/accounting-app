@@ -148,6 +148,8 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .briefbar{background:color-mix(in srgb,#7a5cff 8%,var(--surface));border:1px solid color-mix(in srgb,#7a5cff 35%,var(--line));border-left:4px solid #7a5cff;border-radius:12px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
 .briefhd{font-size:12px;font-weight:900;letter-spacing:.05em;color:#7a5cff;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .briefts{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0}
+.briefday{margin-top:8px;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.5}
+.briefday b.pos{color:var(--in)}.briefday b.red{color:var(--out)}
 .briefpills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .briefpills .pill{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
 .briefpills .pill b{color:var(--text)}
@@ -196,7 +198,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null;
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -249,6 +251,7 @@ async function load(){
   try{var df=await sb.from('linda_fees').select('*').eq('status','dismissed');DISM=df.data||[];}catch(e){DISM=[];}
   try{var am=await sb.from('linda_accounts').select('*');ACCTMETA=am.data||[];}catch(e){ACCTMETA=[];}
   try{var rf=await sb.from('linda_fees').select('*').eq('status','raised');RAISED=rf.data||[];}catch(e){RAISED=[];}
+  try{var ld=await sb.from('linda_day').select('*').eq('day',todayET());DAYSNAP=(ld.data&&ld.data[0])||null;}catch(e){DAYSNAP=null;}
   render();
 }
 function render(){
@@ -278,8 +281,12 @@ function render(){
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   renderFeeLedger();
   renderPaid();
+  var opening=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;
+  var pct=opening>0?Math.round(paidAmt/opening*100):0;
+  var toNotify=CUSTS.filter(function(c){return (c.pastdue_count||0)>0;}).length;
   var lb=document.getElementById('lbrief');
   if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">as of '+etStamp()+'</span></div>'
+    +'<div class="briefday">📊 Owed this morning <b>'+fmt(opening)+'</b> &nbsp;·&nbsp; collected today <b class="pos">'+fmt(paidAmt)+'</b> <b>('+pct+'%)</b> &nbsp;·&nbsp; still outstanding <b>'+fmt(out)+'</b> &nbsp;·&nbsp; <b class="red">'+toNotify+'</b> late to notify'+(DAYSNAP?'':' <span class="hint">(morning snapshot sets at the 12 AM / 1:30 AM sweep)</span>')+'</div>'
     +'<div class="briefpills">'
     +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
     +'<span class="pill'+(tot&&revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'

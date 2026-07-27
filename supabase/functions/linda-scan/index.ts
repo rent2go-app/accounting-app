@@ -195,7 +195,7 @@ async function scanAccount(acc: any) {
   });
   if (fleetRows.length) await sbPost(`fleet_performance?on_conflict=account_label,vehicle,customer_id,month`, fleetRows, "resolution=merge-duplicates,return=minimal");
 
-  return { account: LABEL, active: custs.length, notices: drafts.length, disc: drafts.filter((d) => d.kind === "disconnect").length, fees: fees.length, payments: payments.length, fleet: fleetRows.length };
+  return { account: LABEL, active: custs.length, notices: drafts.length, disc: drafts.filter((d) => d.kind === "disconnect").length, fees: fees.length, payments: payments.length, fleet: fleetRows.length, outstanding: Math.round(custs.reduce((s: number, c: any) => s + (+c.outstanding || 0), 0) * 100) / 100, pastdue_cust: custs.filter((c: any) => (c.pastdue_count || 0) > 0).length };
 }
 
 Deno.serve(async (req) => {
@@ -208,7 +208,9 @@ Deno.serve(async (req) => {
   try {
     const results = [];
     for (const acc of ACCTS) { try { results.push(await scanAccount(acc)); } catch (e) { results.push({ account: acc.label, error: String(e) }); } }
-    const total = results.reduce((a: any, r: any) => ({ active: a.active + (r.active || 0), notices: a.notices + (r.notices || 0), disc: a.disc + (r.disc || 0), fees: a.fees + (r.fees || 0), payments: a.payments + (r.payments || 0) }), { active: 0, notices: 0, disc: 0, fees: 0, payments: 0 });
+    const total = results.reduce((a: any, r: any) => ({ active: a.active + (r.active || 0), notices: a.notices + (r.notices || 0), disc: a.disc + (r.disc || 0), fees: a.fees + (r.fees || 0), payments: a.payments + (r.payments || 0), outstanding: a.outstanding + (r.outstanding || 0), pastdue_cust: a.pastdue_cust + (r.pastdue_cust || 0) }), { active: 0, notices: 0, disc: 0, fees: 0, payments: 0, outstanding: 0, pastdue_cust: 0 });
+    // capture the MORNING snapshot once per ET day (first scan wins; later scans are ignored)
+    await sbPost(`linda_day?on_conflict=day`, [{ day: todaystr, opening_outstanding: Math.round(total.outstanding * 100) / 100, opening_pastdue_cust: total.pastdue_cust, opening_notices: total.notices, captured_at: nowISO }], "resolution=ignore-duplicates,return=minimal");
     return new Response(JSON.stringify({ ok: true, ranAt: nowISO, total, accounts: results }), { headers: { ...CORS, "Content-Type": "application/json" } });
   } catch (e) { return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...CORS, "Content-Type": "application/json" } }); }
 });
