@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     let fees: any[] = [];
-    if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed&select=invoice_id,account_label,customer_id,memo`);
+    if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);
     else if (body.invoice_id) fees = [body];
     else return new Response(JSON.stringify({ error: "pass {invoice_id,account_label,customer_id,memo} or {all:true}" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
     const results = [];
