@@ -48,6 +48,17 @@ Deno.serve(async (req) => {
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
     const body = await req.json().catch(() => ({}));
+    // FINALIZE / SEND a raised draft (draft -> issued; charge_automatically attempts the charge)
+    if (body.finalize && body.invoice_id) {
+      const rows = await sbGet(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}&select=invoice_id,account_label,stripe_invoice_id`);
+      const fee = rows[0];
+      if (!fee || !fee.stripe_invoice_id) return new Response(JSON.stringify({ error: "no draft to finalize for this fee" }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      const fkey = keyFor(fee.account_label);
+      const fin = await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/finalize`, new URLSearchParams({ auto_advance: "true" }), fkey);
+      if (fin.error) return new Response(JSON.stringify({ error: fin.error.message || JSON.stringify(fin.error) }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}`, { status: "sent" });
+      return new Response(JSON.stringify({ ok: true, finalized: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
     let fees: any[] = [];
     if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);
     else if (body.invoice_id) fees = [body];

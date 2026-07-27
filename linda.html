@@ -133,6 +133,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .status.skipped{background:var(--surface-2);color:var(--muted)}
 .status.reviewed{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .status.plan{background:color-mix(in srgb,#0d9488 16%,var(--surface));color:#0d9488}
+.status.raised{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
 .ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
 .ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .btn.on{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff;border-color:#7a5cff}
@@ -241,7 +242,7 @@ function plainCopy(text,done){
 async function load(){
   var d=await sb.from('linda_drafts').select('*').order('kind',{ascending:true});DRAFTS=d.data||[];
   var c=await sb.from('linda_customers').select('*');CUSTS=c.data||[];
-  var f=await sb.from('linda_fees').select('*').eq('status','proposed');FEES=f.data||[];
+  var f=await sb.from('linda_fees').select('*').in('status',['proposed','raised','sent']);FEES=f.data||[];
   try{var lr=await sb.from('linda_learnings').select('*').order('kind',{ascending:true});LEARN=lr.data||[];}catch(e){LEARN=[];}
   try{var p=await sb.from('linda_payments').select('*').order('paid_at',{ascending:false});PAY=p.data||[];}catch(e){PAY=[];}
   try{var nt=await sb.from('linda_notes').select('*');NOTES=nt.data||[];}catch(e){NOTES=[];}
@@ -254,7 +255,8 @@ function render(){
   var rem=DRAFTS.filter(x=>x.kind==='reminder').length,disc=DRAFTS.filter(x=>x.kind==='disconnect').length,rec=DRAFTS.filter(x=>x.kind==='recovery').length;
   var out=CUSTS.reduce((s,c)=>s+(+c.outstanding||0),0);
   var flags=CUSTS.filter(c=>c.flag&&c.flag!=='none').length;
-  var feeCount=FEES.length,feeTotal=FEES.reduce((s,f)=>s+(+f.fee||0),0);
+  var proposedFees=FEES.filter(function(f){return f.status==='proposed';});
+  var feeCount=proposedFees.length,feeTotal=proposedFees.reduce((s,f)=>s+(+f.fee||0),0);
   var pt=paidToday(),paidAmt=pt.reduce((s,p)=>s+(+p.amount||0),0);
   var active=DRAFTS.filter(d=>d.status!=='skipped'),tot=active.length;
   var revN=active.filter(d=>d.reviewed_at||d.status==='sent').length,sentN=active.filter(d=>d.status==='sent').length;
@@ -392,7 +394,16 @@ function editDraft(id){
   el.querySelector('[data-canceledit]').onclick=function(){render();};
 }
 function dismissFee(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'dismissed',dismissed_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='dismissed';f.dismissed_at=new Date().toISOString();DISM.push(f);}render();});}
-function markFeeDone(invId){var f=FEES.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'raised',raised_at:new Date().toISOString()}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);if(f){f.status='raised';f.raised_at=new Date().toISOString();RAISED.push(f);}render();});}
+function markFeeDone(invId){sb.from('linda_fees').update({status:'done'}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}FEES=FEES.filter(x=>x.invoice_id!==invId);render();toast('Marked done ✓');});}
+async function sendFee(invId,btn){
+  if(!confirm('Finalize & SEND this $10 invoice in Stripe now?\n\nThis issues the invoice and charges the customer\'s card on file.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Sending…';
+  try{
+    var r=await sb.functions.invoke('linda-raise-fee',{body:{finalize:true,invoice_id:invId}});
+    if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);
+    toast('Invoice finalized & sent ✓');await load();
+  }catch(e){alert('Send failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+}
 async function raiseFee(invId,btn){
   var f=FEES.find(x=>x.invoice_id===invId);if(!f)return;
   if(!confirm('Create a $10 DRAFT late-fee invoice in Stripe for this customer?\n\nDraft only — NOT sent. You finalize/send it yourself in Stripe.'))return;
@@ -438,30 +449,34 @@ function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
   var nameOf={};CUSTS.forEach(function(c){nameOf[c.account_label+'|'+c.customer_id]=c.name;});
   var dismToday=DISM.filter(function(f){return etDate(f.dismissed_at)===todayET();});
-  var doneToday=RAISED.filter(function(f){return etDate(f.raised_at)===todayET();}).length;
-  if(!FEES.length&&!dismToday.length&&!doneToday){el.innerHTML='<p class="hint">No $10 late-fee invoices pending. 🎉'+(doneToday?' ('+doneToday+' raised today)':'')+'</p>';return;}
-  var tot=FEES.reduce(function(s,f){return s+(+f.fee||0);},0);
-  // group by fleet/account so you clear one owner at a time
-  var byAcc={};FEES.forEach(function(f){(byAcc[f.account_label]=byAcc[f.account_label]||[]).push(f);});
+  // active fees: proposed (current) + raised/sent from today — they STAY until you mark Done
+  var active=FEES.filter(function(f){return f.status==='proposed'||etDate(f.raised_at)===todayET();});
+  if(!active.length&&!dismToday.length){el.innerHTML='<p class="hint">No $10 late fees pending. 🎉</p>';return;}
+  var toRaise=active.filter(function(f){return f.status==='proposed';}).length;
+  var inProg=active.length-toRaise;
+  var byAcc={};active.forEach(function(f){(byAcc[f.account_label]=byAcc[f.account_label]||[]).push(f);});
   var groups=Object.keys(byAcc).sort().map(function(acc){
     var fs=byAcc[acc].slice().sort(function(a,b){return (nameOf[a.account_label+'|'+a.customer_id]||'')<(nameOf[b.account_label+'|'+b.customer_id]||'')?-1:1;});
-    var sub=fs.reduce(function(s,f){return s+(+f.fee||0);},0);
+    var np=fs.filter(function(f){return f.status==='proposed';}).length;
     var frows=fs.map(function(f){
       var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
       var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
-      return '<tr><td>'+esc(nm)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td><button class="btn small pri" data-raisefee="'+esc(f.invoice_id)+'" title="Create this $10 as a DRAFT invoice in Stripe (not sent — you finalize)">📝 Raise draft</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done — I raised it myself in Stripe">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Don’t penalise this customer today">✕ Dismiss</button></td></tr>'
-        +(f.memo?'<tr class="memorow"><td colspan="4">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
+      var act;
+      if(f.status==='proposed')act='<button class="btn small pri" data-raisefee="'+esc(f.invoice_id)+'" title="Create this $10 as a DRAFT invoice in Stripe">📝 Raise draft</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done — I raised it myself">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Spare this customer today">✕ Dismiss</button>';
+      else if(f.status==='raised')act='<span class="status raised">📝 draft in Stripe</span> <button class="btn small pri" data-sendfee="'+esc(f.invoice_id)+'" title="Finalize &amp; send in Stripe — charges the customer">📧 Send</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done">✓ Done</button>';
+      else act='<span class="status sent">✅ sent</span> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Clear from list">✓ Done</button>';
+      return '<tr><td>'+esc(nm)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td>'+act+'</td></tr>'
+        +(f.status==='proposed'&&f.memo?'<tr class="memorow"><td colspan="4">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
     }).join('');
-    return '<div class="feegrp"><div class="feegrphd">🏦 '+esc(acc)+' <span class="feegrpt">'+fs.length+' late · '+fmt(sub)+'</span>'
-      +'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create all '+fs.length+' as DRAFT invoices for this fleet">📝 Raise all '+fs.length+' in this fleet</button></div>'
+    return '<div class="feegrp"><div class="feegrphd">🏦 '+esc(acc)+' <span class="feegrpt">'+fs.length+' fee'+(fs.length===1?'':'s')+'</span>'
+      +(np?'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create all '+np+' proposed as DRAFT invoices for this fleet">📝 Raise all '+np+' in this fleet</button>':'')+'</div>'
       +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Attached to rental invoice</td><td>Fee</td><td>Action</td></tr>'+frows+'</table></div>';
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
-  var main=FEES.length?('<details class="feewrap" open><summary>'+IC_FEE+'$10 late-fee invoices to raise — <b>'+FEES.length+'</b> · '+fmt(tot)+(doneToday?' <span class="hint">· '+doneToday+' ✓ done today</span>':'')+' <span class="hint">(grouped by fleet — clear one owner at a time)</span></summary>'
+  var main='<details class="feewrap" open><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
     +groups
-    +'<p class="hint"><b>📝 Raise draft</b> creates the $10 as a <b>draft</b> in Stripe (not sent, deletable) — finalize/send it in Stripe. <b>Raise all in this fleet</b> does that whole owner at once. <b>✓ Done</b> = you raised it yourself. <b>✕ Dismiss</b> spares the customer today.</p></details>')
-    :'<p class="hint">No $10 late-fee invoices pending. 🎉'+(doneToday?' <span class="hint">('+doneToday+' raised today)</span>':'')+'</p>';
+    +'<p class="hint"><b>📝 Raise draft</b> → $10 draft in Stripe (not sent). <b>📧 Send</b> → finalizes &amp; charges the customer. <b>✓ Done</b> → clears it from this list. <b>✕ Dismiss</b> spares the customer today. Fees <b>stay here through raise → send → done</b>.</p></details>';
   el.innerHTML=main+dismBlock;
 }
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
@@ -564,6 +579,7 @@ function wire(){
   document.querySelectorAll('[data-dismissfee]').forEach(b=>b.onclick=()=>dismissFee(b.dataset.dismissfee));
   document.querySelectorAll('[data-undismissfee]').forEach(b=>b.onclick=()=>undismissFee(b.dataset.undismissfee));
   document.querySelectorAll('[data-donefee]').forEach(b=>b.onclick=()=>markFeeDone(b.dataset.donefee));
+  document.querySelectorAll('[data-sendfee]').forEach(b=>b.onclick=()=>sendFee(b.dataset.sendfee,b));
   document.querySelectorAll('[data-raisefee]').forEach(b=>b.onclick=()=>raiseFee(b.dataset.raisefee,b));
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
