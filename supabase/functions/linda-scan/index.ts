@@ -113,9 +113,20 @@ async function scanAccount(acc: any) {
     const pd_lines = parts.join("\n\n");
     let subj = "", intro = "", closing = "", kind = "reminder", state = "reminder", flag = "none", dnote: string | null = null;
     if (planmap[cid]) {
-      subj = "Your Rent 2 Go payment plan — today’s step";
-      intro = `Good morning ${nm} 👋\n\nThank you for staying on your payment plan — we truly appreciate it. To keep your plan on track and your rental active, today’s step is to pay ${planmap[cid]}.`;
-      closing = "Keeping up your daily plan payment steadily clears your balance and keeps you on the road. Tap Pay now above, or manage everything in your Customer Portal.";
+      // check they kept to the plan YESTERDAY: expect 2 rental payments + 2 late-fee payments
+      const yday = etYMD(now - 86400);
+      let yRent = 0, yLF = 0;
+      for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (pat && etYMD(pat) === yday) { if (isLateFee(iv)) yLF++; else yRent++; } }
+      const onPlan = yRent >= 2 && yLF >= 2;
+      if (onPlan) {
+        subj = "Thank you — your Rent 2 Go payment plan is on track";
+        intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan — yesterday we received ${yRent} rental payments and ${yLF} late-fee payments, exactly as agreed. To stay on track, today’s step is again ${planmap[cid]}.`;
+        closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
+      } else {
+        subj = "Your Rent 2 Go payment plan needs attention — please catch up today";
+        intro = `Good morning ${nm},\n\nYour payment plan is ${planmap[cid]}. Yesterday we only received ${yRent} rental payment${yRent === 1 ? "" : "s"} and ${yLF} late-fee payment${yLF === 1 ? "" : "s"} — short of the plan. Please make up the difference today and keep to the plan to keep your rental active and avoid disconnection.`;
+        closing = "Tap Pay now on the invoices above to bring your plan back on track today. If you need to adjust the arrangement, reply and let us know — but staying on plan is what keeps your rental active.";
+      }
       kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
     } else if (disc) {
       subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
