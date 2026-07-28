@@ -295,8 +295,10 @@ function render(){
   var clearedLate=Math.max(0,Math.round((openingLate-stillLate)*100)/100);  // reduction = paid against the late balance
   var pct=openingLate>0?Math.round(clearedLate/openingLate*100):0;
   var toNotify=CUSTS.filter(function(c){return (c.pastdue_count||0)>0;}).length;
+  var lastPulled=ACCTMETA.reduce(function(m,a){return (a.scanned_at&&(!m||a.scanned_at>m))?a.scanned_at:m;},'');
+  var lsEl=document.getElementById('lastscan');if(lsEl)lsEl.textContent=lastPulled?('🕒 Records last pulled '+shortET(lastPulled)+' ET'):'';
   var lb=document.getElementById('lbrief');
-  if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">as of '+etStamp()+'</span></div>'
+  if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">🕒 records last refreshed '+(lastPulled?shortET(lastPulled)+' ET':'—')+'</span></div>'
     +'<div class="briefday">📊 <b>Past-due</b> owed this morning <b>'+fmt(openingLate)+'</b> &nbsp;·&nbsp; cleared since <b class="pos">'+fmt(clearedLate)+'</b> <b>('+pct+'%)</b> &nbsp;·&nbsp; still past-due <b class="red">'+fmt(stillLate)+'</b> &nbsp;·&nbsp; <b class="red">'+toNotify+'</b> customers to notify'+(DAYSNAP?'':' <span class="hint">(morning snapshot sets at the 12 AM / 1:30 AM sweep)</span>')+'</div>'
     +'<div class="briefpills">'
     +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
