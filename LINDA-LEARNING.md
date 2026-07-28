@@ -38,9 +38,11 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 
 **Escalation ladder**
 1. **Reminder** — any past-due rental or unpaid late fee.
-2. **Disconnection** — **≥3 past-due RENTAL invoices**, OR **≥$70 unpaid late fees AND ≥2 past-due rental invoices**. Includes the line: *"If you intend to continue the rental with us today, please cure the balance by 1:00 PM to avoid vehicle recovery."*
+2. **Disconnection** (admin rule, 2026-07-28) — **3+ OPEN rental invoices with 2+ already past due** (i.e. 2 past-due rentals + a current/new open rental), **OR** **≥$70 unpaid late fees AND ≥2 past-due rental invoices**. Includes the line: *"If you intend to continue the rental with us today, please cure the balance by 1:00 PM to avoid vehicle recovery."*
 3. **Recovery** — **12 hours** after an uncured disconnection: recovery notice + notify the administrator.
+- **2 past-due rentals with NO 3rd open rental and <$70 fees → NOT a disconnection** — soft "cure by 1 PM, or reach out to arrange payments or discuss a plan of action."
 - **$70 late fees but 0–1 past-due rentals → NOT a disconnection** — it's a *strong* reminder that piling up late fees can cause a future service interruption.
+- Requiring **2+ past due** inside the 3-open rule avoids disconnecting a brand-new renter whose open rentals are all still current.
 
 **Workflow**
 - Admin-approved: drafts are prepared; nothing goes to a customer without the admin sending. Email is live (Resend, `billing@rentaride2go.com`); customers can be emailed via **📧 Send** or copied for WhatsApp/SMS.

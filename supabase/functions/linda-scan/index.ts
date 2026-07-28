@@ -119,7 +119,12 @@ async function scanAccount(acc: any) {
         fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: veh.slice(0, 90), for_date: fdate, memo });
       }
     }
-    const disc = (rental_pd.length >= 3) || (unpaid_latefees >= 70 && rental_pd.length >= 2);
+    // DISCONNECTION trigger (admin rule, 2026-07-28):
+    //  (a) 3+ OPEN rentals with 2+ already past due — i.e. 2 past-due rentals + a current/new open rental; OR
+    //  (b) $70+ in open late fees AND 2+ past-due rentals.
+    // (Requiring 2+ past due avoids disconnecting a brand-new renter whose open rentals are all still current.)
+    const open_rentals = inv.filter((i: any) => !isLateFee(i));   // all unpaid rentals: past-due + current
+    const disc = (open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2);
     const current_open = inv.filter((i: any) => !isPastDue(i));
     const current_amt = current_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const grandtot = Math.round((pd_total + current_amt) * 100) / 100;
