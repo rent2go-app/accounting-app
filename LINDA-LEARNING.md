@@ -82,6 +82,9 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **Payment plans are not one-size-fits-all.** Some are the daily "2 rentals + 2 late fees per day" catch-up (verify yesterday's payments); others are custom, e.g. "clear $246 before 1 August" (Penny). → Fix: detect plan type from `plan_terms` ("per day" → daily 2+2 check; otherwise → reference the agreed terms, no daily check).
 - **Don't threaten disconnection/vehicle recovery for everyone behind.** Newly behind (2 days) should read "please cure your balance by 1 PM today, or reach out to discuss a way forward." Reserve the FINAL-NOTICE disconnect + recovery language for the actual disconnection tier (≥3 past-due rentals).
 
+### 2026-07-28 (bulk-write key mismatch)
+- **CRITICAL: every customer write silently failed for hours (dashboard froze on the 6 AM data).** Added `plan_paid_rentals`/`plan_paid_latefees` to the main `custs.push` but NOT to the early-return (current-customer) `custs.push`, so the two objects in the bulk upsert had different keys. PostgREST rejects a bulk insert whose objects don't all share the same keys (`PGRST102: "All object keys must match"`) and fails the ENTIRE batch — but `sbPost` ignores the response, so it failed invisibly. `linda_accounts` still updated (single-row write), which masked it. → Fix: every object pushed to a bulk-upsert array MUST have an identical key set. When adding a column to one branch's push, add it to ALL branches (use null). Also: when a scan "succeeds" but data looks stale, check the write's HTTP status — don't trust ok:true.
+
 <!-- Append new mistakes above this line, newest date first. Format:
 ### YYYY-MM-DD
 - **What went wrong.** → Fix: what was changed.
