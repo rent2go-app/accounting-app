@@ -75,6 +75,11 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .acctfresh b{color:var(--text)}
 .acctfresh.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out);border:1px solid var(--out)}
 .acctfresh.stale b{color:var(--out)}
+.ledgerbar{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ledgerbar b{color:var(--text)}
+.ledgerbar [data-refreshledger]{margin-left:auto}
+.ledgerbar.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out)}
+.ledgerbar.stale b{color:var(--out)}
 .acctbody{padding:0 16px 14px}
 .asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
@@ -212,7 +217,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null;
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null,LEDGER_REFRESHED=null;
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -266,7 +271,14 @@ async function load(){
   try{var am=await sb.from('linda_accounts').select('*');ACCTMETA=am.data||[];}catch(e){ACCTMETA=[];}
   try{var rf=await sb.from('linda_fees').select('*').eq('status','raised');RAISED=rf.data||[];}catch(e){RAISED=[];}
   try{var ld=await sb.from('linda_day').select('*').eq('day',todayET());DAYSNAP=(ld.data&&ld.data[0])||null;}catch(e){DAYSNAP=null;}
+  LEDGER_REFRESHED=new Date().toISOString();
   render();
+}
+// Refresh just the invoice/fee ledger data (re-pull from DB) and re-stamp the "last refreshed" time.
+async function refreshLedger(btn){
+  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='🔄 Refreshing…';
+  try{await load();toast('Invoice ledger refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');}
+  catch(e){alert('Refresh failed: '+(e.message||e));btn.disabled=false;btn.innerHTML=o;}
 }
 function render(){
   var rem=DRAFTS.filter(x=>x.kind==='reminder').length,disc=DRAFTS.filter(x=>x.kind==='disconnect').length,rec=DRAFTS.filter(x=>x.kind==='recovery').length;
@@ -518,7 +530,9 @@ function renderFeeLedger(){
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
+  var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-pull the invoice/fee ledger from the database now">🔄 Refresh ledger</button></div>';
   var main='<details class="feewrap"><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
+    +refreshBar
     +groups
     +'<p class="hint"><b>📝 Raise draft</b> → $10 draft in Stripe (not sent). <b>📧 Send</b> → finalizes &amp; <b>emails the invoice</b> to the customer to pay (never auto-charged). <b>✓ Done</b> → clears it from this list. <b>✕ Dismiss</b> spares the customer today. Fees <b>stay through raise → send → done</b>.</p></details>';
   el.innerHTML=main+dismBlock;
@@ -652,6 +666,7 @@ function wire(){
   document.querySelectorAll('[data-raisefee]').forEach(b=>b.onclick=()=>raiseFee(b.dataset.raisefee,b));
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
   document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
+  document.querySelectorAll('[data-refreshledger]').forEach(b=>b.onclick=()=>refreshLedger(b));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
