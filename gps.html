@@ -261,7 +261,15 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .gpsdetail{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
 .dethead{font-size:15px;margin-bottom:9px}
 .detctrl{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
-.detstat{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.detstat{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.gpscard{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--surface-2);max-width:460px}
+.gpscard .gcr{display:flex;gap:12px;padding:2px 0}
+.gpscard .gk{color:var(--muted);min-width:66px;flex:0 0 66px}
+.gpscard .gv{color:var(--text)}
+.gpscard .coords{color:var(--muted);font-variant-numeric:tabular-nums}
+.gpscard .gclinks{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:var(--muted)}
+.gpscard .gclinks a{color:var(--brand);text-decoration:none;font-weight:700}
+.gpscard .gclinks span{margin:0 6px;color:var(--line-strong)}
 @media(max-width:820px){.gpslayout{flex-direction:column;height:auto}.gpsside{flex:none;max-height:260px}.gpsbigmap{min-height:320px}}
 </style>
 </head><body>
@@ -301,6 +309,7 @@ function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
 let CUSTS=[], SELECTED=null, TRACK=null, SEARCH='';
+function fmtDT(str){if(!str)return '-';var m=String(str).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);if(!m)return str;var mon=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var h=+m[4],ap=h>=12?'PM':'AM',h12=((h+11)%12)+1;return h12+':'+m[5]+' '+ap+' \u00b7 '+mon[(+m[2])-1]+' '+(+m[3]);}
 
 function setMap(lat,lng){var m=document.getElementById('gpsmap');if(lat&&lng){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lng)+'&z=15&output=embed"></iframe>';}else{m.innerHTML='<div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div>';}}
 
@@ -337,11 +346,16 @@ function renderMain(){
   }
   var t=TRACK;
   var badges=t?('<span class="ignbadge '+(t.ignition==='ON'?'on':'off')+'">Ignition '+(t.ignition||'?')+'</span> '+(t.motion?('<span class="gpsmot">'+esc(t.motion)+(t.motion_since?' since '+esc(t.motion_since):'')+(t.speed?' ('+esc(t.speed)+')':'')+'</span>'):'')):'<span class="hint">Tap Track to load live status.</span>';
-  var loc=t?('<div class="gpsloc">'+esc(t.address||'-')+(t.maps?' · <a href="'+esc(t.maps)+'" target="_blank" rel="noopener">open in Google Maps</a>':'')+'</div>'):'';
+  var card=t?('<div class="gpscard">'
+    +'<div class="gcr"><span class="gk">Date</span><span class="gv">'+esc(fmtDT(t.last_event_time))+'</span></div>'
+    +'<div class="gcr"><span class="gk">Event</span><span class="gv"><b>'+esc(t.last_event||'-')+'</b></span></div>'
+    +'<div class="gcr"><span class="gk">Location</span><span class="gv">'+esc(t.address||'-')+((t.lat&&t.lng)?'<br><span class="coords">'+esc(t.lat)+', '+esc(t.lng)+'</span>':'')+'</span></div>'
+    +((t.lat&&t.lng)?'<div class="gclinks"><a href="'+esc(t.maps)+'" target="_blank" rel="noopener">Google Maps</a> <span>|</span> <a href="https://www.bing.com/maps?cp='+encodeURIComponent(t.lat+'~'+t.lng)+'&lvl=16" target="_blank" rel="noopener">Bing Maps</a></div>':'')
+    +'</div>'):'';
   var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap"><summary>recent events</summary>'+t.events.slice(0,10).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('')+'</details>'):'';
   d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+' · '+esc(c.sarekon_device_label||'')+'</span></div>'
     +'<div class="detctrl"><button class="btn small" id="btnLocate">📍 Locate</button> <button class="btn small" id="btnTrack">↻ Track</button> <button class="btn small danger" id="btnDisable">🔴 Disable starter</button> <button class="btn small ok" id="btnEnable">🟢 Enable starter</button> <button class="btn small" id="btnUnlink">unlink</button></div>'
-    +'<div class="detstat">'+badges+loc+ev+'<div id="detmsg" class="hint"></div></div>';
+    +'<div class="detstat">'+badges+card+ev+'<div id="detmsg" class="hint"></div></div>';
   document.getElementById('btnLocate').onclick=locateSel;
   document.getElementById('btnTrack').onclick=trackSel;
   document.getElementById('btnDisable').onclick=function(){cmdSel('disable');};
