@@ -265,6 +265,51 @@ Deno.serve(async (req) => {
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
     const body = await req.json().catch(() => ({}));
+
+    // ── ONE-TIME ASSIST: Penny Mitchell combined notice (today only) ──────────────────
+    // Penny switched cars; her JJM subscription starts tomorrow. She has 2 standalone JJM invoices
+    // (one dated for yesterday 27th = past due, one for today 28th) PLUS a past-due balance on her
+    // previous account (LLC 2.0, on a plan to clear $246 by 1 Aug). Build ONE combined notice with
+    // real Pay-now links from BOTH accounts and insert it as a draft for review. This is a manual,
+    // single-use exception — not part of the normal sweep.
+    if (body.penny_oneoff) {
+      const jjm = ACCTS.find((a: any) => a.label === "RENT 2 GO JJMusa");
+      const llc = ACCTS.find((a: any) => a.label === "RENT 2 GO LLC 2.0");
+      if (!jjm || !llc) return new Response(JSON.stringify({ error: "JJM or LLC 2.0 account not found in LINDA_ACCOUNTS" }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      const PENNY_JJM = "cus_UxzNqzVmRub6bS", PENNY_LLC = "cus_Ui1U2mD77s5YP6";
+      const jInv = (await stripeAll(`https://api.stripe.com/v1/invoices?customer=${PENNY_JJM}&status=open&limit=100`, jjm.key)).sort((a: any, b: any) => (a.created || 0) - (b.created || 0));
+      const lInv = (await stripeAll(`https://api.stripe.com/v1/invoices?customer=${PENNY_LLC}&status=open&limit=100`, llc.key)).filter((i: any) => (i.amount_remaining || 0) > 0);
+      // JJM: oldest = the "for yesterday (27th)" invoice → treat as past due; the rest (28th) → current.
+      const jPast = jInv.slice(0, Math.max(1, jInv.length - 1));
+      const jCurr = jInv.slice(Math.max(1, jInv.length - 1));
+      const lPast = lInv.filter(isPastDue);
+      const jPastAmt = jPast.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
+      const jCurrAmt = jCurr.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
+      const lPastAmt = lPast.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
+      const grand = Math.round((jPastAmt + jCurrAmt + lPastAmt) * 100) / 100;
+      // Both JJM invoices were created today (the "27th" one was generated today with a note that it's
+      // for yesterday), so their created-date reads Jul 28. Force the business dates: past-due = Jul 27, current = Jul 28.
+      const jline = (i: any, icon: string, dateLabel: string) => { const lbl = cleanlbl((i.lines?.data || [{}])[0]?.description || i.description || "Rental"); const url = i.hosted_invoice_url || ""; return `${icon} ${dateLabel} · ${lbl.slice(0, 34)} · ${m((i.amount_remaining || 0) / 100)}${url ? ` · [Pay now](${url})` : ""}`; };
+      const P: string[] = [];
+      P.push("Good morning Penny 👋\n\nWelcome to your new vehicle! Here's a quick summary of everything outstanding across your Rent 2 Go accounts so we can get you set up cleanly before your new plan begins tomorrow.");
+      P.push("① Your new rental account:");
+      if (jPast.length) P.push("Past due (for July 27):\n\n" + jPast.map((i: any) => jline(i, "❌", "Jul 27")).join("\n\n"));
+      if (jCurr.length) P.push("Due today (July 28):\n\n" + jCurr.map((i: any) => jline(i, "✅", "Jul 28")).join("\n\n"));
+      P.push("Pay these in your new account portal:" + footer(jjm.portal || "").replace(/^\n\n/, "\n"));
+      P.push("② Your previous account balance:");
+      if (lPast.length) P.push("Past due (please clear per your plan — the agreed $246 before 1 August):\n\n" + lPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(lPastAmt));
+      else P.push("No past-due invoices remain on your previous account — thank you.");
+      P.push("Pay these in your previous account portal:" + footer(llc.portal || "").replace(/^\n\n/, "\n"));
+      P.push("💰 Total across both accounts: " + m(grand));
+      P.push("Please settle today, or reach out right away to arrange payments or discuss a plan of action. Thank you, Penny — we're glad to have you back on the road.\n\nRent 2 Go");
+      const pbody = P.join("\n\n");
+      const em = "mitchellpenny746@gmail.com";
+      // preserve across today's resets: mark reviewed so the daily reset + keepset leave it in place
+      await sbDel(`linda_drafts?account_label=eq.${enc("RENT 2 GO JJMusa")}&customer_id=eq.${PENNY_JJM}`);
+      await sbPost(`linda_drafts`, [{ account_label: "RENT 2 GO JJMusa", customer_id: PENNY_JJM, customer_name: "PENNY MITCHELL", email: em, phone: "", kind: "reminder", channel: "email", subject: "Your Rent 2 Go accounts — a quick summary before your new plan starts", body: pbody, amount: grand, status: "draft", reviewed_at: nowISO }], "return=minimal");
+      return new Response(JSON.stringify({ ok: true, penny: true, jjm_past: jPast.length, jjm_current: jCurr.length, llc_pastdue: lPast.length, total: grand, body: pbody }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+
     const only = body && body.account;                       // optional: sweep a SINGLE account
     const list = only ? ACCTS.filter((a: any) => a.label === only) : ACCTS;
     const results = [];
