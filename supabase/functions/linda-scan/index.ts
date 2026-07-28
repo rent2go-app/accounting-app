@@ -77,16 +77,22 @@ async function scanAccount(acc: any) {
   const active = subs.filter((s: any) => ["active", "past_due", "unpaid", "trialing"].includes(s.status));
   const custs: any[] = [], drafts: any[] = [], fees: any[] = [], payments: any[] = [];
 
-  // WHO to scan = every active-subscription customer PLUS any customer who has open invoices
-  // but no active subscription yet (e.g. a new renter switching cars whose subscription starts
-  // tomorrow but who already has standalone invoices). Standalone invoices must still be billed.
+  // WHO to scan = ONLY active-subscription customers. This keeps the workflow current — we do NOT
+  // chase the historical open-invoice backlog (old/canceled renters with lingering unpaid invoices).
   const targets = new Map<string, { customer: any; sub_status: string }>();
   for (const s of active) { const c = s.customer || {}; if (c.id) targets.set(c.id, { customer: c, sub_status: s.status }); }
-  const openInvAll = await stripeAll(`https://api.stripe.com/v1/invoices?status=open&limit=100&expand[]=data.customer`, SKEY);
-  for (const i of openInvAll) {
-    const co = i.customer;
-    const id = typeof co === "string" ? co : (co && co.id);
-    if (id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
+  // TEMPORARY EXCEPTION (JJM only, today): a new renter switched cars into JJM and already has a
+  // brand-new standalone invoice, but the subscription starts tomorrow. Pull ONLY this-cycle standalone
+  // invoices for JJM so that customer is billed today. Remove this block once the subscription is live.
+  if (LABEL === "RENT 2 GO JJMusa") {
+    const RECENT_CUT = now - 10 * 86400;   // brand-new only (current cycle), never the backlog
+    const openInvAll = await stripeAll(`https://api.stripe.com/v1/invoices?status=open&limit=100&expand[]=data.customer`, SKEY);
+    for (const i of openInvAll) {
+      if ((i.created || 0) < RECENT_CUT) continue;
+      const co = i.customer;
+      const id = typeof co === "string" ? co : (co && co.id);
+      if (id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
+    }
   }
 
   await Promise.all(Array.from(targets.values()).map(async (t: any) => {
