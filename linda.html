@@ -585,10 +585,12 @@ async function setDisc(c,patch){
   toast('Saved ✓');await load();
 }
 var GPSDEV={}; var GPS_DRYRUN=true; var GPSROWS=[];
+function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
-async function loadGpsDevices(acc){if(GPSDEV[acc])return GPSDEV[acc];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[acc]=d.devices||[];return GPSDEV[acc];}
+async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
 async function gpsLoad(i){var c=GPSROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
-async function gpsLink(i){var c=GPSROWS[i];var sel=document.getElementById('gpssel'+i);var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
+async function gpsLoadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars\u2026';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');render();}catch(e){alert('Load failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}}
+async function gpsPick(i,sel){var c=GPSROWS[i];var id=sel.value;if(!id)return;var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
 async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
 function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open map</a>':'')+'</div>'+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
 async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
@@ -602,10 +604,10 @@ async function gpsCommand(c,kind){
 }
 function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
   if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
-  var devs=GPSDEV[c.account_label];
-  if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">to track / disable / enable the starter</span></div>';}
+  var devs=GPSDEV[gpsKeyFor(c.account_label)];
+  if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">or use \u201cLoad all cars\u201d above</span></div>';}
   var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
-  return '<div class="gpsrow">Car: <select class="gpssel" id="gpssel'+i+'"><option value="">- pick this car -</option>'+opts+'</select> <button class="btn small pri" data-gpslink="'+i+'">Link</button></div>';
+  return '<div class="gpsrow">Car: <select class="gpssel" data-gpspick="'+i+'"><option value="">- pick this car -</option>'+opts+'</select></div>';
 }
 function renderDisconnections(){
   var el=document.getElementById('ldisc');if(!el)return;
@@ -702,7 +704,7 @@ function renderVehicleMap(){
     return '<details class="vmacct"><summary>'+esc(acc)+' <span class="hint">('+byAcc[acc].length+')</span></summary>'+rows+'</details>';
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>\uD83D\uDE97 Vehicle Mapping (GPS) \u2014 <b>'+linked+'</b> of '+CUSTS.length+' linked</summary>'
-    +'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
+    +'<button class="btn small pri" data-gpsloadall="1" style="margin:8px 0">\uD83D\uDE97 Load all cars (both accounts)</button>'+'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
 }
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
@@ -894,7 +896,8 @@ function wire(){
   document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
   document.querySelectorAll('[data-discplan]').forEach(b=>b.onclick=()=>putOnPlan(b.dataset.discplan));
   document.querySelectorAll('[data-gpsload]').forEach(b=>b.onclick=()=>gpsLoad(b.dataset.gpsload));
-  document.querySelectorAll('[data-gpslink]').forEach(b=>b.onclick=()=>gpsLink(b.dataset.gpslink));
+  document.querySelectorAll('[data-gpspick]').forEach(b=>b.onchange=()=>gpsPick(b.dataset.gpspick,b));
+  document.querySelectorAll('[data-gpsloadall]').forEach(b=>b.onclick=()=>gpsLoadAll(b));
   document.querySelectorAll('[data-gpsunlink]').forEach(b=>b.onclick=()=>gpsUnlink(b.dataset.gpsunlink));
   document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
   document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
