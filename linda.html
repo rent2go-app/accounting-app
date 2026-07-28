@@ -172,6 +172,13 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .dlbl{color:var(--muted);min-width:82px}
 .dinput{flex:1;min-width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
 .dts{font-size:11px;color:var(--muted)}
+.dnotice{font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;margin-bottom:8px;display:inline-block}
+.dnotice.sent{background:color-mix(in srgb,var(--in) 15%,var(--surface));color:var(--in)}
+.dnotice.unsent{background:color-mix(in srgb,var(--out) 13%,var(--surface));color:var(--out)}
+.dtimeline{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:9px;padding:7px 10px;background:var(--surface);border-radius:8px}
+.dtimeline b{color:var(--text);font-variant-numeric:tabular-nums}
+.tl-dur{margin-left:auto;font-weight:700}
+.tl-dur.live{color:var(--out)}
 .status.raised{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
 .ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
 .ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -529,6 +536,8 @@ function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('l
 // ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
 var DISCROWS=[];
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
+function durText(a,b){var s=Math.max(0,(new Date(b).getTime()-new Date(a).getTime())/1000);var h=Math.floor(s/3600),m=Math.round((s%3600)/60);return (h?h+'h ':'')+m+'m';}
+function fullET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}catch(e){return '';}}
 async function setDisc(c,patch){
   patch.account_label=c.account_label;patch.customer_id=c.customer_id;patch.customer_name=c.name;patch.updated_at=new Date().toISOString();
   var r=await sb.from('linda_disconnections').upsert(patch,{onConflict:'account_label,customer_id'}).select();
@@ -547,8 +556,18 @@ function renderDisconnections(){
     var badge=r.restored?'<span class="dbadge on">🟢 RESTORED'+(r.restored_at?' · '+shortET(r.restored_at):'')+'</span>'
       :r.signal_sent?'<span class="dbadge red">🔴 ACTIVE DISCONNECTION · SIGNAL SENT'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
       :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
+    var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
+    var nsent=dnf&&dnf.status==='sent';
+    var noticeLine='<div class="dnotice '+(nsent?'sent':'unsent')+'">'+(nsent?'📧 Disconnection notice emailed today · '+shortET(dnf.sent_at)+' ET':(dnf&&dnf.reviewed_at?'✉️ Notice reviewed but NOT emailed yet today':'✉️ Disconnection notice NOT emailed yet today'))+'</div>';
+    var tl=(r.signal_sent_at||r.restored_at)?('<div class="dtimeline">'
+      +(r.signal_sent_at?'<span class="tl-trig">🔴 Disconnection triggered: <b>'+fullET(r.signal_sent_at)+'</b></span>':'')
+      +(r.restored_at?'<span class="tl-rest">🟢 Restored to service: <b>'+fullET(r.restored_at)+'</b></span>':'')
+      +(r.signal_sent_at&&r.restored_at?'<span class="tl-dur">⏱ offline '+durText(r.signal_sent_at,r.restored_at)+'</span>':(r.signal_sent_at&&!r.restored_at?'<span class="tl-dur live">⏱ offline '+durText(r.signal_sent_at,new Date().toISOString())+' so far</span>':''))
+      +'</div>'):'';
     return '<div class="disccard'+(r.restored?' restored':r.signal_sent?' active':'')+'">'
       +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
+      +noticeLine
+      +tl
       +'<div class="dchecks">'
         +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
         +'<label class="dchk"><input type="checkbox" data-discreach="'+i+'"'+(r.reached_out?' checked':'')+'> 📞 Customer reached out'+(r.reached_out_at?' <span class="dts">'+shortET(r.reached_out_at)+' ET</span>':'')+'</label>'
