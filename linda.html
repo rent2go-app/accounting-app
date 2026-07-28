@@ -71,6 +71,11 @@ h2{font-size:15px;margin:18px 0 8px}
 details.acct[open] .accttl::before{transform:rotate(90deg)}
 .accttl:hover{background:var(--surface-2)}
 .accttl .btn.aud{margin-left:10px;flex:none}
+.acctfresh{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acctfresh b{color:var(--text)}
+.acctfresh.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out);border:1px solid var(--out)}
+.acctfresh.stale b{color:var(--out)}
+.acctfresh .aud2{margin-left:auto}
 .acctbody{padding:0 16px 14px}
 .asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
@@ -334,7 +339,8 @@ function render(){
     var ameta=ACCTMETA.find(function(a){return a.label===acc;});var asc=ameta&&ameta.scanned_at;
     pills+='<span class="apill'+(isStale(asc)?' red':'')+'" title="When this fleet\'s data was last pulled from Stripe">🕒 '+agoText(asc)+(isStale(asc)?' — stale, tap Audit Sweep':'')+'</span>';
     var openAttr=(toSend>0||af.length>0)?' open':'';  // auto-open accounts that still need action
-    return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody">'+flagsH+draftsH+'</div></details>';
+    var freshLine='<div class="acctfresh'+(isStale(asc)?' stale':'')+'">🕒 Records last pulled for this fleet: <b>'+(asc?shortET(asc)+' ET':'never')+'</b> ('+agoText(asc)+')'+(isStale(asc)?' — may be missing today\'s new invoices, tap 🔄 Audit Sweep':'')+' <button class="btn small aud2" data-auditacct="'+esc(acc)+'">🔄 Audit Sweep</button></div>';
+    return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody">'+freshLine+flagsH+draftsH+'</div></details>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
   renderSkipped();
   renderLearnings();
