@@ -149,6 +149,29 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .status.reviewed{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .status.plan{background:color-mix(in srgb,#0d9488 16%,var(--surface));color:#0d9488}
 .status.plan.behind{background:color-mix(in srgb,#eab54e 24%,var(--surface));color:#8a6516}
+.status.disc-signal{background:var(--out);color:#fff}
+.status.disc-restored{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.discwrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
+.discwrap>summary{cursor:pointer;font-weight:800;font-size:15px;list-style:none}
+.discwrap>summary::-webkit-details-marker{display:none}
+.disccard{border:1px solid var(--line);border-left:4px solid var(--out);border-radius:10px;padding:11px 13px;margin:10px 0;background:var(--surface-2)}
+.disccard.active{border-left-color:var(--out);background:color-mix(in srgb,var(--out) 6%,var(--surface))}
+.disccard.restored{border-left-color:var(--in);background:color-mix(in srgb,var(--in) 7%,var(--surface))}
+.dischd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.discname{font-weight:800}
+.discacct{font-size:11px;color:var(--muted)}
+.discamt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dbadge{margin-left:auto;font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px}
+.dbadge.red{background:var(--out);color:#fff}
+.dbadge.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.dbadge.on{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.dchecks{display:flex;flex-direction:column;gap:7px}
+.dchk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.dchk input{width:16px;height:16px;accent-color:var(--out)}
+.dact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.dlbl{color:var(--muted);min-width:82px}
+.dinput{flex:1;min-width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
+.dts{font-size:11px;color:var(--muted)}
 .status.raised{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
 .ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
 .ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -202,6 +225,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="reauditbar"><button class="btn pri big" id="reaudit">🔄 RE-AUDIT — sweep all accounts for payments &amp; updates</button><button class="btn big" id="testNotice" title="Send a TEST notice email to yourself">🧪 Send test email</button><span class="hint" id="lastscan"></span></div>
 <div id="lbrief" class="briefbar"></div>
 <div class="cards" id="lsum"></div>
+<div id="ldisc"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div id="laccounts"></div>
@@ -217,7 +241,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null,LEDGER_REFRESHED=null;
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null,LEDGER_REFRESHED=null,DISCONN=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -271,6 +295,7 @@ async function load(){
   try{var am=await sb.from('linda_accounts').select('*');ACCTMETA=am.data||[];}catch(e){ACCTMETA=[];}
   try{var rf=await sb.from('linda_fees').select('*').eq('status','raised');RAISED=rf.data||[];}catch(e){RAISED=[];}
   try{var ld=await sb.from('linda_day').select('*').eq('day',todayET());DAYSNAP=(ld.data&&ld.data[0])||null;}catch(e){DAYSNAP=null;}
+  try{var dc=await sb.from('linda_disconnections').select('*');DISCONN=dc.data||[];}catch(e){DISCONN=[];}
   LEDGER_REFRESHED=new Date().toISOString();
   render();
 }
@@ -305,6 +330,7 @@ function render(){
     card(CIC.cash,'Outstanding',fmt(out),topAcct?('biggest: <b>'+esc(topAcct)+'</b> '+fmt(byAcctOut[topAcct])):'all clear 🎉','')+
     card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
+  renderDisconnections();
   renderFeeLedger();
   renderPaid();
   renderOutstanding();
@@ -386,6 +412,7 @@ function draftCard(d){
   var planBehind=!!(cust&&cust.state==='plan_behind');
   var chips='';
   if(onPlan)chips+='<span class="status plan'+(planBehind?' behind':'')+'" title="'+(planBehind?'Missed yesterday’s 2 rentals + 2 late fees — falling behind the plan':'On a payment plan — never disconnected')+'">📋 '+(planBehind?'plan · ⚠ behind':'payment plan')+'</span>';
+  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr){if(dr.restored)chips+='<span class="status disc-restored" title="Back on service'+(dr.restored_at?' · '+shortET(dr.restored_at):'')+'">🟢 restored</span>';else if(dr.signal_sent)chips+='<span class="status disc-signal" title="Active Disconnection signal sent'+(dr.signal_sent_at?' · '+shortET(dr.signal_sent_at):'')+'">🔴 SIGNAL SENT</span>';}}
   if(d.reviewed_at&&!isSent)chips+='<span class="status reviewed">✓ reviewed</span>';
   if(isSent)chips+='<span class="status sent">✅ sent'+(d.sent_at?' · '+shortET(d.sent_at):'')+'</span>';
   return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+(isSent?' done':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+chips+'<span class="amt">'+fmt(d.amount)+'</span></div>'
@@ -499,6 +526,42 @@ async function sendTestNotice(btn){
   btn.disabled=false;btn.textContent=o;
 }
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
+// ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
+var DISCROWS=[];
+function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
+async function setDisc(c,patch){
+  patch.account_label=c.account_label;patch.customer_id=c.customer_id;patch.customer_name=c.name;patch.updated_at=new Date().toISOString();
+  var r=await sb.from('linda_disconnections').upsert(patch,{onConflict:'account_label,customer_id'}).select();
+  if(r.error){alert('Could not save: '+r.error.message);return;}
+  toast('Saved ✓');await load();
+}
+function renderDisconnections(){
+  var el=document.getElementById('ldisc');if(!el)return;
+  DISCROWS=CUSTS.filter(function(c){return c.state==='disconnect';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  if(!DISCROWS.length){el.innerHTML='';return;}
+  var actd=DISCROWS.filter(function(c){var r=discRec(c);return r.signal_sent&&!r.restored;}).length;
+  var restd=DISCROWS.filter(function(c){return discRec(c).restored;}).length;
+  var pend=DISCROWS.length-DISCROWS.filter(function(c){return discRec(c).signal_sent;}).length;
+  var cards=DISCROWS.map(function(c,i){
+    var r=discRec(c);
+    var badge=r.restored?'<span class="dbadge on">🟢 RESTORED'+(r.restored_at?' · '+shortET(r.restored_at):'')+'</span>'
+      :r.signal_sent?'<span class="dbadge red">🔴 ACTIVE DISCONNECTION · SIGNAL SENT'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
+      :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
+    return '<div class="disccard'+(r.restored?' restored':r.signal_sent?' active':'')+'">'
+      +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
+      +'<div class="dchecks">'
+        +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
+        +'<label class="dchk"><input type="checkbox" data-discreach="'+i+'"'+(r.reached_out?' checked':'')+'> 📞 Customer reached out'+(r.reached_out_at?' <span class="dts">'+shortET(r.reached_out_at)+' ET</span>':'')+'</label>'
+        +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
+        +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
+        +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
+      +'</div></div>';
+  }).join('');
+  el.innerHTML='<details class="discwrap" open><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
+    +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
+    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'
+    +cards+'</details>';
+}
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
   var nameOf={};CUSTS.forEach(function(c){nameOf[c.account_label+'|'+c.customer_id]=c.name;});
@@ -667,6 +730,11 @@ function wire(){
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
   document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
   document.querySelectorAll('[data-refreshledger]').forEach(b=>b.onclick=()=>refreshLedger(b));
+  document.querySelectorAll('[data-discsig]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discsig],{signal_sent:b.checked,signal_sent_at:b.checked?new Date().toISOString():null}));
+  document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
+  document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discrestore],{restored:b.checked,restored_at:b.checked?new Date().toISOString():null}));
+  document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
+  document.querySelectorAll('[data-discnote]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discnote],{notes:document.getElementById('dni'+b.dataset.discnote).value}));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
@@ -683,7 +751,21 @@ async function sendTest(id,btn){
     btn.textContent='Test sent ✓';toast('Test sent to '+to);setTimeout(function(){btn.disabled=false;btn.textContent=t;},2500);
   }catch(e){btn.disabled=false;btn.textContent=t;alert('Test failed: '+(e.message||e));}
 }
-async function upd(id,patch){var r=await sb.from('linda_drafts').update(patch).eq('id',id);if(r.error){alert(r.error.message);return;}var d=DRAFTS.find(x=>x.id==id);Object.assign(d,patch);render();}
+async function upd(id,patch){
+  var d=DRAFTS.find(x=>x.id==id);
+  // Draft row ids are regenerated on every sweep, so a stale page's id can be gone. Update by id first;
+  // if that hits 0 rows (id churned) fall back to the STABLE (account_label, customer_id) key so the
+  // write always lands on the customer's current draft. Verify with .select() — never fail silently.
+  var r=await sb.from('linda_drafts').update(patch).eq('id',id).select();
+  if(r.error){alert(r.error.message);return;}
+  if((!r.data||!r.data.length)&&d){
+    r=await sb.from('linda_drafts').update(patch).eq('account_label',d.account_label).eq('customer_id',d.customer_id).select();
+    if(r.error){alert(r.error.message);return;}
+  }
+  if(!r.data||!r.data.length){toast('⚠ Could not save — refreshing…');await load();return;}
+  if(d)Object.assign(d,patch,r.data[0]);
+  render();
+}
 async function send(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d||!d.email){alert('No email on file for this customer — use 📋 Copy to send by WhatsApp/SMS instead.');return;}
   if(!confirm('Email this notice to '+(d.customer_name||'customer')+' at '+d.email+' ?'))return;
