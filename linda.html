@@ -151,6 +151,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .status.plan.behind{background:color-mix(in srgb,#eab54e 24%,var(--surface));color:#8a6516}
 .status.disc-signal{background:var(--out);color:#fff}
 .status.disc-restored{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.status.disc-grace{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .discwrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
 .discwrap>summary{cursor:pointer;font-weight:800;font-size:15px;list-style:none}
 .discwrap>summary::-webkit-details-marker{display:none}
@@ -165,6 +166,10 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .dbadge.red{background:var(--out);color:#fff}
 .dbadge.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
 .dbadge.on{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.dbadge.grace{background:color-mix(in srgb,#7a5cff 18%,var(--surface));color:#7a5cff}
+.disccard.grace{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 6%,var(--surface))}
+.dgrace .dtime{flex:0 0 auto;min-width:0;width:118px}
+.dts.exp{color:var(--out);font-weight:700}
 .dchecks{display:flex;flex-direction:column;gap:7px}
 .dchk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .dchk input{width:16px;height:16px;accent-color:var(--out)}
@@ -419,7 +424,7 @@ function draftCard(d){
   var planBehind=!!(cust&&cust.state==='plan_behind');
   var chips='';
   if(onPlan)chips+='<span class="status plan'+(planBehind?' behind':'')+'" title="'+(planBehind?'Missed yesterday’s 2 rentals + 2 late fees — falling behind the plan':'On a payment plan — never disconnected')+'">📋 '+(planBehind?'plan · ⚠ behind':'payment plan')+'</span>';
-  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr){if(dr.restored)chips+='<span class="status disc-restored" title="Back on service'+(dr.restored_at?' · '+shortET(dr.restored_at):'')+'">🟢 restored</span>';else if(dr.signal_sent)chips+='<span class="status disc-signal" title="Active Disconnection signal sent'+(dr.signal_sent_at?' · '+shortET(dr.signal_sent_at):'')+'">🔴 SIGNAL SENT</span>';}}
+  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr){if(dr.restored)chips+='<span class="status disc-restored" title="Back on service'+(dr.restored_at?' · '+shortET(dr.restored_at):'')+'">🟢 restored</span>';else if(graceActive(dr))chips+='<span class="status disc-grace" title="Disconnection deferred">⏸ grace until '+shortET(dr.grace_until)+'</span>';else if(dr.signal_sent)chips+='<span class="status disc-signal" title="Active Disconnection signal sent'+(dr.signal_sent_at?' · '+shortET(dr.signal_sent_at):'')+'">🔴 SIGNAL SENT</span>';}}
   if(d.reviewed_at&&!isSent)chips+='<span class="status reviewed">✓ reviewed</span>';
   if(isSent)chips+='<span class="status sent">✅ sent'+(d.sent_at?' · '+shortET(d.sent_at):'')+'</span>';
   return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+(isSent?' done':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+chips+'<span class="amt">'+fmt(d.amount)+'</span></div>'
@@ -537,6 +542,10 @@ function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('l
 var DISCROWS=[];
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
 function durText(a,b){var s=Math.max(0,(new Date(b).getTime()-new Date(a).getTime())/1000);var h=Math.floor(s/3600),m=Math.round((s%3600)/60);return (h?h+'h ':'')+m+'m';}
+function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'+00:00';}catch(e){return '-04:00';}}
+// interpret a manually-entered HH:MM (and optional date) as America/New_York and return an ISO instant
+function etTimeToISO(hhmm,dateStr){var d=dateStr||todayET();return new Date(d+'T'+hhmm+':00'+etOffsetStr()).toISOString();}
+function graceActive(r){return r.grace_until&&new Date(r.grace_until).getTime()>Date.now();}
 function fullET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}catch(e){return '';}}
 async function setDisc(c,patch){
   patch.account_label=c.account_label;patch.customer_id=c.customer_id;patch.customer_name=c.name;patch.updated_at=new Date().toISOString();
@@ -553,7 +562,9 @@ function renderDisconnections(){
   var pend=DISCROWS.length-DISCROWS.filter(function(c){return discRec(c).signal_sent;}).length;
   var cards=DISCROWS.map(function(c,i){
     var r=discRec(c);
+    var gA=graceActive(r);
     var badge=r.restored?'<span class="dbadge on">🟢 RESTORED'+(r.restored_at?' · '+shortET(r.restored_at):'')+'</span>'
+      :gA?'<span class="dbadge grace">⏸ GRACE — deferred until '+fullET(r.grace_until)+'</span>'
       :r.signal_sent?'<span class="dbadge red">🔴 ACTIVE DISCONNECTION · SIGNAL SENT'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
       :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
@@ -564,13 +575,14 @@ function renderDisconnections(){
       +(r.restored_at?'<span class="tl-rest">🟢 Restored to service: <b>'+fullET(r.restored_at)+'</b></span>':'')
       +(r.signal_sent_at&&r.restored_at?'<span class="tl-dur">⏱ offline '+durText(r.signal_sent_at,r.restored_at)+'</span>':(r.signal_sent_at&&!r.restored_at?'<span class="tl-dur live">⏱ offline '+durText(r.signal_sent_at,new Date().toISOString())+' so far</span>':''))
       +'</div>'):'';
-    return '<div class="disccard'+(r.restored?' restored':r.signal_sent?' active':'')+'">'
+    return '<div class="disccard'+(r.restored?' restored':gA?' grace':r.signal_sent?' active':'')+'">'
       +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
       +noticeLine
       +tl
       +'<div class="dchecks">'
         +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
         +'<label class="dchk"><input type="checkbox" data-discreach="'+i+'"'+(r.reached_out?' checked':'')+'> 📞 Customer reached out'+(r.reached_out_at?' <span class="dts">'+shortET(r.reached_out_at)+' ET</span>':'')+'</label>'
+        +'<div class="dact dgrace"><span class="dlbl">⏸ Grace until:</span> <input type="time" id="dgt'+i+'" class="dinput dtime" value="'+esc((r.grace_until?new Date(r.grace_until).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:"2-digit",minute:"2-digit"}):''))+'"> <span class="dts">ET today</span> <input id="dgn'+i+'" class="dinput" placeholder="reason for grace (optional)" value="'+esc(r.grace_note||'')+'"> <button class="btn small" data-discgrace="'+i+'">Apply grace</button>'+(r.grace_until?' <button class="btn small" data-discgraceclear="'+i+'">Clear</button>':'')+(r.grace_until?'<span class="dts '+(gA?"":"exp")+'">'+(gA?'deferred until '+fullET(r.grace_until):'grace expired '+fullET(r.grace_until))+'</span>':'')+'</div>'
         +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
@@ -754,6 +766,8 @@ function wire(){
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discrestore],{restored:b.checked,restored_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
   document.querySelectorAll('[data-discnote]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discnote],{notes:document.getElementById('dni'+b.dataset.discnote).value}));
+  document.querySelectorAll('[data-discgrace]').forEach(b=>b.onclick=function(){var i=b.dataset.discgrace,t=document.getElementById('dgt'+i).value;if(!t){alert('Enter a grace time (ET) first.');return;}setDisc(DISCROWS[i],{grace_until:etTimeToISO(t),grace_note:document.getElementById('dgn'+i).value});});
+  document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
