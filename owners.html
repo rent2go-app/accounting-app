@@ -102,7 +102,12 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .ffnote input{flex:1;min-width:180px}
 .maint{margin:6px 16px 4px;border-top:1px dashed var(--line);padding-top:10px}
 .maint .mh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;font-weight:800;color:var(--muted);margin-bottom:6px}
-.mrow{display:grid;grid-template-columns:120px 116px 132px 1fr 78px 92px 30px;gap:8px;align-items:center;padding:3px 0}
+.mrow{display:grid;grid-template-columns:22px 104px 98px 110px 1fr 56px 78px 92px 26px;gap:7px;align-items:center;padding:3px 0}
+.mstcell{font-size:10.5px;text-align:center;overflow:hidden}
+.mst.paid{color:var(--in);font-weight:800}
+.mst.inv{color:var(--brand);font-weight:700;text-decoration:none}
+.mrow.rowpaid{opacity:.72}
+.mhbtns{display:flex;gap:6px;flex-wrap:wrap}
 .mrow input,.mrow select{width:100%}
 .mrow.mhdr{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:2px 0}
 .mrow.mhdr span{padding:0 2px}
@@ -159,7 +164,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
   .osnap{width:100%}
   .rowscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .rowscroll .crow,.rowscroll .chdr{min-width:500px}
-  .rowscroll .mrow,.rowscroll .mrow.mhdr{min-width:680px}
+  .rowscroll .mrow,.rowscroll .mrow.mhdr{min-width:900px}
   .mbreakrow{grid-template-columns:1fr;gap:10px}
   .maint,.cars{padding-left:12px;padding-right:12px}
   .ofoot{padding:10px 12px}
@@ -280,10 +285,13 @@ function maintTotal(o){return r2((o.maint||[]).reduce(function(s,x){return s+(+x
 function maintChips(obj){var ks=Object.keys(obj);if(!ks.length)return '<span class="hint">none in '+fmtYM(YM)+'</span>';return ks.sort(function(a,b){return obj[b]-obj[a];}).map(function(k){return '<span class="mchip">'+esc(k)+' <b>'+fmt(r2(obj[k]))+'</b></span>';}).join('');}
 function maintHTML(o){var oi=STATE.indexOf(o);var cars=(o.cars||[]);var m=o.maint||[];
  function carOpts(sel){return '<option value="">— car —</option>'+cars.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===sel?' selected':'')+'>'+esc(c.name||c.plate||'car')+'</option>';}).join('');}
- var rows=m.map(function(x,mi){return '<div class="mrow"><input type="date" data-mf="'+oi+'|'+mi+'|date" value="'+esc(x.date||'')+'"><select data-mf="'+oi+'|'+mi+'|carId">'+carOpts(x.carId)+'</select><select data-mf="'+oi+'|'+mi+'|cat">'+maintCatOpts(x.cat)+'</select><input type="text" placeholder="Item / details" data-mf="'+oi+'|'+mi+'|desc" value="'+esc(x.desc||'')+'"><input type="number" min="0" placeholder="Mileage" data-mf="'+oi+'|'+mi+'|mileage" value="'+(x.mileage!=null?x.mileage:'')+'"><input class="tnum" type="number" min="0" step="0.01" placeholder="$ cost" data-mf="'+oi+'|'+mi+'|cost" value="'+(+x.cost||0)+'"><button class="mdel" data-mdel="'+oi+'|'+mi+'" title="Remove">×</button></div>';}).join('');
+ var rows=m.map(function(x,mi){var billed=(x.status==='paid'||x.stripe_invoice_id);var stat=x.status==='paid'?'<span class="mst paid">✅ paid</span>':(x.stripe_invoice_id?'<a class="mst inv" href="'+esc(x.hosted_url||'#')+'" target="_blank" rel="noopener">🧾 pay</a>':'');return '<div class="mrow'+(x.status==='paid'?' rowpaid':'')+'"><input type="checkbox" class="msel" data-msel="'+oi+'|'+mi+'"'+(billed?' disabled':'')+' title="Select to bill via Stripe"><input type="date" data-mf="'+oi+'|'+mi+'|date" value="'+esc(x.date||'')+'"><select data-mf="'+oi+'|'+mi+'|carId">'+carOpts(x.carId)+'</select><select data-mf="'+oi+'|'+mi+'|cat">'+maintCatOpts(x.cat)+'</select><input type="text" placeholder="Item / details (what was done / where)" data-mf="'+oi+'|'+mi+'|desc" value="'+esc(x.desc||'')+'"><input type="number" min="0" placeholder="Mileage" data-mf="'+oi+'|'+mi+'|mileage" value="'+(x.mileage!=null?x.mileage:'')+'"><input class="tnum" type="number" min="0" step="0.01" placeholder="$ cost" data-mf="'+oi+'|'+mi+'|cost" value="'+(+x.cost||0)+'"><span class="mstcell">'+stat+'</span><button class="mdel" data-mdel="'+oi+'|'+mi+'" title="Remove">×</button></div>';}).join('');
  var byCar={},byCat={};m.forEach(function(x){if(String(x.date||'').slice(0,7)===YM){var c=+x.cost||0;var cn=(cars.find(function(cc){return cc.id===x.carId;})||{}).name||'Unassigned';byCar[cn]=(byCar[cn]||0)+c;var k=x.cat||'Uncategorised';byCat[k]=(byCat[k]||0)+c;}});
  var breakdown=m.length?'<div class="mbreakrow"><div><div class="mbl">By car · '+fmtYM(YM)+'</div><div class="mchips">'+maintChips(byCar)+'</div></div><div><div class="mbl">By type · '+fmtYM(YM)+'</div><div class="mchips">'+maintChips(byCat)+'</div></div></div>':'';
- return '<div class="maint"><div class="mh"><span>🔧 Maintenance · '+fmt(maintYM(o))+' in '+fmtYM(YM)+' · '+fmt(maintTotal(o))+' all-time</span><button class="btn small" data-maddm="'+oi+'">+ maintenance record</button></div>'+(m.length?'<div class="rowscroll"><div class="mrow mhdr"><span>Date</span><span>Car</span><span>Type</span><span>Item / details</span><span>Mileage</span><span>Cost</span><span></span></div>'+rows+'</div>'+breakdown:'<div class="hint" style="padding:6px 2px">No maintenance logged yet — add records to track cost per car.</div>')+'</div>';}
+ return '<div class="maint"><div class="mh"><span>🔧 Maintenance · '+fmt(maintYM(o))+' in '+fmtYM(YM)+' · '+fmt(maintTotal(o))+' all-time</span><span class="mhbtns"><button class="btn small" data-maddm="'+oi+'">+ record</button><button class="btn small pri" data-billsel="'+oi+'">🧾 Bill selected (Stripe)</button><button class="btn small" data-syncpaid="'+oi+'">↻ Sync paid</button></span></div>'+(m.length?'<div class="rowscroll"><div class="mrow mhdr"><span></span><span>Date</span><span>Car</span><span>Type</span><span>Item / details</span><span>Mileage</span><span>Cost</span><span>Status</span><span></span></div>'+rows+'</div>'+breakdown:'<div class="hint" style="padding:6px 2px">No maintenance logged yet — add records to track cost per car.</div>')+'</div>';}
+function selMaint(oi){var out=[];document.querySelectorAll('[data-msel^="'+oi+'|"]').forEach(function(cb){if(cb.checked)out.push(+cb.dataset.msel.split('|')[1]);});return out;}
+async function billSelected(oi){var o=STATE[oi];var sel=selMaint(oi);if(!sel.length){alert('Tick the maintenance item(s) you want to bill first.');return;}if(!o.email){alert('This owner has no email yet — add one in the owner details, then try again.');return;}var items=sel.map(function(mi){var x=o.maint[mi];return {_mi:mi,amount:r2(+x.cost||0),desc:(x.date||'')+' · '+carName(o,x.carId)+' — '+(x.cat||'Maintenance')+(x.desc?' ('+x.desc+')':'')};}).filter(function(i){return i.amount>0;});if(!items.length){alert('Selected items have no cost.');return;}var total=r2(items.reduce(function(a,i){return a+i.amount;},0));if(!confirm('Create a Stripe invoice for '+items.length+' maintenance item(s) — '+fmt(total)+' — and email it to '+o.email+'?\n\nThe owner pays into RENT 2 GO LLC 2.0.'))return;try{var r=await sb.functions.invoke('owner-invoice',{body:{account_label:'RENT 2 GO LLC 2.0',owner:{name:o.ownerName||o.name,email:o.email},items:items.map(function(i){return {desc:i.desc,amount:i.amount};}),memo:'Fleet maintenance — '+(o.name||'owner')}});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));var d=r.data;snap();items.forEach(function(i){var x=o.maint[i._mi];x.status='invoiced';x.stripe_invoice_id=d.invoice_id;x.hosted_url=d.hosted_invoice_url;x.invoice_number=d.number;x.invoiced_at=new Date().toISOString();});scheduleSave();render();toast('Invoice '+(d.number||'')+' emailed to '+o.email+' ✓');if(d.hosted_invoice_url)window.open(d.hosted_invoice_url,'_blank');}catch(e){alert('Invoice failed: '+(e.message||e));}}
+async function syncPaid(oi){var o=STATE[oi];var ids=(o.maint||[]).filter(function(x){return x.stripe_invoice_id&&x.status!=='paid';}).map(function(x){return x.stripe_invoice_id;});if(!ids.length){toast('No open Stripe invoices to sync.');return;}try{var r=await sb.functions.invoke('owner-invoice',{body:{action:'status',account_label:'RENT 2 GO LLC 2.0',invoice_ids:ids}});if(r.error)throw r.error;var byId={};(r.data.invoices||[]).forEach(function(v){byId[v.id]=v;});snap();var np=0;(o.maint||[]).forEach(function(x){if(x.stripe_invoice_id&&byId[x.stripe_invoice_id]&&byId[x.stripe_invoice_id].paid&&x.status!=='paid'){x.status='paid';x.paid_at=new Date().toISOString();np++;}});scheduleSave();render();toast(np?(np+' invoice(s) now marked PAID ✓'):'No new payments yet.');}catch(e){alert('Sync failed: '+(e.message||e));}}
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
 function toast(msg){var h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+msg+'</div>';setTimeout(()=>{h.innerHTML='';},2600);}
 
@@ -449,6 +457,8 @@ function wire(){
   document.querySelectorAll('[data-ccustom]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.ccustom.split('|');STATE[+p[0]].cars[+p[1]].rate=+el.value||0;scheduleSave();render();});
   document.querySelectorAll('[data-addcar]').forEach(el=>el.onclick=()=>{snap();var o=STATE[+el.dataset.addcar];o.cars=o.cars||[];o.cars.push({id:uid('c_'),name:'',plate:'',vin:'',rate:500,days:{}});scheduleSave();render();});
   document.querySelectorAll('[data-maddm]').forEach(el=>el.onclick=()=>{snap();var o=STATE[+el.dataset.maddm];o.maint=o.maint||[];o.maint.push({id:uid('m_'),date:'',carId:'',cat:'',desc:'',mileage:null,cost:0});scheduleSave();render();});
+  document.querySelectorAll('[data-billsel]').forEach(el=>el.onclick=()=>billSelected(+el.dataset.billsel));
+  document.querySelectorAll('[data-syncpaid]').forEach(el=>el.onclick=()=>syncPaid(+el.dataset.syncpaid));
   document.querySelectorAll('[data-mdel]').forEach(el=>el.onclick=()=>{snap();var p=el.dataset.mdel.split('|');STATE[+p[0]].maint.splice(+p[1],1);scheduleSave();render();});
   document.querySelectorAll('[data-mf]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.mf.split('|');var m=STATE[+p[0]].maint[+p[1]];var f=p[2];var v=el.value;if(f==='cost')m.cost=+v||0;else if(f==='mileage')m.mileage=(v===''?null:+v);else m[f]=v;scheduleSave();if(f==='cost'||f==='carId'||f==='cat'||f==='date')render();});
   document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;snap();STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
@@ -532,11 +542,12 @@ function openDoc(oi,kind){
     var pfRows='';
     if(weekly){pfRows='<tr><td>Programme fee — weekly (×4 payments)</td><td class="n">'+fmt(plat)+'</td></tr>';}
     else{(o.cars||[]).forEach(function(c){var f=carFee(c,YM);if(f>0)pfRows+='<tr><td>Platform fee — '+esc(c.name||c.plate||'car')+' · '+carDays(c,YM)+'/'+dim(YM)+' days</td><td class="n">'+fmt(f)+'</td></tr>';});if(!pfRows)pfRows='<tr><td>Platform fees</td><td class="n">'+fmt(plat)+'</td></tr>';}
-    var mRowsH=mrows.map(function(x){return '<tr><td>'+esc(x.date)+' · '+esc(carName(o,x.carId))+' — '+esc(x.cat||'Maintenance')+(x.desc?' ('+esc(x.desc)+')':'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('');
-    totVal=r2(plat+mtot);
+    var imr=mrows.filter(function(x){return x.status!=='paid' && !x.stripe_invoice_id;});var imt=r2(imr.reduce(function(a,x){return a+(+x.cost||0);},0));
+    var mRowsH=imr.map(function(x){return '<tr><td>'+esc(x.date)+' · '+esc(carName(o,x.carId))+' — '+esc(x.cat||'Maintenance')+(x.desc?' ('+esc(x.desc)+')':'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('');
+    totVal=r2(plat+imt);
     body='<table class="dtbl"><thead><tr><th>Description</th><th class="n">Amount</th></tr></thead><tbody>'
       +'<tr class="sec"><td colspan="2">Platform fees — '+fmtYM(YM)+'</td></tr>'+pfRows
-      +(mrows.length?'<tr class="sec"><td colspan="2">Fleet maintenance — '+fmtYM(YM)+'</td></tr>'+mRowsH:'')
+      +(imr.length?'<tr class="sec"><td colspan="2">Fleet maintenance — '+fmtYM(YM)+' <span style="font-weight:400">(unpaid only)</span></td></tr>'+mRowsH:'')
       +'</tbody><tfoot><tr><td class="tl">Total due (USD)</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
       +'<div class="dnote">Payment due within 7 days of issue. Amounts in USD. Owner rental earnings are collected in and paid out from the owner\'s own Stripe account; this invoice covers Rent 2 Go platform fees and fleet maintenance for the period only.</div>';
   }else{
