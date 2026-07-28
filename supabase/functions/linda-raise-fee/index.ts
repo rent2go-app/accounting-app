@@ -42,6 +42,21 @@ async function raiseOne(feeIn: any) {
   return { invoice_id: fee.invoice_id, ok: true, stripe_invoice_id: inv.id, status: inv.status };
 }
 
+// finalize a raised draft -> issue + email the customer to pay (never auto-charge) -> mark done
+async function finalizeOne(invoice_id: string) {
+  const rows = await sbGet(`linda_fees?invoice_id=eq.${encodeURIComponent(invoice_id)}&select=invoice_id,account_label,stripe_invoice_id,status`);
+  const fee = rows[0];
+  if (!fee || !fee.stripe_invoice_id) return { invoice_id, error: "no draft to finalize" };
+  if (fee.status === "done") return { invoice_id, already: true };
+  const fkey = keyFor(fee.account_label);
+  if (!fkey) return { invoice_id, error: "no key for " + fee.account_label };
+  const fin = await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/finalize`, new URLSearchParams({ auto_advance: "true" }), fkey);
+  if (fin.error) return { invoice_id, error: fin.error.message || JSON.stringify(fin.error) };
+  await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/send`, new URLSearchParams({}), fkey);
+  await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(invoice_id)}`, { status: "done" });
+  return { invoice_id, ok: true, hosted: fin.hosted_invoice_url };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const auth = (req.headers.get("Authorization") || "").replace("Bearer ", "");
@@ -50,19 +65,18 @@ Deno.serve(async (req) => {
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
     const body = await req.json().catch(() => ({}));
-    // FINALIZE / SEND a raised draft (draft -> issued; charge_automatically attempts the charge)
+    // BULK SEND — finalize + email EVERY raised draft in an account (mirror of {all:true} bulk-raise).
+    if (body.send_all) {
+      const raised = await sbGet(`linda_fees?status=eq.raised${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id`);
+      const results = [];
+      for (const f of raised) results.push(await finalizeOne(f.invoice_id));  // sequential — gentle on Stripe
+      return new Response(JSON.stringify({ ok: true, sent: results.filter((r) => r.ok).length, failed: results.filter((r) => r.error).length, results }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+    // FINALIZE / SEND a single raised draft (draft -> issued -> emailed -> done)
     if (body.finalize && body.invoice_id) {
-      const rows = await sbGet(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}&select=invoice_id,account_label,stripe_invoice_id`);
-      const fee = rows[0];
-      if (!fee || !fee.stripe_invoice_id) return new Response(JSON.stringify({ error: "no draft to finalize for this fee" }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
-      const fkey = keyFor(fee.account_label);
-      const fin = await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/finalize`, new URLSearchParams({ auto_advance: "true" }), fkey);
-      if (fin.error) return new Response(JSON.stringify({ error: fin.error.message || JSON.stringify(fin.error) }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
-      // email the invoice to the customer to pay (send for payment — we never auto-charge)
-      await stripeForm(`https://api.stripe.com/v1/invoices/${fee.stripe_invoice_id}/send`, new URLSearchParams({}), fkey);
-      // sending completes the task — mark done automatically (no manual Done needed)
-      await sbPatch(`linda_fees?invoice_id=eq.${encodeURIComponent(body.invoice_id)}`, { status: "done" });
-      return new Response(JSON.stringify({ ok: true, finalized: true, emailed: true, done: true, status: fin.status, hosted: fin.hosted_invoice_url }), { headers: { ...CORS, "Content-Type": "application/json" } });
+      const r = await finalizeOne(body.invoice_id);
+      if (r.error) return new Response(JSON.stringify({ error: r.error }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, finalized: true, emailed: true, done: true, hosted: r.hosted }), { headers: { ...CORS, "Content-Type": "application/json" } });
     }
     let fees: any[] = [];
     if (body.all) fees = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);

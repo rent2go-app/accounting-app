@@ -63,15 +63,34 @@ async function scanAccount(acc: any) {
   await sbDel(`linda_drafts?${aL}&status=eq.skipped&skipped_at=is.null`);
   const skipset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&status=eq.skipped`)).map((r: any) => r.customer_id));
   const keepset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&or=(sent_at.gte.${enc(midnightISO)},reviewed_at.gte.${enc(midnightISO)})`)).map((r: any) => r.customer_id));
+  // Read EVERY customer's plan flag for this account so the sweep carries it FORWARD verbatim.
+  // on_plan/plan_terms are set by the admin (dashboard toggle) and must survive every upsert —
+  // we re-write them with their existing values so the badge can never flip off on a scan.
+  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null }> = {};
   const planmap: Record<string, string> = {};
-  (await sbGet(`linda_customers?select=customer_id,plan_terms&${aL}&on_plan=eq.true`)).forEach((r: any) => { planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day"; });
+  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms&${aL}`)).forEach((r: any) => {
+    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null };
+    if (r.on_plan) planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day";
+  });
 
   const subs = await stripeAll(`https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.customer`, SKEY);
   const active = subs.filter((s: any) => ["active", "past_due", "unpaid", "trialing"].includes(s.status));
   const custs: any[] = [], drafts: any[] = [], fees: any[] = [], payments: any[] = [];
 
-  await Promise.all(active.map(async (s: any) => {
-    const c = s.customer || {}, cid = c.id, nm = c.name || "(no name)", em = c.email || "", ph = c.phone || "";
+  // WHO to scan = every active-subscription customer PLUS any customer who has open invoices
+  // but no active subscription yet (e.g. a new renter switching cars whose subscription starts
+  // tomorrow but who already has standalone invoices). Standalone invoices must still be billed.
+  const targets = new Map<string, { customer: any; sub_status: string }>();
+  for (const s of active) { const c = s.customer || {}; if (c.id) targets.set(c.id, { customer: c, sub_status: s.status }); }
+  const openInvAll = await stripeAll(`https://api.stripe.com/v1/invoices?status=open&limit=100&expand[]=data.customer`, SKEY);
+  for (const i of openInvAll) {
+    const co = i.customer;
+    const id = typeof co === "string" ? co : (co && co.id);
+    if (id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
+  }
+
+  await Promise.all(Array.from(targets.values()).map(async (t: any) => {
+    const c = t.customer || {}, cid = c.id, nm = c.name || "(no name)", em = c.email || "", ph = c.phone || "", substatus = t.sub_status;
     const allinv = await stripeAll(`https://api.stripe.com/v1/invoices?customer=${cid}&limit=100`, SKEY);
     for (const i of allinv) { if (i.status === "paid") { const pat = i.status_transitions?.paid_at || 0; if (pat && etYMD(pat) === todaystr) payments.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, customer_name: nm, amount: Math.round((i.amount_paid || 0) / 100 * 100) / 100, paid_at: etISO(pat), invoice_number: i.number || i.id, kind: isLateFee(i) ? "latefee" : "rental", updated_at: nowISO }); } }
     const inv = allinv.filter((i: any) => i.status === "open" && (i.amount_remaining || 0) > 0);
@@ -82,7 +101,7 @@ async function scanAccount(acc: any) {
     const latefee_open = inv.filter(isLateFee);
     const unpaid_latefees = latefee_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const pd_total = pdinv.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
-    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: s.status, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, updated_at: nowISO }); return; }
+    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, updated_at: nowISO }); return; }
     // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
     const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
@@ -116,6 +135,7 @@ async function scanAccount(acc: any) {
     parts.push("💰 Total balance: " + m(grandtot));
     const pd_lines = parts.join("\n\n");
     let subj = "", intro = "", closing = "", kind = "reminder", state = "reminder", flag = "none", dnote: string | null = null;
+    let planBehind = false;
     if (planmap[cid]) {
       const terms = planmap[cid];
       if (/per day/i.test(terms)) {
@@ -123,6 +143,7 @@ async function scanAccount(acc: any) {
         const yday = etYMD(now - 86400);
         let yRent = 0, yLF = 0;
         for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (pat && etYMD(pat) === yday) { if (isLateFee(iv)) yLF++; else yRent++; } }
+        planBehind = !(yRent >= 2 && yLF >= 2);   // didn't pay 2 rentals + 2 late fees yesterday → falling behind the plan
         if (yRent >= 2 && yLF >= 2) {
           subj = "Thank you — your Rent 2 Go payment plan is on track";
           intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan — yesterday we received ${yRent} rental payments and ${yLF} late-fee payments, exactly as agreed. To stay on track, today’s step is again ${terms}.`;
@@ -138,11 +159,13 @@ async function scanAccount(acc: any) {
         intro = `Good morning ${nm} 👋\n\nJust a friendly reminder of your agreed payment plan: ${terms}. Every payment brings your balance down — please keep to your plan to stay in good standing.`;
         closing = "Tap Pay now on any invoice above to make a payment toward your plan. If anything has changed, just reply and we'll work with you.";
       }
-      kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
+      // Plan customers are NEVER disconnected, no matter how many invoices are open — but if they
+      // missed yesterday's 2 rentals + 2 late fees, mark them "falling behind their plan" so it's visible.
+      kind = "reminder"; state = planBehind ? "plan_behind" : "plan"; flag = "none"; dnote = null;
     } else if (disc) {
       subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
       intro = `${nm},\n\nThis is a FINAL NOTICE. Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices) and is scheduled for DISCONNECTION today. To keep your vehicle, your account must be brought fully current by 1:00 PM today.`;
-      closing = "If your balance is not cleared by 1:00 PM today, your rental will be disconnected and the vehicle scheduled for recovery. Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reply right away to arrange a payment plan — otherwise recovery will proceed.";
+      closing = "If your balance is not cleared by 1:00 PM today, your rental will be disconnected and the vehicle scheduled for recovery. Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reach out right away to arrange payments or discuss a plan of action — otherwise recovery will proceed.";
       kind = "disconnect"; state = "disconnect"; flag = "disconnect"; dnote = nowISO;
     } else if (rental_pd.length > 0 && pd_total > 250) {
       subj = "Important — your Rent 2 Go account needs prompt attention (" + m(pd_total) + " past due)";
@@ -151,7 +174,7 @@ async function scanAccount(acc: any) {
     } else if (rental_pd.length >= 2) {
       subj = "Your Rent 2 Go account is past due — " + m(pd_total);
       intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} days${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}). Please cure your balance by 1:00 PM today, or reach out so we can discuss a way forward.`;
-      closing = "Tap Pay now on any invoice above to settle. If you need a little more time, just reply — we're glad to work out a plan with you.";
+      closing = "Tap Pay now on any invoice above to settle. If you can't clear it today, reach out right away to arrange payments or discuss a plan of action.";
     } else if (rental_pd.length > 0) {
       subj = "A reminder about your Rent 2 Go balance — " + m(pd_total) + " past due";
       intro = `Good morning ${nm} 👋\n\nJust a quick reminder that ${m(pd_total)} is now past due on your rental. Settling it today keeps everything active and in good standing.`;
@@ -167,7 +190,7 @@ async function scanAccount(acc: any) {
     }
     const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you so much for your urgent attention to this matter.\n\nRent 2 Go" + FOOTER;
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
-    custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: s.status, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, updated_at: nowISO });
+    custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, updated_at: nowISO });
   }));
 
   if (custs.length) await sbPost(`linda_customers?on_conflict=account_label,customer_id`, custs, "resolution=merge-duplicates,return=minimal");

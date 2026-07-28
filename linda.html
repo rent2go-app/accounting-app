@@ -75,7 +75,6 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .acctfresh b{color:var(--text)}
 .acctfresh.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out);border:1px solid var(--out)}
 .acctfresh.stale b{color:var(--out)}
-.acctfresh .aud2{margin-left:auto}
 .acctbody{padding:0 16px 14px}
 .asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
@@ -144,6 +143,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .status.skipped{background:var(--surface-2);color:var(--muted)}
 .status.reviewed{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
 .status.plan{background:color-mix(in srgb,#0d9488 16%,var(--surface));color:#0d9488}
+.status.plan.behind{background:color-mix(in srgb,#eab54e 24%,var(--surface));color:#8a6516}
 .status.raised{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
 .ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
 .ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -339,7 +339,7 @@ function render(){
     var ameta=ACCTMETA.find(function(a){return a.label===acc;});var asc=ameta&&ameta.scanned_at;
     pills+='<span class="apill'+(isStale(asc)?' red':'')+'" title="When this fleet\'s data was last pulled from Stripe">🕒 '+agoText(asc)+(isStale(asc)?' — stale, tap Audit Sweep':'')+'</span>';
     var openAttr=(toSend>0||af.length>0)?' open':'';  // auto-open accounts that still need action
-    var freshLine='<div class="acctfresh'+(isStale(asc)?' stale':'')+'">🕒 Records last pulled for this fleet: <b>'+(asc?shortET(asc)+' ET':'never')+'</b> ('+agoText(asc)+')'+(isStale(asc)?' — may be missing today\'s new invoices, tap 🔄 Audit Sweep':'')+' <button class="btn small aud2" data-auditacct="'+esc(acc)+'">🔄 Audit Sweep</button></div>';
+    var freshLine='<div class="acctfresh'+(isStale(asc)?' stale':'')+'">🕒 Records last pulled for this fleet: <b>'+(asc?shortET(asc)+' ET':'never')+'</b> ('+agoText(asc)+')'+(isStale(asc)?' — may be missing today\'s new invoices, tap 🔄 Audit Sweep above':'')+'</div>';
     return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody">'+freshLine+flagsH+draftsH+'</div></details>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
   renderSkipped();
@@ -371,8 +371,9 @@ function draftCard(d){
   var isSent=d.status==='sent';
   var cust=CUSTS.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);
   var onPlan=!!(cust&&cust.on_plan);
+  var planBehind=!!(cust&&cust.state==='plan_behind');
   var chips='';
-  if(onPlan)chips+='<span class="status plan">📋 payment plan</span>';
+  if(onPlan)chips+='<span class="status plan'+(planBehind?' behind':'')+'" title="'+(planBehind?'Missed yesterday’s 2 rentals + 2 late fees — falling behind the plan':'On a payment plan — never disconnected')+'">📋 '+(planBehind?'plan · ⚠ behind':'payment plan')+'</span>';
   if(d.reviewed_at&&!isSent)chips+='<span class="status reviewed">✓ reviewed</span>';
   if(isSent)chips+='<span class="status sent">✅ sent'+(d.sent_at?' · '+shortET(d.sent_at):'')+'</span>';
   return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+(isSent?' done':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+chips+'<span class="amt">'+fmt(d.amount)+'</span></div>'
@@ -457,6 +458,17 @@ async function raiseAllFees(btn,acc){
     toast('Raised '+((r.data&&r.data.raised)||0)+' draft invoice(s) ✓'+((r.data&&r.data.failed)?' · '+r.data.failed+' failed':''));await load();
   }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
+async function sendAllFees(btn,acc){
+  var list=(acc?FEES.filter(function(f){return f.account_label===acc;}):FEES).filter(function(f){return f.status==='raised';});
+  if(!list.length){alert('No raised drafts to send.');return;}
+  if(!confirm('Finalize & EMAIL '+list.length+' raised late-fee invoice(s)'+(acc?' for '+acc:'')+' to the customers to pay?\n\nEach is emailed a Stripe invoice — never auto-charged. This cannot be undone.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Sending '+list.length+'…';
+  try{
+    var r=await sb.functions.invoke('linda-raise-fee',{body:acc?{send_all:true,account_label:acc}:{send_all:true}});
+    if(r.error)throw r.error;
+    toast('Emailed '+((r.data&&r.data.sent)||0)+' invoice(s) ✓'+((r.data&&r.data.failed)?' · '+r.data.failed+' failed':''));await load();
+  }catch(e){alert('Send failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+}
 // 🧪 TEST EMAIL BUTTON — remove after email delivery is confirmed
 async function sendTestNotice(btn){
   var to=prompt('Send a TEST notice email to which address?\n(Domain is verified — any address works now.)','gorentaride@gmail.com');
@@ -488,6 +500,7 @@ function renderFeeLedger(){
   var groups=Object.keys(byAcc).sort().map(function(acc){
     var fs=byAcc[acc].slice().sort(function(a,b){return (nameOf[a.account_label+'|'+a.customer_id]||'')<(nameOf[b.account_label+'|'+b.customer_id]||'')?-1:1;});
     var np=fs.filter(function(f){return f.status==='proposed';}).length;
+    var nr=fs.filter(function(f){return f.status==='raised';}).length;
     var frows=fs.map(function(f){
       var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
       var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
@@ -499,7 +512,8 @@ function renderFeeLedger(){
         +(f.status==='proposed'&&f.memo?'<tr class="memorow"><td colspan="4">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
     }).join('');
     return '<div class="feegrp"><div class="feegrphd">🏦 '+esc(acc)+' <span class="feegrpt">'+fs.length+' fee'+(fs.length===1?'':'s')+'</span>'
-      +(np?'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create all '+np+' proposed as DRAFT invoices for this fleet">📝 Raise all '+np+' in this fleet</button>':'')+'</div>'
+      +(np?'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create all '+np+' proposed as DRAFT invoices for this fleet">📝 Raise all '+np+' in this fleet</button>':'')
+      +(nr?' <button class="btn small ok" data-sendallacct="'+esc(acc)+'" title="Finalize &amp; email all '+nr+' raised draft(s) to customers to pay (never auto-charged)">📧 Send all '+nr+' raised in this fleet</button>':'')+'</div>'
       +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Attached to rental invoice</td><td>Fee</td><td>Action</td></tr>'+frows+'</table></div>';
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
@@ -637,6 +651,7 @@ function wire(){
   document.querySelectorAll('[data-sendfee]').forEach(b=>b.onclick=()=>sendFee(b.dataset.sendfee,b));
   document.querySelectorAll('[data-raisefee]').forEach(b=>b.onclick=()=>raiseFee(b.dataset.raisefee,b));
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
+  document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
