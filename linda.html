@@ -181,6 +181,12 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .gpsok{font-weight:700;color:var(--in)}
 .gpsdry{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:0 0 10px}
+.vmacct{border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:2px 10px}
+.vmacct>summary{cursor:pointer;font-weight:700;font-size:13px;padding:7px 0}
+.vmrow{padding:7px 0;border-top:1px solid var(--line)}
+.vmrow:first-of-type{border-top:none}
+.vmname{font-weight:700;font-size:13px;display:block;margin-bottom:2px}
+.vmrow .gpsrow{margin-top:4px;padding-top:4px;border-top:none}
 .discwrap.plans .disccard.active{border-left-color:#eab54e;background:color-mix(in srgb,#eab54e 8%,var(--surface))}
 .planterms{font-weight:700;color:var(--text)}
 .btn.small.danger{background:var(--out);color:#fff;border-color:var(--out)}
@@ -256,6 +262,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="cards" id="lsum"></div>
 <div id="ldisc"></div>
 <div id="lplans"></div>
+<div id="lvmap"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div id="laccounts"></div>
@@ -360,8 +367,10 @@ function render(){
     card(CIC.cash,'Outstanding',fmt(out),topAcct?('biggest: <b>'+esc(topAcct)+'</b> '+fmt(byAcctOut[topAcct])):'all clear 🎉','')+
     card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
+  GPSROWS=[];
   renderDisconnections();
   renderPlans();
+  renderVehicleMap();
   renderFeeLedger();
   renderPaid();
   renderOutstanding();
@@ -575,15 +584,15 @@ async function setDisc(c,patch){
   if(r.error){alert('Could not save: '+r.error.message);return;}
   toast('Saved ✓');await load();
 }
-var GPSDEV={}; var GPS_DRYRUN=true;
+var GPSDEV={}; var GPS_DRYRUN=true; var GPSROWS=[];
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function loadGpsDevices(acc){if(GPSDEV[acc])return GPSDEV[acc];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[acc]=d.devices||[];return GPSDEV[acc];}
-async function gpsLoad(i){var c=DISCROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
-async function gpsLink(i){var c=DISCROWS[i];var sel=document.getElementById('gpssel'+i);var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
-async function gpsUnlink(i){var c=DISCROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
+async function gpsLoad(i){var c=GPSROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
+async function gpsLink(i){var c=GPSROWS[i];var sel=document.getElementById('gpssel'+i);var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
+async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
 function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open map</a>':'')+'</div>'+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
-async function gpsTrack(i){var c=DISCROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
-async function gpsSend(i,kind){var c=DISCROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
+async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
+async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
 async function gpsCommand(c,kind){
   if(!c.sarekon_device_id)return null;
   var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';
@@ -591,7 +600,7 @@ async function gpsCommand(c,kind){
   try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});toast(d.dry_run?('DRY-RUN: would '+kind):(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:'')));return d;}
   catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
 }
-function gpsRow(c,i){
+function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
   if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
   var devs=GPSDEV[c.account_label];
   if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">to track / disable / enable the starter</span></div>';}
@@ -632,7 +641,7 @@ function renderDisconnections(){
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
         +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button></div>'
-        +gpsRow(c,i)
+        +gpsRow(c)
       +'</div></div>';
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
@@ -679,6 +688,21 @@ function renderPlans(){
   el.innerHTML='<details class="discwrap plans"><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Linda checks each plan daily. <b>On track</b> = yesterday\'s agreed payments came in. <b>Behind</b> = they didn\'t — the notice warns them, and you can recommend disconnection.</p>'
     +cards+'</details>';
+}
+function renderVehicleMap(){
+  var el=document.getElementById('lvmap'); if(!el) return;
+  var byAcc={}; CUSTS.forEach(function(c){ if(c.sub_status==='no_subscription' && !c.sarekon_device_id) return; (byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c); });
+  var accs=Object.keys(byAcc).sort();
+  if(!accs.length){ el.innerHTML=''; return; }
+  var linked=CUSTS.filter(function(c){return c.sarekon_device_id;}).length;
+  var groups=accs.map(function(acc){
+    var rows=byAcc[acc].slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(c){
+      return '<div class="vmrow"><span class="vmname">'+esc(c.name)+'</span>'+gpsRow(c)+'</div>';
+    }).join('');
+    return '<details class="vmacct"><summary>'+esc(acc)+' <span class="hint">('+byAcc[acc].length+')</span></summary>'+rows+'</details>';
+  }).join('');
+  el.innerHTML='<details class="discwrap"><summary>\uD83D\uDE97 Vehicle Mapping (GPS) \u2014 <b>'+linked+'</b> of '+CUSTS.length+' linked</summary>'
+    +'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
 }
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
