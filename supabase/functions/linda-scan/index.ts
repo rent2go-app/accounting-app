@@ -38,7 +38,11 @@ async function stripeAll(base: string, key: string) { let out: any[] = [], sa: s
 
 // A $10 invoice is a late fee (rentals are ~$70+). Description text varies ("late fee", "Past Due", etc.) so amount is the reliable signal.
 function isLateFee(i: any) { return i.amount_due === 1000; }
-function isPastDue(i: any) { const dd = i.due_date; return dd ? (dd < now) : ((now - (i.created || now)) > 86400); }
+function isPastDue(i: any) {
+  // Late fees are due the SAME day they're raised → past due once created before today (ignore a stray future due date).
+  if (isLateFee(i)) return (i.due_date && i.due_date < now) || (etYMD(i.created || now) < todaystr);
+  const dd = i.due_date; return dd ? (dd < now) : ((now - (i.created || now)) > 86400);
+}
 function cleanlbl(s: string) { s = (s || "Rental").trim(); if (s.includes("×")) s = s.split("×")[1].trim(); const p = s.indexOf("(at "); if (p > 0) s = s.slice(0, p).trim(); return s; }
 function invline(i: any, icon: string) { const lbl = isLateFee(i) ? "Late fee" : cleanlbl((i.lines?.data || [{}])[0]?.description || i.description || "Rental"); const gen = i.created ? etMD(i.created) : "—"; const url = i.hosted_invoice_url || ""; return `${icon} ${gen} · ${lbl.slice(0, 34)} · ${m((i.amount_remaining || 0) / 100)}${url ? ` · [Pay now](${url})` : ""}`; }
 function footer(portal: string) { return portal ? `\n\n💳 Manage & pay anytime in your [Customer Portal](${portal}) — sign in with your email on file.` : `\n\nManage & pay from your customer portal — sign in with your email on file.`; }

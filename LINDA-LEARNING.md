@@ -26,7 +26,8 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **One $10 fee PER CUSTOMER, for the LATEST past-due rental only** (latest by **due date**). Do **not** bill one-per-rental and do **not** back-bill older past-due days ("we only bill one for the latest one").
 - **A rental's late fee is raised the DAY AFTER it goes past due**, so an existing fee for a rental lands on **due_date + 1** (not the due date). When de-duping, check for an existing late fee created on **due+1 / due+2** — NOT the due date. (Comparing to the due date wrongly treats yesterday's rental's fee as covering today's rental, skipping a fee that's genuinely owed.)
 - **Never** charge a fee on a late-fee invoice (no fee-on-fee). One fee per rental, once.
-- **Fees are `send_invoice`** (customer is **emailed** an invoice to pay, 7-day due) — **NEVER `charge_automatically`**. R2G does not pull customer cards; customers pay the emailed invoice.
+- **Fees are `send_invoice`** (customer is **emailed** an invoice to pay) — **NEVER `charge_automatically`**. R2G does not pull customer cards; customers pay the emailed invoice.
+- **Late fees are due the SAME day** they're raised (`days_until_due = 0`). An unpaid late fee is **past due the next day** — treat a late fee as past due once it was **created before today** (don't let a stray future due date make it read as "current").
 - Each $10 fee is **attached to the specific rental invoice** that triggered it, with a clean memo (vehicle + invoice + date; strip the raw "N × … (at $/day)" formatting).
 
 **Reminders**
@@ -73,6 +74,11 @@ canonical rules she follows, and a dated log of every mistake made + how it was 
 - **Verbose late-fee memo leaked raw Stripe line** ("1 × NISSAN SENTRA (at $72.55/day)"). → Fix: clean memo (vehicle + invoice + date), strip the "N × … (at $/day)" formatting.
 - **`toast()` undefined in the dashboard** — Raise/Send/Test succeeded server-side but threw a false "failed" afterward. → Fix: define `toast()`. Also **`todayET()` was undefined in owners.html**, and the Fleet-Financials code threw and **blanked every owner block** → Fix: define the helper; runtime-test, not just syntax-check.
 - **Fleet Financials showed the same car twice when it changed hands mid-month**, with a false "21 days no payment" flag on the earlier renter. → Fix: **merge by car** (overlap renters into one block); compute the no-payment gap on the combined timeline.
+
+### 2026-07-28
+- **Raised $10 late fees had a 7-day due date, so they read as "current / not yet late"** instead of past due — notices were wrong. → Fix: (a) raise late fees with **`days_until_due = 0`** (due the SAME day, `send_invoice`, still emailed not auto-charged); (b) treat a **late fee as past due once it was created before today** (ignore a stray future due date) — late fees are due same-day, so an unpaid one from yesterday is late today.
+- **Payment plans are not one-size-fits-all.** Some are the daily "2 rentals + 2 late fees per day" catch-up (verify yesterday's payments); others are custom, e.g. "clear $246 before 1 August" (Penny). → Fix: detect plan type from `plan_terms` ("per day" → daily 2+2 check; otherwise → reference the agreed terms, no daily check).
+- **Don't threaten disconnection/vehicle recovery for everyone behind.** Newly behind (2 days) should read "please cure your balance by 1 PM today, or reach out to discuss a way forward." Reserve the FINAL-NOTICE disconnect + recovery language for the actual disconnection tier (≥3 past-due rentals).
 
 <!-- Append new mistakes above this line, newest date first. Format:
 ### YYYY-MM-DD

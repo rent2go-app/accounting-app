@@ -24,9 +24,10 @@ async function raiseOne(feeIn: any) {
   if (!key) return { invoice_id: fee.invoice_id, error: "no key for " + fee.account_label };
   if (!fee.customer_id) return { invoice_id: fee.invoice_id, error: "no customer_id" };
   // 1) create an empty DRAFT invoice (exclude other pending items so only our $10 lands on it)
-  // collection_method=send_invoice → customer is EMAILED an invoice to pay; we never auto-pull their card
+  // collection_method=send_invoice → customer is EMAILED an invoice to pay; we never auto-pull their card.
+  // days_until_due=0 → due the SAME day it's finalized (a late fee is payable immediately, not in a week).
   const inv = await stripeForm("https://api.stripe.com/v1/invoices", new URLSearchParams({
-    customer: fee.customer_id, auto_advance: "false", collection_method: "send_invoice", days_until_due: "7",
+    customer: fee.customer_id, auto_advance: "false", collection_method: "send_invoice", days_until_due: "0",
     pending_invoice_items_behavior: "exclude", description: "Late fee", "metadata[linda_late_fee]": "true",
   }), key);
   if (inv.error) return { invoice_id: fee.invoice_id, error: inv.error.message || JSON.stringify(inv.error) };
