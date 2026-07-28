@@ -67,10 +67,10 @@ async function scanAccount(acc: any) {
   // Read EVERY customer's plan flag for this account so the sweep carries it FORWARD verbatim.
   // on_plan/plan_terms are set by the admin (dashboard toggle) and must survive every upsert —
   // we re-write them with their existing values so the badge can never flip off on a scan.
-  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null }> = {};
+  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null; plan_behind_days: number; plan_last_behind_day: string | null }> = {};
   const planmap: Record<string, string> = {};
-  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms&${aL}`)).forEach((r: any) => {
-    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null };
+  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms,plan_behind_days,plan_last_behind_day&${aL}`)).forEach((r: any) => {
+    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null, plan_behind_days: r.plan_behind_days || 0, plan_last_behind_day: r.plan_last_behind_day || null };
     if (r.on_plan) planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day";
   });
 
@@ -110,7 +110,7 @@ async function scanAccount(acc: any) {
     const latefee_open = inv.filter(isLateFee);
     const unpaid_latefees = latefee_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const pd_total = pdinv.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
-    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, updated_at: nowISO }); return; }
+    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, plan_behind_days: 0, plan_last_behind_day: null, updated_at: nowISO }); return; }
     // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
     const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
@@ -133,9 +133,30 @@ async function scanAccount(acc: any) {
     //  (b) $70+ in open late fees AND 2+ past-due rentals.
     // (Requiring 2+ past due avoids disconnecting a brand-new renter whose open rentals are all still current.)
     const open_rentals = inv.filter((i: any) => !isLateFee(i));   // all unpaid rentals: past-due + current
-    // Plan customers are NEVER auto-disconnected here — even if behind, disconnection is a MANUAL
-    // recommendation (admin removes them from the plan in the dashboard, which then lets them auto-flag).
-    const disc = !planmap[cid] && ((open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2));
+
+    // ── PLAN ADHERENCE (computed for every plan customer) ──────────────────────────────
+    // What did they actually pay yesterday? (rentals + late fees). Judge on-track vs behind, and keep a
+    // consecutive-days-behind streak. On track never disconnects; 3 days behind in a row auto-returns
+    // them to the disconnection list (on_plan cleared). A single behind day is a MANUAL recommendation.
+    const yday = etYMD(now - 86400);
+    let planPaidR = 0, planPaidLF = 0;
+    for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (pat && etYMD(pat) === yday) { if (isLateFee(iv)) planPaidLF++; else planPaidR++; } }
+    let onPlan = !!planmap[cid];
+    let planBehind = false;
+    const prevPlan = planExisting[cid] || { plan_behind_days: 0, plan_last_behind_day: null };
+    let behindDays = prevPlan.plan_behind_days || 0;
+    let lastBehindDay = prevPlan.plan_last_behind_day || null;
+    if (onPlan) {
+      const isDaily = /per day/i.test(planmap[cid]);
+      planBehind = isDaily ? !(planPaidR >= 2 && planPaidLF >= 2) : (rental_pd.length >= 2);
+      if (planBehind) { if (lastBehindDay !== todaystr) { behindDays = behindDays + 1; lastBehindDay = todaystr; } }
+      else { behindDays = 0; lastBehindDay = null; }
+      if (behindDays >= 3) onPlan = false;   // 3 strikes → back on the disconnection list
+    } else { behindDays = 0; lastBehindDay = null; }
+
+    // Plan customers on track/behind are NOT auto-disconnected (disconnection stays a manual call) —
+    // UNLESS the 3-day streak above cleared onPlan, in which case normal disc logic applies.
+    const disc = !onPlan && ((open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2));
     const current_open = inv.filter((i: any) => !isPastDue(i));
     const current_amt = current_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const grandtot = Math.round((pd_total + current_amt) * 100) / 100;
@@ -151,39 +172,20 @@ async function scanAccount(acc: any) {
     parts.push("💰 Total balance: " + m(grandtot));
     const pd_lines = parts.join("\n\n");
     let subj = "", intro = "", closing = "", kind = "reminder", state = "reminder", flag = "none", dnote: string | null = null;
-    let planBehind = false;
-    if (planmap[cid]) {
+    if (onPlan) {
       const terms = planmap[cid];
-      if (/per day/i.test(terms)) {
-        // daily catch-up plan — verify yesterday's 2 rentals + 2 late fees
-        const yday = etYMD(now - 86400);
-        let yRent = 0, yLF = 0;
-        for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (pat && etYMD(pat) === yday) { if (isLateFee(iv)) yLF++; else yRent++; } }
-        planBehind = !(yRent >= 2 && yLF >= 2);   // didn't pay 2 rentals + 2 late fees yesterday → falling behind the plan
-        if (yRent >= 2 && yLF >= 2) {
-          subj = "Thank you — your Rent 2 Go payment plan is on track";
-          intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan — yesterday we received ${yRent} rental payments and ${yLF} late-fee payments, exactly as agreed. To stay on track, today’s step is again ${terms}.`;
-          closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
-        } else {
-          subj = "⚠ Your Rent 2 Go payment plan — you've fallen behind";
-          intro = `Good morning ${nm},\n\nYour payment plan is ${terms}. Yesterday we received ${yRent} rental payment${yRent === 1 ? "" : "s"} and ${yLF} late-fee payment${yLF === 1 ? "" : "s"} — short of your agreed plan, so you have fallen behind. It's important that you catch up today to stay on your plan and in good standing.`;
-          closing = "Please tap Pay now on the invoices above to bring your plan back on track today. If you don't get back on track, your account may be recommended for disconnection. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
-        }
+      const isDaily = /per day/i.test(terms);
+      const paidLine = `Yesterday you paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}${isDaily ? " (your plan asks for 2 of each per day)" : ""}.`;
+      const STRIKES = "Continued failure to stay on plan 3 days in a row will place you back on the disconnection list. Please resume the plan as promised.";
+      if (!planBehind) {
+        subj = "Thank you — your Rent 2 Go payment plan is on track";
+        intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
+        closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
       } else {
-        // custom plan (e.g. clear a balance by a date) — on track vs behind is judged on whether the past-due is growing
-        planBehind = rental_pd.length >= 2;   // multiple past-due rentals while on a custom plan → falling behind
-        if (planBehind) {
-          subj = "⚠ Your Rent 2 Go payment plan — you're falling behind";
-          intro = `Good morning ${nm},\n\nYour agreed payment plan is: ${terms}. Your past-due balance is growing (${rental_pd.length} past-due rentals), which means you're falling behind your plan. Please catch up today to stay in good standing.`;
-          closing = "Please tap Pay now on any invoice above to get back on plan today. If you don't, your account may be recommended for disconnection. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
-        } else {
-          subj = "Your Rent 2 Go payment plan — a friendly reminder";
-          intro = `Good morning ${nm} 👋\n\nJust a friendly reminder of your agreed payment plan: ${terms}. Every payment brings your balance down — please keep to your plan to stay in good standing.`;
-          closing = "Tap Pay now on any invoice above to make a payment toward your plan. If anything has changed, just reply and we'll work with you.";
-        }
+        subj = "⚠ Your Rent 2 Go payment plan — you've fallen behind";
+        intro = `Good morning ${nm},\n\nYour payment plan is: ${terms}. ${paidLine} That is short of your agreed plan, so you have fallen behind${behindDays > 1 ? ` — this is day ${behindDays} in a row` : ""}. It's important that you catch up today to stay on your plan and in good standing.`;
+        closing = "Please tap Pay now on the invoices above to bring your plan back on track today. If you don't get back on track, your account may be recommended for disconnection. " + STRIKES + " If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
       }
-      // Plan customers are NEVER disconnected, no matter how many invoices are open — but if they
-      // missed yesterday's 2 rentals + 2 late fees, mark them "falling behind their plan" so it's visible.
       kind = "reminder"; state = planBehind ? "plan_behind" : "plan"; flag = "none"; dnote = null;
     } else if (disc) {
       subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
@@ -214,10 +216,10 @@ async function scanAccount(acc: any) {
     // Whenever there are past-due RENTALS, remind them a $10 late fee applies and to settle ASAP to
     // avoid further penalties / service interruption. Skip for disconnect (its own stronger language)
     // and for plan customers (they're on an agreed catch-up plan).
-    if (rental_pd.length > 0 && kind !== "disconnect" && !planmap[cid]) closing = closing + " " + LATEFEE_NOTE;
+    if (rental_pd.length > 0 && kind !== "disconnect" && !onPlan) closing = closing + " " + LATEFEE_NOTE;
     const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you so much for your urgent attention to this matter.\n\nRent 2 Go" + FOOTER;
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
-    custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, updated_at: nowISO });
+    custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: onPlan, plan_terms: onPlan ? (planExisting[cid] && planExisting[cid].plan_terms) : null, plan_paid_rentals: planPaidR, plan_paid_latefees: planPaidLF, plan_behind_days: behindDays, plan_last_behind_day: lastBehindDay, updated_at: nowISO });
   }));
 
   if (custs.length) await sbPost(`linda_customers?on_conflict=account_label,customer_id`, custs, "resolution=merge-duplicates,return=minimal");

@@ -173,6 +173,9 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .discwrap.plans .disccard.active{border-left-color:#eab54e;background:color-mix(in srgb,#eab54e 8%,var(--surface))}
 .planterms{font-weight:700;color:var(--text)}
 .btn.small.danger{background:var(--out);color:#fff;border-color:var(--out)}
+.planflag{background:#7a5cff;color:#fff;font-weight:800;font-size:12.5px;padding:8px 12px;border-radius:8px;margin:6px 0 9px;letter-spacing:.3px}
+.planflag.big{font-size:13.5px;margin:8px 0}
+.discwrap.plans .disccard.behind{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 8%,var(--surface))}
 .dchecks{display:flex;flex-direction:column;gap:7px}
 .dchk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .dchk input{width:16px;height:16px;accent-color:var(--out)}
@@ -622,11 +625,17 @@ function renderPlans(){
   var behindN=PLANROWS.filter(function(c){return c.state==='plan_behind';}).length;
   var cards=PLANROWS.map(function(c,i){
     var behind=c.state==='plan_behind';
-    var badge=behind?'<span class="dbadge warn">⚠ BEHIND PLAN — can be recommended for disconnection</span>':'<span class="dbadge on">🟢 ON TRACK</span>';
-    return '<div class="disccard'+(behind?' active':' restored')+'">'
+    var pr=(c.plan_paid_rentals==null?'—':c.plan_paid_rentals),pl=(c.plan_paid_latefees==null?'—':c.plan_paid_latefees);
+    var didAny=(c.plan_paid_rentals>0||c.plan_paid_latefees>0);
+    var streak=c.plan_behind_days||0;
+    var badge=behind?'<span class="dbadge grace">⚑ BEHIND PLAN'+(streak>1?' · '+streak+' days in a row':'')+'</span>':'<span class="dbadge on">🟢 ON TRACK</span>';
+    var flag=behind?'<div class="planflag">⚑ FELL BEHIND THE PAYMENT PLAN'+(streak>=3?' — 3+ DAYS: back on disconnection list':streak>1?' — day '+streak+' in a row':'')+'</div>':'';
+    return '<div class="disccard plan'+(behind?' behind':' restored')+'">'
       +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
+      +flag
       +'<div class="dchecks">'
         +'<div class="dact"><span class="dlbl">Plan terms:</span> <span class="planterms">'+esc(c.plan_terms||'—')+'</span> <button class="btn small" data-planterms="'+i+'">✏️ Edit</button></div>'
+        +'<div class="dact"><span class="dlbl">Paid yesterday:</span> <b class="'+(didAny?'pos':'red')+'">'+pr+' rental'+(pr===1?'':'s')+' + '+pl+' late fee'+(pl===1?'':'s')+'</b> '+(didAny?'<span class="hint">(did part of the plan)</span>':'<span class="hint red">(no plan payment at all)</span>')+'</div>'
         +'<div class="dact"><span class="dlbl">Adherence:</span> '+(behind?'<b class="red">Fell behind yesterday\'s agreed payments — Linda is watching.</b>':'<b class="pos">Keeping to plan (yesterday\'s payments received).</b>')+'</div>'
         +(c.plan_note?'<div class="dact"><span class="dlbl">Note:</span> '+esc(c.plan_note)+(c.plan_contacted_at?' <span class="dts">'+shortET(c.plan_contacted_at)+' ET</span>':'')+'</div>':'')
         +'<div class="dact"><button class="btn small" data-plancontact="'+i+'">📝 Log contact / note</button> <button class="btn small" data-planremove="'+i+'">Remove from plan</button>'+(behind?' <button class="btn small danger" data-planrecdisc="'+i+'">🔴 Recommend for disconnection</button>':'')+'</div>'
