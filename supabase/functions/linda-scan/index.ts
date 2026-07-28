@@ -81,17 +81,19 @@ async function scanAccount(acc: any) {
   // chase the historical open-invoice backlog (old/canceled renters with lingering unpaid invoices).
   const targets = new Map<string, { customer: any; sub_status: string }>();
   for (const s of active) { const c = s.customer || {}; if (c.id) targets.set(c.id, { customer: c, sub_status: s.status }); }
-  // TEMPORARY EXCEPTION (JJM only, today): a new renter switched cars into JJM and already has a
-  // brand-new standalone invoice, but the subscription starts tomorrow. Pull ONLY this-cycle standalone
-  // invoices for JJM so that customer is billed today. Remove this block once the subscription is live.
+  // TEMPORARY EXCEPTION (JJM only, today): ONE specific renter — Penny Mitchell — switched cars into
+  // JJM and already has standalone invoices, but her subscription starts tomorrow. Include ONLY her,
+  // by customer id / email — NOT every standalone customer (that wrongly pulled in ended-subscription
+  // renters like Cordell). Remove this whole block once Penny's subscription goes live.
   if (LABEL === "RENT 2 GO JJMusa") {
-    const RECENT_CUT = now - 10 * 86400;   // brand-new only (current cycle), never the backlog
+    const PENNY_ID = "cus_UxzNqzVmRub6bS", PENNY_EMAIL = "mitchellpenny746@gmail.com";
     const openInvAll = await stripeAll(`https://api.stripe.com/v1/invoices?status=open&limit=100&expand[]=data.customer`, SKEY);
     for (const i of openInvAll) {
-      if ((i.created || 0) < RECENT_CUT) continue;
       const co = i.customer;
       const id = typeof co === "string" ? co : (co && co.id);
-      if (id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
+      const em = (co && typeof co === "object") ? (co.email || "") : "";
+      const isPenny = id === PENNY_ID || (em && em.toLowerCase() === PENNY_EMAIL);
+      if (isPenny && id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
     }
   }
 
