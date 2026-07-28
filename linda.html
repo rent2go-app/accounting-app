@@ -181,6 +181,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .gpsok{font-weight:700;color:var(--in)}
 .gpsdry{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:0 0 10px}
+.gpsdry:has(input:not(:checked)){color:var(--out);font-weight:700}
 .vmacct{border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:2px 10px}
 .vmacct>summary{cursor:pointer;font-weight:700;font-size:13px;padding:7px 0}
 .vmrow{padding:7px 0;border-top:1px solid var(--line)}
@@ -648,7 +649,7 @@ function renderDisconnections(){
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
-    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<label class="gpsdry"><input type="checkbox" id="gpsdry"'+(GPS_DRYRUN?' checked':'')+'> GPS dry-run (safe) - uncheck to actually disable/enable a car</label>'
+    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<label class="gpsdry"><input type="checkbox" class="gpsdrychk"'+(GPS_DRYRUN?' checked':'')+'> \uD83E\uDDEA GPS dry-run (safe) \u2014 UNCHECK to actually disable/enable a car</label>'
     +cards+'</details>';
 }
 // ── PAYMENT PLAN MODULE ──────────────────────────────────────────────────────────────
@@ -704,7 +705,7 @@ function renderVehicleMap(){
     return '<details class="vmacct"><summary>'+esc(acc)+' <span class="hint">('+byAcc[acc].length+')</span></summary>'+rows+'</details>';
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>\uD83D\uDE97 Vehicle Mapping (GPS) \u2014 <b>'+linked+'</b> of '+CUSTS.length+' linked</summary>'
-    +'<button class="btn small pri" data-gpsloadall="1" style="margin:8px 0">\uD83D\uDE97 Load all cars (both accounts)</button>'+'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
+    +'<button class="btn small pri" data-gpsloadall="1" style="margin:8px 0">\uD83D\uDE97 Load all cars (both accounts)</button>'+'<label class="gpsdry"><input type="checkbox" class="gpsdrychk"'+(GPS_DRYRUN?' checked':'')+'> \uD83E\uDDEA GPS dry-run (safe) \u2014 UNCHECK to actually disable/enable a car</label>'+'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
 }
 function renderFeeLedger(){
   var el=document.getElementById('lfeeledger');if(!el)return;
@@ -902,7 +903,7 @@ function wire(){
   document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
   document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
   document.querySelectorAll('[data-gpsenable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsenable,'enable'));
-  var gd=document.getElementById('gpsdry');if(gd)gd.onchange=function(){GPS_DRYRUN=gd.checked;};
+  document.querySelectorAll('.gpsdrychk').forEach(function(cb){cb.onchange=function(){GPS_DRYRUN=cb.checked;document.querySelectorAll('.gpsdrychk').forEach(function(x){x.checked=GPS_DRYRUN;});};});
   document.querySelectorAll('[data-planterms]').forEach(b=>b.onclick=()=>editPlanTerms(b.dataset.planterms));
   document.querySelectorAll('[data-plancontact]').forEach(b=>b.onclick=()=>markPlanContacted(b.dataset.plancontact));
   document.querySelectorAll('[data-planremove]').forEach(b=>b.onclick=()=>removePlan(b.dataset.planremove));
