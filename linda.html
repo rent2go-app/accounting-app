@@ -156,6 +156,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .briefts{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0}
 .briefday{margin-top:8px;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.5}
 .briefday b.pos{color:var(--in)}.briefday b.red{color:var(--out)}
+.stalewarn{margin-top:8px;background:color-mix(in srgb,var(--out) 12%,var(--surface));border:1px solid var(--out);color:var(--out);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:700}
 .briefpills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .briefpills .pill{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
 .briefpills .pill b{color:var(--text)}
@@ -185,7 +186,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
     <h1 id="greeting">Hello 👋</h1>
     <p class="herosub">I'm Linda. Here's what needs your attention today.</p>
     <div id="heroBubble"></div>
-    <div class="dryrun">🧪 Dry run — nothing is charged or emailed until you approve &amp; send. (Customer email needs rentaride2go.com verified in Resend.)</div>
+    <div class="dryrun">✅ Email live from billing@rentaride2go.com · late fees are emailed to pay, never auto-charged. Nothing goes to a customer until you 📧 Send or 📋 Copy.</div>
   </div>
 </div>
 <div class="reauditbar"><button class="btn pri big" id="reaudit">🔄 RE-AUDIT — sweep all accounts for payments &amp; updates</button><button class="btn big" id="testNotice" title="Send a TEST notice email to yourself">🧪 Send test email</button><span class="hint" id="lastscan"></span></div>
@@ -299,6 +300,7 @@ function render(){
   var lsEl=document.getElementById('lastscan');if(lsEl)lsEl.textContent=lastPulled?('🕒 Records last pulled '+shortET(lastPulled)+' ET'):'';
   var lb=document.getElementById('lbrief');
   if(lb)lb.innerHTML='<div class="briefhd">🔔 TODAY’S BRIEFING<span class="briefts">🕒 records last refreshed '+(lastPulled?shortET(lastPulled)+' ET':'—')+'</span></div>'
+    +(isStale(lastPulled)?'<div class="stalewarn">⚠️ Data may be stale — last pulled '+agoText(lastPulled)+'. Tap 🔄 RE-AUDIT to refresh before acting.</div>':'')
     +'<div class="briefday">📊 <b>Past-due</b> owed this morning <b>'+fmt(openingLate)+'</b> &nbsp;·&nbsp; cleared since <b class="pos">'+fmt(clearedLate)+'</b> <b>('+pct+'%)</b> &nbsp;·&nbsp; still past-due <b class="red">'+fmt(stillLate)+'</b> &nbsp;·&nbsp; <b class="red">'+toNotify+'</b> customers to notify'+(DAYSNAP?'':' <span class="hint">(morning snapshot sets at the 12 AM / 1:30 AM sweep)</span>')+'</div>'
     +'<div class="briefpills">'
     +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
@@ -329,6 +331,8 @@ function render(){
     if(discN)pills+='<span class="apill red">'+discN+' disconnect</span>';
     if(af.length)pills+='<span class="apill red">'+af.length+' red flag'+(af.length==1?'':'s')+'</span>';
     if(acctOut)pills+='<span class="apill">'+fmt(acctOut)+' outstanding</span>';
+    var ameta=ACCTMETA.find(function(a){return a.label===acc;});var asc=ameta&&ameta.scanned_at;
+    pills+='<span class="apill'+(isStale(asc)?' red':'')+'" title="When this fleet\'s data was last pulled from Stripe">🕒 '+agoText(asc)+(isStale(asc)?' — stale, tap Audit Sweep':'')+'</span>';
     var openAttr=(toSend>0||af.length>0)?' open':'';  // auto-open accounts that still need action
     return '<details class="acct"'+openAttr+'><summary class="accttl">🏦 '+esc(acc)+'<span class="asum">'+pills+'</span><button class="btn small aud" data-auditacct="'+esc(acc)+'" title="Re-sweep just this fleet now">🔄 Audit Sweep</button></summary><div class="acctbody">'+flagsH+draftsH+'</div></details>';
   }).join('')||'<p class="hint">No active rentals scanned yet.</p>';
@@ -506,6 +510,8 @@ function dynBody(d){return d.status==='sent'?d.body:d.body.replace(/^Good (morni
 function etStamp(){return new Date().toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}
 function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
+function agoText(iso){if(!iso)return 'never';var s=(Date.now()-new Date(iso).getTime())/1000;if(s<90)return 'just now';if(s<3600)return Math.round(s/60)+'m ago';if(s<86400)return Math.round(s/3600)+'h ago';return Math.round(s/86400)+'d ago';}
+function isStale(iso){if(!iso)return true;return (Date.now()-new Date(iso).getTime())>7*3600*1000;}  // crons run ≤6h apart; >7h means one was missed
 function etDate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/New_York'});}catch(e){return '';}}
 function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
 function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
@@ -575,13 +581,14 @@ function renderSuggestions(){
   var disc=CUSTS.filter(c=>c.flag==='disconnect').length;
   var rec=CUSTS.filter(c=>c.flag==='recovery').length;
   var near=CUSTS.filter(c=>c.flag==='none'&&c.pastdue_count===2);
+  var proposedN=FEES.filter(function(f){return f.status==='proposed';}).length;
+  var proposedAmt=FEES.filter(function(f){return f.status==='proposed';}).reduce(function(a,f){return a+(+f.fee||0);},0);
   if(rec)s.push({c:'red',t:rec+' customer(s) at RECOVERY — notify the administrator to schedule collection.'});
-  if(disc)s.push({c:'red',t:disc+' customer(s) under disconnection — recovery follows in 12h if uncured.'});
+  if(disc)s.push({c:'red',t:disc+' customer(s) on FINAL disconnection notice — recovery follows in 12h if uncured.'});
   near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
-  if(draftN)s.push({c:'',t:draftN+' notice(s) awaiting review — tap 📋 Copy, send by email/WhatsApp/SMS, then ✅ Mark sent.'});
-  if(FEES.length)s.push({c:'',t:IC_FEE+'I will raise '+FEES.length+' × $10 late-fee invoice(s) ('+fmt(FEES.reduce((a,f)=>a+(+f.fee||0),0))+') on go-live — proposed now, only posted once you approve writes.'});
-  s.push({c:'',t:'To email customers, verify rentaride2go.com in Resend.'});
-  if(!draftN&&!disc&&!rec)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
+  if(proposedN)s.push({c:'',t:IC_FEE+proposedN+' × $10 late fee(s) ready to raise ('+fmt(proposedAmt)+') — open the $10 ledger and tap 📝 Raise draft.'});
+  if(draftN)s.push({c:'',t:draftN+' notice(s) awaiting review — 📧 Send email or 📋 Copy for WhatsApp/SMS, then ✅ Mark sent.'});
+  if(!draftN&&!disc&&!rec&&!proposedN)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
   var el=document.getElementById('heroBubble');
   el.innerHTML='<h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
 }
