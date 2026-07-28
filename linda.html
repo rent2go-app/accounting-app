@@ -170,6 +170,17 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .disccard.grace{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 6%,var(--surface))}
 .dgrace .dtime{flex:0 0 auto;min-width:0;width:118px}
 .dts.exp{color:var(--out);font-weight:700}
+.gpsrow{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px}
+.gpssel{max-width:340px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px}
+.gpsresult{flex-basis:100%}
+.gpstrack{margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;font-size:12.5px;display:flex;flex-direction:column;gap:5px}
+.ignbadge{display:inline-block;font-weight:800;font-size:11px;padding:2px 8px;border-radius:6px}
+.ignbadge.on{background:color-mix(in srgb,var(--out) 18%,var(--surface));color:var(--out)}
+.ignbadge.off{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.gpsmot{color:var(--muted)}
+.gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gpsok{font-weight:700;color:var(--in)}
+.gpsdry{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:0 0 10px}
 .discwrap.plans .disccard.active{border-left-color:#eab54e;background:color-mix(in srgb,#eab54e 8%,var(--surface))}
 .planterms{font-weight:700;color:var(--text)}
 .btn.small.danger{background:var(--out);color:#fff;border-color:var(--out)}
@@ -564,6 +575,29 @@ async function setDisc(c,patch){
   if(r.error){alert('Could not save: '+r.error.message);return;}
   toast('Saved ✓');await load();
 }
+var GPSDEV={}; var GPS_DRYRUN=true;
+async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
+async function loadGpsDevices(acc){if(GPSDEV[acc])return GPSDEV[acc];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[acc]=d.devices||[];return GPSDEV[acc];}
+async function gpsLoad(i){var c=DISCROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
+async function gpsLink(i){var c=DISCROWS[i];var sel=document.getElementById('gpssel'+i);var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
+async function gpsUnlink(i){var c=DISCROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
+function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open map</a>':'')+'</div>'+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
+async function gpsTrack(i){var c=DISCROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
+async function gpsSend(i,kind){var c=DISCROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
+async function gpsCommand(c,kind){
+  if(!c.sarekon_device_id)return null;
+  var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';
+  if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return {cancelled:true};
+  try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});toast(d.dry_run?('DRY-RUN: would '+kind):(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:'')));return d;}
+  catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
+}
+function gpsRow(c,i){
+  if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
+  var devs=GPSDEV[c.account_label];
+  if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">to track / disable / enable the starter</span></div>';}
+  var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
+  return '<div class="gpsrow">Car: <select class="gpssel" id="gpssel'+i+'"><option value="">- pick this car -</option>'+opts+'</select> <button class="btn small pri" data-gpslink="'+i+'">Link</button></div>';
+}
 function renderDisconnections(){
   var el=document.getElementById('ldisc');if(!el)return;
   DISCROWS=CUSTS.filter(function(c){return c.state==='disconnect';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
@@ -591,18 +625,19 @@ function renderDisconnections(){
       +noticeLine
       +tl
       +'<div class="dchecks">'
-        +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
+        +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b> <span class="hint">(fires starter-disable if a car is linked)</span>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
         +'<label class="dchk"><input type="checkbox" data-discreach="'+i+'"'+(r.reached_out?' checked':'')+'> 📞 Customer reached out'+(r.reached_out_at?' <span class="dts">'+shortET(r.reached_out_at)+' ET</span>':'')+'</label>'
         +'<div class="dact dgrace"><span class="dlbl">⏸ Grace until:</span> <input type="time" id="dgt'+i+'" class="dinput dtime" value="'+esc((r.grace_until?new Date(r.grace_until).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:"2-digit",minute:"2-digit"}):''))+'"> <span class="dts">ET today</span> <input id="dgn'+i+'" class="dinput" placeholder="reason for grace (optional)" value="'+esc(r.grace_note||'')+'"> <button class="btn small" data-discgrace="'+i+'">Apply grace</button>'+(r.grace_until?' <button class="btn small" data-discgraceclear="'+i+'">Clear</button>':'')+(r.grace_until?'<span class="dts '+(gA?"":"exp")+'">'+(gA?'deferred until '+fullET(r.grace_until):'grace expired '+fullET(r.grace_until))+'</span>':'')+'</div>'
         +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
         +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button></div>'
+        +gpsRow(c,i)
       +'</div></div>';
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
-    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'
+    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<label class="gpsdry"><input type="checkbox" id="gpsdry"'+(GPS_DRYRUN?' checked':'')+'> GPS dry-run (safe) - uncheck to actually disable/enable a car</label>'
     +cards+'</details>';
 }
 // ── PAYMENT PLAN MODULE ──────────────────────────────────────────────────────────────
@@ -826,14 +861,21 @@ function wire(){
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
   document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
   document.querySelectorAll('[data-refreshledger]').forEach(b=>b.onclick=()=>refreshLedger(b));
-  document.querySelectorAll('[data-discsig]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discsig],{signal_sent:b.checked,signal_sent_at:b.checked?new Date().toISOString():null}));
+  document.querySelectorAll('[data-discsig]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discsig];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'disable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{signal_sent:b.checked,signal_sent_at:b.checked?new Date().toISOString():null});});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
-  document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discrestore],{restored:b.checked,restored_at:b.checked?new Date().toISOString():null}));
+  document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
   document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
   document.querySelectorAll('[data-discnote]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discnote],{notes:document.getElementById('dni'+b.dataset.discnote).value}));
   document.querySelectorAll('[data-discgrace]').forEach(b=>b.onclick=function(){var i=b.dataset.discgrace,t=document.getElementById('dgt'+i).value;if(!t){alert('Enter a grace time (ET) first.');return;}setDisc(DISCROWS[i],{grace_until:etTimeToISO(t),grace_note:document.getElementById('dgn'+i).value});});
   document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
   document.querySelectorAll('[data-discplan]').forEach(b=>b.onclick=()=>putOnPlan(b.dataset.discplan));
+  document.querySelectorAll('[data-gpsload]').forEach(b=>b.onclick=()=>gpsLoad(b.dataset.gpsload));
+  document.querySelectorAll('[data-gpslink]').forEach(b=>b.onclick=()=>gpsLink(b.dataset.gpslink));
+  document.querySelectorAll('[data-gpsunlink]').forEach(b=>b.onclick=()=>gpsUnlink(b.dataset.gpsunlink));
+  document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
+  document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
+  document.querySelectorAll('[data-gpsenable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsenable,'enable'));
+  var gd=document.getElementById('gpsdry');if(gd)gd.onchange=function(){GPS_DRYRUN=gd.checked;};
   document.querySelectorAll('[data-planterms]').forEach(b=>b.onclick=()=>editPlanTerms(b.dataset.planterms));
   document.querySelectorAll('[data-plancontact]').forEach(b=>b.onclick=()=>markPlanContacted(b.dataset.plancontact));
   document.querySelectorAll('[data-planremove]').forEach(b=>b.onclick=()=>removePlan(b.dataset.planremove));
