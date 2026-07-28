@@ -600,7 +600,7 @@ function renderDisconnections(){
         +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button></div>'
       +'</div></div>';
   }).join('');
-  el.innerHTML='<details class="discwrap" open><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
+  el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'
     +cards+'</details>';
@@ -641,7 +641,7 @@ function renderPlans(){
         +'<div class="dact"><button class="btn small" data-plancontact="'+i+'">📝 Log contact / note</button> <button class="btn small" data-planremove="'+i+'">Remove from plan</button>'+(behind?' <button class="btn small danger" data-planrecdisc="'+i+'">🔴 Recommend for disconnection</button>':'')+'</div>'
       +'</div></div>';
   }).join('');
-  el.innerHTML='<details class="discwrap plans" open><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
+  el.innerHTML='<details class="discwrap plans"><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Linda checks each plan daily. <b>On track</b> = yesterday\'s agreed payments came in. <b>Behind</b> = they didn\'t — the notice warns them, and you can recommend disconnection.</p>'
     +cards+'</details>';
 }

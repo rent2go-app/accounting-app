@@ -110,7 +110,7 @@ async function scanAccount(acc: any) {
     const latefee_open = inv.filter(isLateFee);
     const unpaid_latefees = latefee_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const pd_total = pdinv.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
-    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, plan_behind_days: 0, plan_last_behind_day: null, updated_at: nowISO }); return; }
+    if (pdinv.length === 0) { custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: 0, outstanding: 0, state: "current", flag: "none", disconnect_notice_at: null, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, plan_paid_rentals: null, plan_paid_latefees: null, plan_behind_days: 0, plan_last_behind_day: null, updated_at: nowISO }); return; }
     // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
     const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
