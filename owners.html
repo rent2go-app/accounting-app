@@ -554,6 +554,10 @@ function carName(o,id){var c=(o.cars||[]).find(function(cc){return cc.id===id;})
 function openDoc(oi,kind){
   var o=STATE[oi];var s=stripeFor(o.stripeLabel||'');var weekly=o.cadence==='weekly';
   var plat=r2(ownerMonthTotal(o,YM));
+  var STD_RATE=500;
+  function ffee(c){var d=dim(YM);var a=(c.days&&c.days[YM]!=null)?Math.max(0,Math.min(+c.days[YM],d)):d;return r2(STD_RATE*a/d);}
+  var fullPlat=weekly?r2(STD_RATE*((o.cars||[]).length)):r2((o.cars||[]).reduce(function(s,c){return s+ffee(c);},0));
+  var pfDisc=r2(Math.max(0,fullPlat-plat));
   var mrows=maintRowsYM(o);var mtot=r2(mrows.reduce(function(a,x){return a+(+x.cost||0);},0));
   var today=new Date();var todayStr=today.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
   var ctry=(COUNTRIES.find(function(c){return c[0]===o.country;})||['',''])[1];
@@ -564,8 +568,9 @@ function openDoc(oi,kind){
   if(kind==='invoice'){
     title='INVOICE';
     var pfRows='';
-    if(weekly){pfRows='<tr><td>Programme fee — weekly (×4 payments)</td><td class="n">'+fmt(plat)+'</td></tr>';}
-    else{(o.cars||[]).forEach(function(c){var f=carFee(c,YM);if(f>0)pfRows+='<tr><td>Platform fee — '+esc(c.name||c.plate||'car')+' · '+carDays(c,YM)+'/'+dim(YM)+' days</td><td class="n">'+fmt(f)+'</td></tr>';});if(!pfRows)pfRows='<tr><td>Platform fees</td><td class="n">'+fmt(plat)+'</td></tr>';}
+    if(weekly){pfRows='<tr><td>Programme fee — weekly (×4) · standard $500/car</td><td class="n">'+fmt(fullPlat)+'</td></tr>'+(pfDisc>0?'<tr><td>Preferred rate discount</td><td class="n neg">-'+fmt(pfDisc)+'</td></tr>':'');}
+    else{(o.cars||[]).forEach(function(c){var full=ffee(c);if(full<=0)return;var f=carFee(c,YM);var dd=r2(full-f);pfRows+='<tr><td>Platform fee — '+esc(c.name||c.plate||'car')+' · '+carDays(c,YM)+'/'+dim(YM)+' days (standard $500/mo)</td><td class="n">'+fmt(full)+'</td></tr>'+(dd>0?'<tr><td style="padding-left:20px">Preferred rate discount — '+esc(c.name||c.plate||'car')+'</td><td class="n neg">-'+fmt(dd)+'</td></tr>':'');});if(!pfRows)pfRows='<tr><td>Platform fees</td><td class="n">'+fmt(plat)+'</td></tr>';}
+    if(pfDisc>0)pfRows+='<tr class="tot"><td>Platform fees — net after preferred discount</td><td class="n">'+fmt(plat)+'</td></tr>';
     var imr=mrows.filter(function(x){return x.status!=='paid' && !x.stripe_invoice_id;});var imt=r2(imr.reduce(function(a,x){return a+(+x.cost||0);},0));
     var mRowsH=imr.map(function(x){return '<tr><td>'+esc(x.date)+' · '+esc(carName(o,x.carId))+' — '+esc(x.cat||'Maintenance')+(x.desc?' ('+esc(x.desc)+')':'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('');
     totVal=r2(plat+imt);
@@ -573,7 +578,7 @@ function openDoc(oi,kind){
       +'<tr class="sec"><td colspan="2">Platform fees — '+fmtYM(YM)+'</td></tr>'+pfRows
       +(imr.length?'<tr class="sec"><td colspan="2">Fleet maintenance — '+fmtYM(YM)+' <span style="font-weight:400">(unpaid only)</span></td></tr>'+mRowsH:'')
       +'</tbody><tfoot><tr><td class="tl">Total due (USD)</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
-      +'<div class="dnote">Payment due within 7 days of issue. Amounts in USD. Owner rental earnings are collected in and paid out from the owner\'s own Stripe account; this invoice covers Rent 2 Go platform fees and fleet maintenance for the period only.</div>';
+      +'<div class="dnote">'+(pfDisc>0?'\u2714 You are on our <b>Preferred Owner rate</b> — a '+fmt(pfDisc)+' discount off the standard $500/car platform fee has been applied this period. ':'')+'Payment due within 7 days of issue. Amounts in USD. Owner rental earnings are collected in and paid out from the owner\'s own Stripe account; this invoice covers Rent 2 Go platform fees and fleet maintenance for the period only.</div>';
   }else{
     title='STATEMENT';
     var netPos=r2(s.n-plat-mtot);totVal=r2(plat+mtot);
@@ -585,12 +590,13 @@ function openDoc(oi,kind){
       +'<tr><td>Payouts received by owner'+(s.fi>0?' (excl. Capital loan)':'')+'</td><td class="n">'+fmt(s.pn)+'</td></tr>'
       +(s.fi>0?'<tr><td>Stripe Capital loan (financing — not earnings)</td><td class="n neg">'+fmt(s.fi)+'</td></tr>':'')
       +'<tr class="sec"><td colspan="2">Rent 2 Go charges — '+fmtYM(YM)+'</td></tr>'
-      +'<tr><td>Platform fee</td><td class="n neg">-'+fmt(plat)+'</td></tr>'
+      +'<tr><td>Platform fee'+(pfDisc>0?' (standard $500/car)':'')+'</td><td class="n neg">-'+fmt(pfDisc>0?fullPlat:plat)+'</td></tr>'
+      +(pfDisc>0?'<tr><td>Preferred rate discount</td><td class="n">+'+fmt(pfDisc)+'</td></tr><tr><td>Net platform fee</td><td class="n neg">-'+fmt(plat)+'</td></tr>':'')
       +'<tr><td>Fleet maintenance ('+mrows.length+' item'+(mrows.length===1?'':'s')+')</td><td class="n neg">-'+fmt(mtot)+'</td></tr>'
       +'<tr class="tot"><td>Net position (net earnings less R2G charges)</td><td class="n">'+fmt(netPos)+'</td></tr>'
       +'</tbody><tfoot><tr><td class="tl">Payable to Rent 2 Go</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
       +(mrows.length?'<div class="dsub">Maintenance detail</div><table class="dtbl small"><thead><tr><th>Date</th><th>Car</th><th>Type</th><th>Detail</th><th class="n">Cost</th></tr></thead><tbody>'+mrows.map(function(x){return '<tr><td>'+esc(x.date)+'</td><td>'+esc(carName(o,x.carId))+'</td><td>'+esc(x.cat||'')+'</td><td>'+esc(x.desc||'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('')+'</tbody></table>':'')
-      +'<div class="dnote">Owner earnings are collected in and paid out from the owner\'s own Stripe account. This statement summarises the period; Rent 2 Go charges (platform fee + maintenance) are billed on the matching invoice '+docNo('invoice',oi)+'.</div>';
+      +'<div class="dnote">'+(pfDisc>0?'\u2714 You are on our <b>Preferred Owner rate</b> — a '+fmt(pfDisc)+' discount off the standard $500/car platform fee applied this period. ':'')+'Owner earnings are collected in and paid out from the owner\'s own Stripe account. This statement summarises the period; Rent 2 Go charges (platform fee + maintenance) are billed on the matching invoice '+docNo('invoice',oi)+'.</div>';
   }
   // email draft (mailto) — opens the user's mail client pre-filled; attach the saved PDF
   var eln=[];eln.push('Hi '+(o.ownerName||o.name||'')+',');eln.push('');
