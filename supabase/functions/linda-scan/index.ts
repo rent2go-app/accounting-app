@@ -48,6 +48,7 @@ function invline(i: any, icon: string) { const lbl = isLateFee(i) ? "Late fee" :
 function footer(portal: string) { return portal ? `\n\n💳 Manage & pay anytime in your [Customer Portal](${portal}) — sign in with your email on file.` : `\n\nManage & pay from your customer portal — sign in with your email on file.`; }
 const APPREC_PAID = "Thank you so much for your recent payment — we truly appreciate you keeping up with your account. ";
 const APPREC_GEN = "Thank you for being a valued Rent 2 Go customer — we really appreciate your efforts to stay on top of your account. ";
+const LATEFEE_NOTE = "Please note that a $10 late fee has been applied to your past-due balance. We strongly recommend settling your account as soon as possible to avoid further penalties or a service interruption.";
 
 async function scanAccount(acc: any) {
   const LABEL = acc.label, SKEY = acc.key, FOOTER = footer(acc.portal || "");
@@ -201,6 +202,10 @@ async function scanAccount(acc: any) {
       intro = `Good morning ${nm} 👋\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Just a gentle reminder that there's ${m(pd_total)} in late fees on your account whenever you have a moment to take care of it.`;
       closing = "Whenever you're ready, simply tap Pay now above. Please reach out anytime if we can help.";
     }
+    // Whenever there are past-due RENTALS, remind them a $10 late fee applies and to settle ASAP to
+    // avoid further penalties / service interruption. Skip for disconnect (its own stronger language)
+    // and for plan customers (they're on an agreed catch-up plan).
+    if (rental_pd.length > 0 && kind !== "disconnect" && !planmap[cid]) closing = closing + " " + LATEFEE_NOTE;
     const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you so much for your urgent attention to this matter.\n\nRent 2 Go" + FOOTER;
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
     custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: !!(planExisting[cid] && planExisting[cid].on_plan), plan_terms: (planExisting[cid] && planExisting[cid].plan_terms) || null, updated_at: nowISO });
