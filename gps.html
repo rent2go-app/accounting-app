@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="assets/linda-sm.png">
+<title>Vehicles &amp; GPS — Rent 2 Go</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--gold:#eab54e;--shadow:0 1px 3px rgba(16,24,40,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--brand:#12a35c;--in:#38d07f;--out:#f36f6f}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.topbar{display:flex;align-items:center;gap:12px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brandlogo{height:28px}.sub{color:var(--muted);font-weight:700}.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:9px;padding:7px 12px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.danger{color:var(--out);border-color:var(--out)}
+.btn.small{padding:4px 9px;font-size:12px}
+.wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+.banner{background:color-mix(in srgb,var(--gold) 18%,var(--surface));border:1px solid var(--gold);color:#7a5c12;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;margin-bottom:14px}
+.lavatar{width:30px;height:30px;border-radius:50%;vertical-align:middle}
+.says{display:flex;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:16px;align-items:flex-start}
+.says img{width:56px;height:56px;border-radius:50%;flex:0 0 auto}
+.says .bubble{flex:1}
+.says .bubble h3{margin:0 0 6px;font-size:14px}
+.says .bubble h3 span{color:var(--muted);font-weight:600;font-size:12px}
+.says ul{margin:0;padding-left:18px}
+.says li{font-size:13px;margin:4px 0;line-height:1.4}
+.says li.warn{color:#8a6d1e}.says li.red{color:var(--out);font-weight:700}.says li.ok{color:var(--in)}
+#lindaWidget{position:fixed;left:18px;bottom:22px;z-index:40}
+#lindaFace{width:64px;height:64px;border-radius:50%;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;border:3px solid var(--surface);transition:transform .15s}
+#lindaFace:hover{transform:scale(1.06)}
+#lindaTag{position:absolute;left:50%;transform:translateX(-50%);bottom:-8px;background:var(--brand);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
+#lindaBubble{position:absolute;left:78px;bottom:0;width:290px;max-width:70vw;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,.24);padding:13px 15px;display:none}
+#lindaWidget.open #lindaBubble{display:block}
+#lindaBubble h3{margin:0 0 7px;font-size:13px}
+#lindaBubble ul{margin:0;padding-left:17px}#lindaBubble li{font-size:12.5px;margin:5px 0;line-height:1.4}
+#lindaBubble li.warn{color:#8a6d1e}#lindaBubble li.red{color:var(--out);font-weight:700}#lindaBubble li.ok{color:var(--in)}
+#lindaBubble .x{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--muted);font-weight:800}
+@media(max-width:700px){#lindaFace{width:52px;height:52px}#lindaBubble{width:220px}}
+.hero{display:flex;gap:26px;align-items:center;background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 12%,var(--surface)),var(--surface));border:1px solid var(--line);border-radius:20px;padding:24px 26px;margin-bottom:18px;box-shadow:var(--shadow)}
+.heroimg{width:min(40vw,340px);aspect-ratio:1;object-fit:cover;border-radius:18px;box-shadow:0 14px 38px rgba(0,0,0,.24);flex:0 0 auto}
+.herotext{flex:1;min-width:0}
+.heroeyebrow{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+#greeting{font-size:clamp(24px,3.4vw,34px);margin:6px 0 4px;line-height:1.1;text-wrap:balance}
+.herosub{color:var(--muted);margin:0 0 14px;font-size:15px}
+.dryrun{margin-top:14px;font-size:12px;color:#8a6d1e;background:color-mix(in srgb,var(--gold) 14%,var(--surface));border:1px solid var(--gold);border-radius:10px;padding:8px 12px}
+#heroBubble h3{margin:0 0 6px;font-size:14px}
+#heroBubble ul{margin:0;padding-left:18px}#heroBubble li{font-size:13px;margin:5px 0;line-height:1.45}
+#heroBubble li.warn{color:#8a6d1e}#heroBubble li.red{color:var(--out);font-weight:700}#heroBubble li.ok{color:var(--in)}
+@media(max-width:720px){.hero{flex-direction:column;text-align:center}.heroimg{width:min(74vw,300px)}.herotext{text-align:center}#heroBubble{text-align:left}}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.ctop{display:flex;align-items:center;gap:11px}
+.cicon{flex:none}.cicon svg{width:42px;height:42px;display:block}
+.card .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:9px}
+.card .v{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;margin-left:auto}
+.card .v small{font-size:15px;font-weight:800;color:var(--muted)}
+.card .v.red{color:var(--out)}.card .v.pos{color:var(--in)}.card .v.pink{color:#d6336c}
+.card .cd{font-size:11px;color:var(--muted);margin-top:4px;font-weight:600;line-height:1.3;min-height:14px}
+.card .cd b{color:var(--text)}
+.reauditbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.btn.big{font-size:14px;font-weight:800;padding:11px 18px;border-radius:11px}
+#heroBubble li.pink{color:#d6336c;font-weight:700}
+h2{font-size:15px;margin:18px 0 8px}
+.ic{width:16px;height:16px;vertical-align:-3px;margin-right:5px;flex:0 0 auto}
+.icfee{width:24px;height:24px;vertical-align:-7px;margin-right:7px;flex:0 0 auto}
+.acct{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.accttl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:15px;font-weight:800;margin:0;padding:14px 16px;cursor:pointer;list-style:none;user-select:none}
+.accttl::-webkit-details-marker{display:none}
+.accttl::before{content:'▸';color:var(--muted);font-size:13px;transition:transform .18s;display:inline-block}
+details.acct[open] .accttl::before{transform:rotate(90deg)}
+.accttl:hover{background:var(--surface-2)}
+.accttl .btn.aud{margin-left:10px;flex:none}
+.acctfresh{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acctfresh b{color:var(--text)}
+.acctfresh.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out);border:1px solid var(--out)}
+.acctfresh.stale b{color:var(--out)}
+.ledgerbar{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin:8px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ledgerbar b{color:var(--text)}
+.ledgerbar [data-refreshledger]{margin-left:auto}
+.ledgerbar.stale{background:color-mix(in srgb,var(--out) 12%,var(--surface));color:var(--out)}
+.ledgerbar.stale b{color:var(--out)}
+.acctbody{padding:0 16px 14px}
+.asum{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.apill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.apill.warn{background:color-mix(in srgb,#eab54e 20%,var(--surface));color:#8a6516}
+.apill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.apill.done{background:color-mix(in srgb,var(--brand) 15%,var(--surface));color:var(--brand)}
+.accmeta{font-size:11px;color:var(--muted);font-weight:600}
+.foldbar{display:flex;gap:8px;align-items:center;margin:6px 0 2px}
+.feetbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.feetbl td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.feetbl tr.hd td{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:800;background:var(--surface-2)}
+.feetbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.feetbl tr.tot td{font-weight:800;background:var(--surface-2)}
+.feetbl tr.memorow td{background:var(--surface-2);color:var(--muted);font-size:11.5px;line-height:1.4;border-bottom:2px solid var(--line)}
+.paygrp{margin:10px 0}
+.paygrphd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:5px}
+.paygrpt{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.paygrpt b{color:var(--out)}
+.ostag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:5px}
+.ostag.disc{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.ostag.rec{background:#8a1c1c;color:#fff}
+.ostag.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.ostag.paid{background:color-mix(in srgb,var(--brand) 16%,var(--surface));color:var(--brand)}
+.feegrp{margin:12px 0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.feegrphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:800;font-size:13px;margin-bottom:6px}
+.feegrpt{font-size:11.5px;font-weight:700;color:var(--out);font-variant-numeric:tabular-nums}
+.feegrphd button{margin-left:auto}
+.reusehint{margin-top:9px;padding:8px 11px;background:color-mix(in srgb,#7a5cff 9%,var(--surface));border:1px solid color-mix(in srgb,#7a5cff 28%,var(--line));border-radius:9px;font-size:12px;color:var(--muted)}
+.reusesnip{font-style:italic;margin-top:3px;color:var(--muted);font-size:11.5px;line-height:1.35}
+.linkbtn{background:none;border:none;color:#7a5cff;font-weight:800;cursor:pointer;padding:0;font-size:12px;text-decoration:underline}
+.feewrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px;margin-bottom:16px;box-shadow:var(--shadow)}
+.feewrap summary{cursor:pointer;font-weight:800;font-size:14px;padding:9px 0;list-style:none}
+.feewrap summary::-webkit-details-marker{display:none}
+.feewrap summary::before{content:'▸ ';color:var(--muted)}
+.feewrap[open] summary::before{content:'▾ '}
+.feewrap[open] summary{border-bottom:1px solid var(--line);margin-bottom:10px}
+.skwrap{margin-top:18px;background:var(--surface-2);border:1px dashed var(--line);border-radius:12px;padding:6px 14px}
+.skwrap summary{cursor:pointer;font-weight:800;font-size:13px;color:var(--muted);padding:6px 0}
+.skbody{padding:6px 0}
+.skrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.skrow .dmail{color:var(--muted);font-size:12px}
+.skrow .amt{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.skrow .skre{font-size:11px;color:var(--muted);font-weight:700}
+.learnwrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.learnwrap summary{cursor:pointer;font-weight:800;font-size:13px;padding:6px 0}
+.learnlist{margin:4px 0 8px;padding-left:18px}.learnlist li{font-size:12.5px;margin:6px 0;line-height:1.45}
+.draft{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.draft.disc{border-color:var(--out);border-left:5px solid var(--out)}
+.draft.recovery{border-color:#8a1c1c;border-left:5px solid #8a1c1c}
+.dhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dname{font-weight:800}.dmail{color:var(--muted);font-size:12px}
+.kind{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 8px;border-radius:7px}
+.kind.reminder{background:color-mix(in srgb,var(--brand) 12%,var(--surface));color:var(--brand)}
+.kind.disconnect{background:color-mix(in srgb,var(--out) 14%,var(--surface));color:var(--out)}
+.kind.recovery{background:#8a1c1c;color:#fff}
+.amt{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.dsubj{font-weight:700;margin:8px 0 4px;font-size:13px}
+.dbody{white-space:pre-wrap;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:9px;padding:10px;max-height:0;overflow:hidden;transition:max-height .2s}
+.draft.open .dbody{max-height:400px;overflow:auto}
+.dact{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.ein{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;margin:4px 0 8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px}
+.eta{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:12.5px;line-height:1.5;resize:vertical}
+.status{font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px}
+.status.approved{background:color-mix(in srgb,var(--in) 14%,var(--surface));color:var(--in)}
+.status.sent{background:var(--brand);color:#fff}
+.status.skipped{background:var(--surface-2);color:var(--muted)}
+.status.reviewed{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
+.status.plan{background:color-mix(in srgb,#0d9488 16%,var(--surface));color:#0d9488}
+.status.plan.behind{background:color-mix(in srgb,#eab54e 24%,var(--surface));color:#8a6516}
+.status.disc-signal{background:var(--out);color:#fff}
+.status.disc-restored{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.status.disc-grace{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
+.discwrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
+.discwrap>summary{cursor:pointer;font-weight:800;font-size:15px;list-style:none}
+.discwrap>summary::-webkit-details-marker{display:none}
+.disccard{border:1px solid var(--line);border-left:4px solid var(--out);border-radius:10px;padding:11px 13px;margin:10px 0;background:var(--surface-2)}
+.disccard.active{border-left-color:var(--out);background:color-mix(in srgb,var(--out) 6%,var(--surface))}
+.disccard.restored{border-left-color:var(--in);background:color-mix(in srgb,var(--in) 7%,var(--surface))}
+.dischd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.discname{font-weight:800}
+.discacct{font-size:11px;color:var(--muted)}
+.discamt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dbadge{margin-left:auto;font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px}
+.dbadge.red{background:var(--out);color:#fff}
+.dbadge.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.dbadge.on{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.dbadge.grace{background:color-mix(in srgb,#7a5cff 18%,var(--surface));color:#7a5cff}
+.disccard.grace{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 6%,var(--surface))}
+.dgrace .dtime{flex:0 0 auto;min-width:0;width:118px}
+.dts.exp{color:var(--out);font-weight:700}
+.gpsrow{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px}
+.gpssel{max-width:340px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px}
+.gpsresult{flex-basis:100%}
+.gpstrack{margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;font-size:12.5px;display:flex;flex-direction:column;gap:5px}
+.ignbadge{display:inline-block;font-weight:800;font-size:11px;padding:2px 8px;border-radius:6px}
+.ignbadge.on{background:color-mix(in srgb,var(--out) 18%,var(--surface));color:var(--out)}
+.ignbadge.off{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.gpsmot{color:var(--muted)}
+.gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gpsok{font-weight:700;color:var(--in)}
+.gpsmap{width:100%;max-width:520px;height:240px;border:1px solid var(--line);border-radius:9px;margin-top:4px}
+.gpsdry{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:0 0 10px}
+.gpsdry:has(input:not(:checked)){color:var(--out);font-weight:700}
+.vmacct{border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:2px 10px}
+.vmacct>summary{cursor:pointer;font-weight:700;font-size:13px;padding:7px 0}
+.vmrow{padding:7px 0;border-top:1px solid var(--line)}
+.vmrow:first-of-type{border-top:none}
+.vmname{font-weight:700;font-size:13px;display:block;margin-bottom:2px}
+.vmrow .gpsrow{margin-top:4px;padding-top:4px;border-top:none}
+.discwrap.plans .disccard.active{border-left-color:#eab54e;background:color-mix(in srgb,#eab54e 8%,var(--surface))}
+.planterms{font-weight:700;color:var(--text)}
+.btn.small.danger{background:var(--out);color:#fff;border-color:var(--out)}
+.planflag{background:#7a5cff;color:#fff;font-weight:800;font-size:12.5px;padding:8px 12px;border-radius:8px;margin:6px 0 9px;letter-spacing:.3px}
+.planflag.big{font-size:13.5px;margin:8px 0}
+.discwrap.plans .disccard.behind{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 8%,var(--surface))}
+.dchecks{display:flex;flex-direction:column;gap:7px}
+.dchk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.dchk input{width:16px;height:16px;accent-color:var(--out)}
+.dact{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.dlbl{color:var(--muted);min-width:82px}
+.dinput{flex:1;min-width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
+.dts{font-size:11px;color:var(--muted)}
+.dnotice{font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;margin-bottom:8px;display:inline-block}
+.dnotice.sent{background:color-mix(in srgb,var(--in) 15%,var(--surface));color:var(--in)}
+.dnotice.unsent{background:color-mix(in srgb,var(--out) 13%,var(--surface));color:var(--out)}
+.dtimeline{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:9px;padding:7px 10px;background:var(--surface);border-radius:8px}
+.dtimeline b{color:var(--text);font-variant-numeric:tabular-nums}
+.tl-dur{margin-left:auto;font-weight:700}
+.tl-dur.live{color:var(--out)}
+.status.raised{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.ltoast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;transition:all .25s;z-index:9999;max-width:90vw;text-align:center}
+.ltoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.btn.on{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff;border-color:#7a5cff}
+.btn.ok{background:color-mix(in srgb,var(--brand) 14%,var(--surface));color:var(--brand);border-color:var(--brand);font-weight:800}
+.draft.done{opacity:.62}.draft.done:hover{opacity:1}
+.dayprog{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:2px 0 14px;font-size:13px;font-weight:700}
+.dayprog .pill{padding:5px 11px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.dayprog .pill b{color:var(--text)}
+.dayprog .pill.alldone{background:var(--brand);color:#fff}.dayprog .pill.alldone b{color:#fff}
+.dayprog .pill.brief{background:color-mix(in srgb,#7a5cff 16%,var(--surface));color:#7a5cff}
+.dayprog .pill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.briefbar{background:color-mix(in srgb,#7a5cff 8%,var(--surface));border:1px solid color-mix(in srgb,#7a5cff 35%,var(--line));border-left:4px solid #7a5cff;border-radius:12px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.briefhd{font-size:12px;font-weight:900;letter-spacing:.05em;color:#7a5cff;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.briefts{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0}
+.briefday{margin-top:8px;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.5}
+.briefday b.pos{color:var(--in)}.briefday b.red{color:var(--out)}
+.stalewarn{margin-top:8px;background:color-mix(in srgb,var(--out) 12%,var(--surface));border:1px solid var(--out);color:var(--out);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:700}
+.briefpills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.briefpills .pill{font-size:12.5px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.briefpills .pill b{color:var(--text)}
+.briefpills .pill.alldone{background:var(--brand);color:#fff}.briefpills .pill.alldone b{color:#fff}
+.briefpills .pill.done{background:color-mix(in srgb,var(--brand) 15%,var(--surface));color:var(--brand)}.briefpills .pill.done b{color:var(--brand)}
+.briefpills .pill.warn{background:color-mix(in srgb,#eab54e 22%,var(--surface));color:#8a6516}
+.briefpills .pill.red{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}.briefpills .pill.red b{color:var(--out)}
+.loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
+.logincard h1{margin:0 0 4px;font-size:20px}.logincard input{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;margin-top:8px;background:var(--surface);color:var(--text)}
+.logincard button{width:100%;margin-top:14px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;cursor:pointer}
+.err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
+.hint{color:var(--muted);font-size:12.5px}
+
+.wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+</style>
+</head><body>
+
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">Vehicles &amp; GPS — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+
+<div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
+
+<div id="appwrap" style="display:none">
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· Vehicles &amp; GPS</span><div class="spacer"></div><button class="btn" onclick="location.href='linda.html'" title="Linda — Billing Agent"><img src="assets/linda-sm.png" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px" alt="">Linda</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<main class="wrap">
+<h2 style="margin:6px 0 2px">🚗 Vehicles &amp; GPS</h2>
+<p class="hint" style="margin:0 0 14px">Map each customer to their SareKon device, then Locate / Track / Disable / Enable the starter. JJT cars route to the JJT account automatically.</p>
+<div id="lvmap"></div>
+</main></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-config.js"></script>
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com','thandobnkala@gmail.com'];
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
+let CUSTS=[];
+var GPSDEV={}; var GPS_DRYRUN=true; var GPSROWS=[];
+function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
+async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
+async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
+async function gpsLoad(i){var c=GPSROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
+async function gpsLoadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars\u2026';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');render();}catch(e){alert('Load failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}}
+async function gpsPick(i,sel){var c=GPSROWS[i];var id=sel.value;if(!id)return;var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
+async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
+function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open in Google Maps</a>':'')+'</div>'+((d.lat&&d.lng)?'<iframe class="gpsmap" loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(d.lat+','+d.lng)+'&z=15&output=embed"></iframe>':'')+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
+async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
+async function gpsLocate(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">pinging the car for a fresh location\u2026</span>';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});el.innerHTML='<span class="hint">ping sent \u2014 fetching the fresh position in ~15s\u2026</span>';setTimeout(function(){gpsTrack(i);},15000);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Locate failed: '+esc(e.message||e)+'</span>';}}
+async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
+async function gpsCommand(c,kind){
+  if(!c.sarekon_device_id)return null;
+  var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';
+  if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return {cancelled:true};
+  try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});toast(d.dry_run?('DRY-RUN: would '+kind):(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:'')));return d;}
+  catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
+}
+function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
+  if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpslocate="'+i+'" title="Force a fresh GPS ping now">\uD83D\uDCCD Locate</button> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
+  var devs=GPSDEV[gpsKeyFor(c.account_label)];
+  if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">or use \u201cLoad all cars\u201d above</span></div>';}
+  var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
+  return '<div class="gpsrow">Car: <select class="gpssel" data-gpspick="'+i+'"><option value="">- pick this car -</option>'+opts+'</select></div>';
+}
+
+function renderVehicleMap(){
+  var el=document.getElementById('lvmap'); if(!el) return;
+  var byAcc={}; CUSTS.forEach(function(c){ if(c.sub_status==='no_subscription' && !c.sarekon_device_id) return; (byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c); });
+  var accs=Object.keys(byAcc).sort();
+  if(!accs.length){ el.innerHTML=''; return; }
+  var linked=CUSTS.filter(function(c){return c.sarekon_device_id;}).length;
+  var groups=accs.map(function(acc){
+    var rows=byAcc[acc].slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(c){
+      return '<div class="vmrow"><span class="vmname">'+esc(c.name)+'</span>'+gpsRow(c)+'</div>';
+    }).join('');
+    return '<details class="vmacct"><summary>'+esc(acc)+' <span class="hint">('+byAcc[acc].length+')</span></summary>'+rows+'</details>';
+  }).join('');
+  el.innerHTML='<details class="discwrap"><summary>\uD83D\uDE97 Vehicle Mapping (GPS) \u2014 <b>'+linked+'</b> of '+CUSTS.length+' linked</summary>'
+    +'<button class="btn small pri" data-gpsloadall="1" style="margin:8px 0">\uD83D\uDE97 Load all cars (both accounts)</button>'+'<label class="gpsdry"><input type="checkbox" class="gpsdrychk"'+(GPS_DRYRUN?' checked':'')+'> \uD83E\uDDEA GPS dry-run (safe) \u2014 UNCHECK to actually disable/enable a car</label>'+'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
+}
+function render(){ GPSROWS=[]; renderVehicleMap(); bind(); }
+function bind(){
+  document.querySelectorAll('[data-gpsload]').forEach(b=>b.onclick=()=>gpsLoad(b.dataset.gpsload));
+  document.querySelectorAll('[data-gpspick]').forEach(b=>b.onchange=()=>gpsPick(b.dataset.gpspick,b));
+  document.querySelectorAll('[data-gpsunlink]').forEach(b=>b.onclick=()=>gpsUnlink(b.dataset.gpsunlink));
+  document.querySelectorAll('[data-gpslocate]').forEach(b=>b.onclick=()=>gpsLocate(b.dataset.gpslocate));
+  document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
+  document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
+  document.querySelectorAll('[data-gpsenable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsenable,'enable'));
+  document.querySelectorAll('[data-gpsloadall]').forEach(b=>b.onclick=()=>gpsLoadAll(b));
+  document.querySelectorAll('.gpsdrychk').forEach(function(cb){cb.onchange=function(){GPS_DRYRUN=cb.checked;document.querySelectorAll('.gpsdrychk').forEach(function(x){x.checked=GPS_DRYRUN;});};});
+}
+async function load(){ var c=await sb.from('linda_customers').select('*'); CUSTS=c.data||[]; render(); }
+async function boot(){ var s=await sb.auth.getSession(); var u=s.data.session&&s.data.session.user; if(!u)return; if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;} document.getElementById('loginwrap').style.display='none'; document.getElementById('appwrap').style.display='block'; load(); }
+document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
+document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
+document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
+document.getElementById('refresh').onclick=()=>load();
+boot();
+</script>
+</body></html>

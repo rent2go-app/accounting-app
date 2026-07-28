@@ -247,7 +247,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda.png" alt="Linda" style="width:86px;height:86px;border-radius:50%;box-shadow:0 6px 18px rgba(0,0,0,.18)"></div><h1 style="text-align:center;margin-top:10px">Linda</h1><p class="hint" style="text-align:center">Your billing agent — admin sign in.</p><input id="li_email" type="email" autocomplete="username" placeholder="Email" required><input id="li_pass" type="password" autocomplete="current-password" placeholder="Password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda-sm.png" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><img src="assets/linda-sm.png" alt="Linda" class="lavatar"><span class="sub">· Linda — Billing Agent</span><div class="spacer"></div><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='gps.html'">🚗 Vehicles</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
 <div class="hero">
   <img src="assets/linda.png" alt="Linda" class="heroimg">
@@ -274,7 +274,6 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="lpaid"></div>
 <h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
 <div id="llearn"></div>
-<div id="lvmap" style="margin-top:22px"></div>
 </main></div>
 
 <script>
@@ -372,7 +371,6 @@ function render(){
   GPSROWS=[];
   renderDisconnections();
   renderPlans();
-  renderVehicleMap();
   renderFeeLedger();
   renderPaid();
   renderOutstanding();
