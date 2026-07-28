@@ -378,7 +378,10 @@ function render(){
     var toSend=ad.filter(d=>d.status!=='sent').length;
     var discN=ad.filter(d=>d.kind==='disconnect').length;
     var acctOut=CUSTS.filter(c=>c.account_label===acc).reduce((s,c)=>s+(+c.outstanding||0),0);
-    var flagsH=af.length?af.map(function(c){return '<div class="draft '+(c.flag==='recovery'?'recovery':'disc')+'"><div class="dhead"><span class="kind '+c.flag+'">'+c.flag.toUpperCase()+'</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'';
+    // Disconnect-flagged customers are now shown in the dedicated 🔴 Disconnection module (with checklist)
+    // AND as their full notice below — so we DON'T repeat them here. Keep only recovery flags (no notice of their own).
+    var afRec=af.filter(function(c){return c.flag==='recovery';});
+    var flagsH=afRec.length?afRec.map(function(c){return '<div class="draft recovery"><div class="dhead"><span class="kind recovery">RECOVERY</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'';
     var draftsH=ad.length?ad.map(draftCard).join(''):'<p class="hint">No past-due notices for this account. 🎉</p>';
     var pills=ad.length?('<span class="apill">'+ad.length+' notice'+(ad.length==1?'':'s')+'</span>'
         +(toSend?'<span class="apill warn">'+toSend+' to send</span>':'<span class="apill done">all sent ✓</span>'))
