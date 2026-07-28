@@ -133,7 +133,9 @@ async function scanAccount(acc: any) {
     //  (b) $70+ in open late fees AND 2+ past-due rentals.
     // (Requiring 2+ past due avoids disconnecting a brand-new renter whose open rentals are all still current.)
     const open_rentals = inv.filter((i: any) => !isLateFee(i));   // all unpaid rentals: past-due + current
-    const disc = (open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2);
+    // Plan customers are NEVER auto-disconnected here — even if behind, disconnection is a MANUAL
+    // recommendation (admin removes them from the plan in the dashboard, which then lets them auto-flag).
+    const disc = !planmap[cid] && ((open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2));
     const current_open = inv.filter((i: any) => !isPastDue(i));
     const current_amt = current_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const grandtot = Math.round((pd_total + current_amt) * 100) / 100;
@@ -163,23 +165,30 @@ async function scanAccount(acc: any) {
           intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan — yesterday we received ${yRent} rental payments and ${yLF} late-fee payments, exactly as agreed. To stay on track, today’s step is again ${terms}.`;
           closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
         } else {
-          subj = "Your Rent 2 Go payment plan — please stay on track today";
-          intro = `Good morning ${nm},\n\nYour payment plan is ${terms}. Yesterday we received ${yRent} rental payment${yRent === 1 ? "" : "s"} and ${yLF} late-fee payment${yLF === 1 ? "" : "s"} — a little short. Please make up the difference today so you stay on plan. If anything's changed, just reach out and we'll work with you.`;
-          closing = "Tap Pay now on the invoices above to bring your plan back on track today, or reply to discuss a way forward.";
+          subj = "⚠ Your Rent 2 Go payment plan — you've fallen behind";
+          intro = `Good morning ${nm},\n\nYour payment plan is ${terms}. Yesterday we received ${yRent} rental payment${yRent === 1 ? "" : "s"} and ${yLF} late-fee payment${yLF === 1 ? "" : "s"} — short of your agreed plan, so you have fallen behind. It's important that you catch up today to stay on your plan and in good standing.`;
+          closing = "Please tap Pay now on the invoices above to bring your plan back on track today. If you don't get back on track, your account may be recommended for disconnection. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
         }
       } else {
-        // custom plan (e.g. clear a balance by a date) — reference their agreed terms
-        subj = "Your Rent 2 Go payment plan — a friendly reminder";
-        intro = `Good morning ${nm} 👋\n\nJust a friendly reminder of your agreed payment plan: ${terms}. Every payment brings your balance down — please keep to your plan to stay in good standing.`;
-        closing = "Tap Pay now on any invoice above to make a payment toward your plan. If anything has changed, just reply and we'll work with you.";
+        // custom plan (e.g. clear a balance by a date) — on track vs behind is judged on whether the past-due is growing
+        planBehind = rental_pd.length >= 2;   // multiple past-due rentals while on a custom plan → falling behind
+        if (planBehind) {
+          subj = "⚠ Your Rent 2 Go payment plan — you're falling behind";
+          intro = `Good morning ${nm},\n\nYour agreed payment plan is: ${terms}. Your past-due balance is growing (${rental_pd.length} past-due rentals), which means you're falling behind your plan. Please catch up today to stay in good standing.`;
+          closing = "Please tap Pay now on any invoice above to get back on plan today. If you don't, your account may be recommended for disconnection. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
+        } else {
+          subj = "Your Rent 2 Go payment plan — a friendly reminder";
+          intro = `Good morning ${nm} 👋\n\nJust a friendly reminder of your agreed payment plan: ${terms}. Every payment brings your balance down — please keep to your plan to stay in good standing.`;
+          closing = "Tap Pay now on any invoice above to make a payment toward your plan. If anything has changed, just reply and we'll work with you.";
+        }
       }
       // Plan customers are NEVER disconnected, no matter how many invoices are open — but if they
       // missed yesterday's 2 rentals + 2 late fees, mark them "falling behind their plan" so it's visible.
       kind = "reminder"; state = planBehind ? "plan_behind" : "plan"; flag = "none"; dnote = null;
     } else if (disc) {
       subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
-      intro = `${nm},\n\nThis is a FINAL NOTICE. Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices) and is scheduled for DISCONNECTION today. To keep your vehicle, your account must be brought fully current by 1:00 PM today.`;
-      closing = "If your balance is not cleared by 1:00 PM today, your rental will be disconnected and the vehicle scheduled for recovery. Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reach out right away to arrange payments or discuss a plan of action — otherwise recovery will proceed.";
+      intro = `${nm},\n\nThis is a FINAL NOTICE. Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices) and is scheduled for DISCONNECTION today. To keep your vehicle, your account must be brought fully current right away.`;
+      closing = "Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reach out right away to arrange payments or discuss a plan of action — otherwise recovery will proceed.";
       kind = "disconnect"; state = "disconnect"; flag = "disconnect"; dnote = nowISO;
     } else if (rental_pd.length > 0 && pd_total > 250) {
       subj = "Important — your Rent 2 Go account needs prompt attention (" + m(pd_total) + " past due)";
@@ -187,7 +196,7 @@ async function scanAccount(acc: any) {
       closing = "If you intend to continue the rental with us today, it is imperative that you catch up your account as soon as possible — to avoid service interruption as well as vehicle recovery. Please tap Pay now on any invoice above to settle without delay.";
     } else if (rental_pd.length >= 2) {
       subj = "Your Rent 2 Go account is past due — " + m(pd_total);
-      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} days${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}). Please cure your balance by 1:00 PM today, or reach out so we can discuss a way forward.`;
+      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} days${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}). Please cure your balance as soon as possible, or reach out so we can discuss a way forward.`;
       closing = "Tap Pay now on any invoice above to settle. If you can't clear it today, reach out right away to arrange payments or discuss a plan of action.";
     } else if (rental_pd.length > 0) {
       subj = "A reminder about your Rent 2 Go balance — " + m(pd_total) + " past due";

@@ -170,6 +170,9 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .disccard.grace{border-left-color:#7a5cff;background:color-mix(in srgb,#7a5cff 6%,var(--surface))}
 .dgrace .dtime{flex:0 0 auto;min-width:0;width:118px}
 .dts.exp{color:var(--out);font-weight:700}
+.discwrap.plans .disccard.active{border-left-color:#eab54e;background:color-mix(in srgb,#eab54e 8%,var(--surface))}
+.planterms{font-weight:700;color:var(--text)}
+.btn.small.danger{background:var(--out);color:#fff;border-color:var(--out)}
 .dchecks{display:flex;flex-direction:column;gap:7px}
 .dchk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .dchk input{width:16px;height:16px;accent-color:var(--out)}
@@ -238,6 +241,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="lbrief" class="briefbar"></div>
 <div class="cards" id="lsum"></div>
 <div id="ldisc"></div>
+<div id="lplans"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div id="laccounts"></div>
@@ -343,6 +347,7 @@ function render(){
     card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   renderDisconnections();
+  renderPlans();
   renderFeeLedger();
   renderPaid();
   renderOutstanding();
@@ -589,11 +594,46 @@ function renderDisconnections(){
         +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
+        +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button></div>'
       +'</div></div>';
   }).join('');
   el.innerHTML='<details class="discwrap" open><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'
+    +cards+'</details>';
+}
+// ── PAYMENT PLAN MODULE ──────────────────────────────────────────────────────────────
+var PLANROWS=[];
+async function setPlan(c,patch){
+  var r=await sb.from('linda_customers').update(patch).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();
+  if(r.error){alert('Could not save: '+r.error.message);return;}
+  if(!r.data||!r.data.length){toast('⚠ Could not save — refreshing…');await load();return;}
+  toast('Saved ✓');await load();
+}
+async function editPlanTerms(i){var c=PLANROWS[i];var t=prompt('Payment plan terms for '+c.name+':\n(e.g. "2 rental invoices and 2 late fees per day" or "clear $246 before 1 August")',c.plan_terms||'2 rental invoices and 2 late fees per day');if(t===null)return;await setPlan(c,{plan_terms:t.trim()});}
+async function markPlanContacted(i){var c=PLANROWS[i];var n=prompt('Note for '+c.name+' (what was agreed / discussed):',c.plan_note||'');if(n===null)return;await setPlan(c,{plan_note:n.trim(),plan_contacted_at:new Date().toISOString()});}
+async function removePlan(i){var c=PLANROWS[i];if(!confirm('Take '+c.name+' OFF the payment plan?\n\nThey will return to normal reminder/disconnection logic on the next sweep.'))return;await setPlan(c,{on_plan:false,plan_terms:null,plan_note:null,plan_contacted_at:null});}
+async function recommendDisc(i){var c=PLANROWS[i];if(!confirm('Recommend '+c.name+' for DISCONNECTION?\n\nThis removes them from the payment plan; if they meet the threshold they will be flagged for disconnection on the next sweep.'))return;await setPlan(c,{on_plan:false,plan_terms:null});auditOne(c.account_label);}
+async function putOnPlan(i){var c=DISCROWS[i];var t=prompt('Put '+c.name+' on a payment plan — terms:\n(e.g. "2 rental invoices and 2 late fees per day")','2 rental invoices and 2 late fees per day');if(t===null)return;var r=await sb.from('linda_customers').update({on_plan:true,plan_terms:t.trim()}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert('Could not save: '+r.error.message);return;}if(!r.data||!r.data.length){toast('⚠ Could not save');return;}toast('On plan — moving off disconnection…');auditOne(c.account_label);}
+function renderPlans(){
+  var el=document.getElementById('lplans');if(!el)return;
+  PLANROWS=CUSTS.filter(function(c){return c.on_plan;}).sort(function(a,b){return (a.state==='plan_behind'?0:1)-(b.state==='plan_behind'?0:1);});
+  if(!PLANROWS.length){el.innerHTML='';return;}
+  var behindN=PLANROWS.filter(function(c){return c.state==='plan_behind';}).length;
+  var cards=PLANROWS.map(function(c,i){
+    var behind=c.state==='plan_behind';
+    var badge=behind?'<span class="dbadge warn">⚠ BEHIND PLAN — can be recommended for disconnection</span>':'<span class="dbadge on">🟢 ON TRACK</span>';
+    return '<div class="disccard'+(behind?' active':' restored')+'">'
+      +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
+      +'<div class="dchecks">'
+        +'<div class="dact"><span class="dlbl">Plan terms:</span> <span class="planterms">'+esc(c.plan_terms||'—')+'</span> <button class="btn small" data-planterms="'+i+'">✏️ Edit</button></div>'
+        +'<div class="dact"><span class="dlbl">Adherence:</span> '+(behind?'<b class="red">Fell behind yesterday\'s agreed payments — Linda is watching.</b>':'<b class="pos">Keeping to plan (yesterday\'s payments received).</b>')+'</div>'
+        +(c.plan_note?'<div class="dact"><span class="dlbl">Note:</span> '+esc(c.plan_note)+(c.plan_contacted_at?' <span class="dts">'+shortET(c.plan_contacted_at)+' ET</span>':'')+'</div>':'')
+        +'<div class="dact"><button class="btn small" data-plancontact="'+i+'">📝 Log contact / note</button> <button class="btn small" data-planremove="'+i+'">Remove from plan</button>'+(behind?' <button class="btn small danger" data-planrecdisc="'+i+'">🔴 Recommend for disconnection</button>':'')+'</div>'
+      +'</div></div>';
+  }).join('');
+  el.innerHTML='<details class="discwrap plans" open><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
+    +'<p class="hint" style="margin:6px 0 10px">Linda checks each plan daily. <b>On track</b> = yesterday\'s agreed payments came in. <b>Behind</b> = they didn\'t — the notice warns them, and you can recommend disconnection.</p>'
     +cards+'</details>';
 }
 function renderFeeLedger(){
@@ -637,7 +677,20 @@ function renderFeeLedger(){
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
 function greetWord(){var h=parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}),10)%24;return h<12?'Good morning':h<18?'Good afternoon':'Good evening';}
 // Message greeting tracks the current ET time until the notice is sent, then it freezes.
-function dynBody(d){return d.status==='sent'?d.body:d.body.replace(/^Good (morning|afternoon|evening)/,greetWord());}
+function dynBody(d){
+  var b=d.status==='sent'?d.body:d.body.replace(/^Good (morning|afternoon|evening)/,greetWord());
+  // If grace is active on a disconnection, the notice must reflect the extended deadline — not "1:00 PM today / recovery now".
+  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr&&graceActive(dr))b=graceRewrite(b,dr);}
+  return b;
+}
+function graceRewrite(b,dr){
+  var t=fullET(dr.grace_until);
+  b=b.replace('This is a FINAL NOTICE.','This is an important account notice. As a courtesy, we have granted you a GRACE PERIOD — your deadline is extended to '+t+'.');
+  b=b.replace(/is scheduled for DISCONNECTION today/g,'is at risk of disconnection');
+  b=b.replace(/brought fully current right away/g,'brought fully current by '+t+' (your extended grace deadline)');
+  b=b.replace(/otherwise recovery will proceed\./g,'if it is not settled by '+t+' (your extended grace deadline), recovery will proceed.');
+  return b;
+}
 function etStamp(){return new Date().toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';}
 function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
@@ -771,6 +824,11 @@ function wire(){
   document.querySelectorAll('[data-discnote]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discnote],{notes:document.getElementById('dni'+b.dataset.discnote).value}));
   document.querySelectorAll('[data-discgrace]').forEach(b=>b.onclick=function(){var i=b.dataset.discgrace,t=document.getElementById('dgt'+i).value;if(!t){alert('Enter a grace time (ET) first.');return;}setDisc(DISCROWS[i],{grace_until:etTimeToISO(t),grace_note:document.getElementById('dgn'+i).value});});
   document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
+  document.querySelectorAll('[data-discplan]').forEach(b=>b.onclick=()=>putOnPlan(b.dataset.discplan));
+  document.querySelectorAll('[data-planterms]').forEach(b=>b.onclick=()=>editPlanTerms(b.dataset.planterms));
+  document.querySelectorAll('[data-plancontact]').forEach(b=>b.onclick=()=>markPlanContacted(b.dataset.plancontact));
+  document.querySelectorAll('[data-planremove]').forEach(b=>b.onclick=()=>removePlan(b.dataset.planremove));
+  document.querySelectorAll('[data-planrecdisc]').forEach(b=>b.onclick=()=>recommendDisc(b.dataset.planrecdisc));
   var tn=document.getElementById('testNotice');if(tn)tn.onclick=()=>sendTestNotice(tn);
   document.querySelectorAll('[data-plan]').forEach(b=>b.onclick=()=>togglePlan(b.dataset.plan));
 }
