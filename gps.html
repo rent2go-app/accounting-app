@@ -240,20 +240,53 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
 .hint{color:var(--muted);font-size:12.5px}
 
-.wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto;padding:14px 20px 40px}
+
+.gpstop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}
+.gpslayout{display:flex;gap:14px;align-items:stretch;height:calc(100vh - 200px);min-height:440px}
+.gpsside{flex:0 0 310px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.carsearchwrap{padding:8px;position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);z-index:2}
+#carsearch{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px}
+.caracc{font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 11px 4px}
+.carrow{padding:8px 11px;cursor:pointer;border-left:3px solid transparent}
+.carrow:hover{background:var(--surface-2)}
+.carrow.sel{background:color-mix(in srgb,var(--brand) 12%,var(--surface));border-left-color:var(--brand)}
+.carnm{font-weight:700;font-size:13px}
+.carsub{font-size:11.5px;color:var(--muted)}
+.carsub .nolink{color:var(--out)}
+.gpsmainpane{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.gpsbigmap{flex:1;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2)}
+.gpsbigmap iframe{width:100%;height:100%;border:0;display:block}
+.mapempty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;padding:20px;text-align:center}
+.gpsdetail{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
+.dethead{font-size:15px;margin-bottom:9px}
+.detctrl{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.detstat{display:flex;flex-direction:column;gap:6px;font-size:13px}
+@media(max-width:820px){.gpslayout{flex-direction:column;height:auto}.gpsside{flex:none;max-height:260px}.gpsbigmap{min-height:320px}}
 </style>
 </head><body>
 
 <div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">Vehicles &amp; GPS — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
-
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
 
 <div id="appwrap" style="display:none">
-<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· Vehicles &amp; GPS</span><div class="spacer"></div><button class="btn" onclick="location.href='linda.html'" title="Linda — Billing Agent"><img src="assets/linda-sm.png" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px" alt="">Linda</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="refresh">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· Vehicles &amp; GPS</span><div class="spacer"></div><button class="btn" onclick="location.href='linda.html'" title="Linda — Billing Agent"><img src="assets/linda-sm.png" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px" alt="">Linda</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
-<h2 style="margin:6px 0 2px">🚗 Vehicles &amp; GPS</h2>
-<p class="hint" style="margin:0 0 14px">Map each customer to their SareKon device, then Locate / Track / Disable / Enable the starter. JJT cars route to the JJT account automatically.</p>
-<div id="lvmap"></div>
+<div class="gpstop">
+  <h2 style="margin:0;flex:0 0 auto">🚗 Vehicles &amp; GPS</h2>
+  <button class="btn small pri" id="loadall">🚗 Load all cars</button>
+  <label class="gpsdry" style="margin:0"><input type="checkbox" class="gpsdrychk" checked> 🧪 dry-run (safe) — uncheck to actually disable/enable</label>
+</div>
+<div class="gpslayout">
+  <aside class="gpsside">
+    <div class="carsearchwrap"><input id="carsearch" placeholder="Search customer / car / fleet…"></div>
+    <div id="carlist"></div>
+  </aside>
+  <section class="gpsmainpane">
+    <div class="gpsbigmap" id="gpsmap"><div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div></div>
+    <div class="gpsdetail" id="gpsdetail"><p class="hint" style="margin:0">Select a car from the list to view its status and controls.</p></div>
+  </section>
+</div>
 </main></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -262,69 +295,72 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com','thandobnkala@gmail.com'];
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
-let CUSTS=[];
-var GPSDEV={}; var GPS_DRYRUN=true; var GPSROWS=[];
+var GPSDEV={}, GPS_DRYRUN=true;
 function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
-async function gpsLoad(i){var c=GPSROWS[i];try{await loadGpsDevices(c.account_label);render();}catch(e){alert('Could not load GPS cars: '+(e.message||e));}}
-async function gpsLoadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars\u2026';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');render();}catch(e){alert('Load failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}}
-async function gpsPick(i,sel){var c=GPSROWS[i];var id=sel.value;if(!id)return;var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await load();}
-async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
-function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open in Google Maps</a>':'')+'</div>'+((d.lat&&d.lng)?'<iframe class="gpsmap" loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(d.lat+','+d.lng)+'&z=15&output=embed"></iframe>':'')+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
-async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
-async function gpsLocate(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">pinging the car for a fresh location\u2026</span>';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});el.innerHTML='<span class="hint">ping sent \u2014 fetching the fresh position in ~15s\u2026</span>';setTimeout(function(){gpsTrack(i);},15000);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Locate failed: '+esc(e.message||e)+'</span>';}}
-async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
-async function gpsCommand(c,kind){
-  if(!c.sarekon_device_id)return null;
-  var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';
-  if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return {cancelled:true};
-  try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});toast(d.dry_run?('DRY-RUN: would '+kind):(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:'')));return d;}
-  catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
-}
-function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
-  if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpslocate="'+i+'" title="Force a fresh GPS ping now">\uD83D\uDCCD Locate</button> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
-  var devs=GPSDEV[gpsKeyFor(c.account_label)];
-  if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">or use \u201cLoad all cars\u201d above</span></div>';}
-  var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
-  return '<div class="gpsrow">Car: <select class="gpssel" data-gpspick="'+i+'"><option value="">- pick this car -</option>'+opts+'</select></div>';
-}
+let CUSTS=[], SELECTED=null, TRACK=null, SEARCH='';
 
-function renderVehicleMap(){
-  var el=document.getElementById('lvmap'); if(!el) return;
-  var byAcc={}; CUSTS.forEach(function(c){ if(c.sub_status==='no_subscription' && !c.sarekon_device_id) return; (byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c); });
-  var accs=Object.keys(byAcc).sort();
-  if(!accs.length){ el.innerHTML=''; return; }
-  var linked=CUSTS.filter(function(c){return c.sarekon_device_id;}).length;
-  var groups=accs.map(function(acc){
+function setMap(lat,lng){var m=document.getElementById('gpsmap');if(lat&&lng){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lng)+'&z=15&output=embed"></iframe>';}else{m.innerHTML='<div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div>';}}
+
+function renderSide(){
+  var q=SEARCH.toLowerCase();
+  var list=CUSTS.filter(function(c){return !q||((c.name||'').toLowerCase().indexOf(q)>=0)||((c.sarekon_device_label||'').toLowerCase().indexOf(q)>=0)||((c.account_label||'').toLowerCase().indexOf(q)>=0);});
+  var byAcc={}; list.forEach(function(c){(byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c);});
+  var html=Object.keys(byAcc).sort().map(function(acc){
     var rows=byAcc[acc].slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(c){
-      return '<div class="vmrow"><span class="vmname">'+esc(c.name)+'</span>'+gpsRow(c)+'</div>';
+      var idx=CUSTS.indexOf(c), linked=!!c.sarekon_device_id;
+      var sel=(SELECTED&&SELECTED.customer_id===c.customer_id&&SELECTED.account_label===c.account_label)?' sel':'';
+      var top=linked?esc(c.sarekon_device_label||'linked'):esc(c.name);
+      var sub=linked?esc(c.name):'<span class="nolink">no car linked</span>';
+      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+top+'</div><div class="carsub">'+sub+'</div></div>';
     }).join('');
-    return '<details class="vmacct"><summary>'+esc(acc)+' <span class="hint">('+byAcc[acc].length+')</span></summary>'+rows+'</details>';
+    return '<div class="caracc">'+esc(acc)+'</div>'+rows;
   }).join('');
-  el.innerHTML='<details class="discwrap"><summary>\uD83D\uDE97 Vehicle Mapping (GPS) \u2014 <b>'+linked+'</b> of '+CUSTS.length+' linked</summary>'
-    +'<button class="btn small pri" data-gpsloadall="1" style="margin:8px 0">\uD83D\uDE97 Load all cars (both accounts)</button>'+'<label class="gpsdry"><input type="checkbox" class="gpsdrychk"'+(GPS_DRYRUN?' checked':'')+'> \uD83E\uDDEA GPS dry-run (safe) \u2014 UNCHECK to actually disable/enable a car</label>'+'<p class="hint" style="margin:6px 0 10px">Link each customer to their SareKon car once. JJT customers automatically load JJT\'s cars; everyone else loads the main account. Once linked you can Track / Disable / Enable from here or from the disconnection card.</p>'+groups+'</details>';
+  document.getElementById('carlist').innerHTML=html||'<p class="hint" style="padding:12px">No matches.</p>';
+  document.querySelectorAll('[data-car]').forEach(function(b){b.onclick=function(){selectCar(+b.dataset.car);};});
 }
-function render(){ GPSROWS=[]; renderVehicleMap(); bind(); }
-function bind(){
-  document.querySelectorAll('[data-gpsload]').forEach(b=>b.onclick=()=>gpsLoad(b.dataset.gpsload));
-  document.querySelectorAll('[data-gpspick]').forEach(b=>b.onchange=()=>gpsPick(b.dataset.gpspick,b));
-  document.querySelectorAll('[data-gpsunlink]').forEach(b=>b.onclick=()=>gpsUnlink(b.dataset.gpsunlink));
-  document.querySelectorAll('[data-gpslocate]').forEach(b=>b.onclick=()=>gpsLocate(b.dataset.gpslocate));
-  document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
-  document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
-  document.querySelectorAll('[data-gpsenable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsenable,'enable'));
-  document.querySelectorAll('[data-gpsloadall]').forEach(b=>b.onclick=()=>gpsLoadAll(b));
-  document.querySelectorAll('.gpsdrychk').forEach(function(cb){cb.onchange=function(){GPS_DRYRUN=cb.checked;document.querySelectorAll('.gpsdrychk').forEach(function(x){x.checked=GPS_DRYRUN;});};});
+function selectCar(idx){SELECTED=CUSTS[idx];TRACK=null;renderSide();renderMain();if(SELECTED.sarekon_device_id){setMap(null);trackSel();}else{setMap(null);}}
+
+function renderMain(){
+  var d=document.getElementById('gpsdetail');
+  if(!SELECTED){d.innerHTML='<p class="hint" style="margin:0">Select a car from the list.</p>';return;}
+  var c=SELECTED;
+  if(!c.sarekon_device_id){
+    var devs=GPSDEV[gpsKeyFor(c.account_label)];
+    var picker=devs?('<select class="gpssel" id="linksel"><option value="">- pick this car -</option>'+devs.map(function(x){return '<option value="'+esc(x.device_id)+'">'+esc(x.description)+'</option>';}).join('')+'</select> <button class="btn small pri" id="linkbtn">Link</button>'):'<button class="btn small" id="loadbtn">Load cars</button> <span class="hint">or hit “Load all cars” above</span>';
+    d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+'</span></div><div class="detrow">No GPS car linked yet. '+picker+'</div>';
+    var lb=document.getElementById('linkbtn'); if(lb)lb.onclick=linkSel;
+    var lo=document.getElementById('loadbtn'); if(lo)lo.onclick=async function(){await loadGpsDevices(c.account_label);renderMain();};
+    return;
+  }
+  var t=TRACK;
+  var badges=t?('<span class="ignbadge '+(t.ignition==='ON'?'on':'off')+'">Ignition '+(t.ignition||'?')+'</span> '+(t.motion?('<span class="gpsmot">'+esc(t.motion)+(t.motion_since?' since '+esc(t.motion_since):'')+(t.speed?' ('+esc(t.speed)+')':'')+'</span>'):'')):'<span class="hint">Tap Track to load live status.</span>';
+  var loc=t?('<div class="gpsloc">'+esc(t.address||'-')+(t.maps?' · <a href="'+esc(t.maps)+'" target="_blank" rel="noopener">open in Google Maps</a>':'')+'</div>'):'';
+  var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap"><summary>recent events</summary>'+t.events.slice(0,10).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('')+'</details>'):'';
+  d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+' · '+esc(c.sarekon_device_label||'')+'</span></div>'
+    +'<div class="detctrl"><button class="btn small" id="btnLocate">📍 Locate</button> <button class="btn small" id="btnTrack">↻ Track</button> <button class="btn small danger" id="btnDisable">🔴 Disable starter</button> <button class="btn small ok" id="btnEnable">🟢 Enable starter</button> <button class="btn small" id="btnUnlink">unlink</button></div>'
+    +'<div class="detstat">'+badges+loc+ev+'<div id="detmsg" class="hint"></div></div>';
+  document.getElementById('btnLocate').onclick=locateSel;
+  document.getElementById('btnTrack').onclick=trackSel;
+  document.getElementById('btnDisable').onclick=function(){cmdSel('disable');};
+  document.getElementById('btnEnable').onclick=function(){cmdSel('enable');};
+  document.getElementById('btnUnlink').onclick=unlinkSel;
 }
-async function load(){ var c=await sb.from('linda_customers').select('*'); CUSTS=c.data||[]; render(); }
-async function boot(){ var s=await sb.auth.getSession(); var u=s.data.session&&s.data.session.user; if(!u)return; if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;} document.getElementById('loginwrap').style.display='none'; document.getElementById('appwrap').style.display='block'; load(); }
+async function trackSel(){var c=SELECTED;if(!c||!c.sarekon_device_id)return;var m=document.getElementById('detmsg');if(m)m.textContent='locating…';try{TRACK=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});renderMain();if(TRACK.lat&&TRACK.lng)setMap(TRACK.lat,TRACK.lng);}catch(e){var m2=document.getElementById('detmsg');if(m2)m2.textContent='Track failed: '+(e.message||e);}}
+async function locateSel(){var c=SELECTED;var m=document.getElementById('detmsg');if(m)m.textContent='pinging the car for a fresh location…';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});if(m)m.textContent='ping sent — refreshing position in ~15s…';setTimeout(trackSel,15000);}catch(e){if(m)m.textContent='Locate failed: '+(e.message||e);}}
+async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var m=document.getElementById('detmsg');if(m)m.textContent='sending…';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(m)m.textContent=d.dry_run?('DRY-RUN — would send '+kind+' (nothing sent).'):('Sent: '+kind+' — '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' #'+d.command_queue_id:''));toast(kind+(d.dry_run?' (dry-run)':' sent'));}catch(e){if(m)m.textContent='Failed: '+(e.message||e);}}
+async function linkSel(){var c=SELECTED;var sel=document.getElementById('linksel');var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await reloadKeepSel(c);trackSel();}
+async function unlinkSel(){var c=SELECTED;if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await reloadKeepSel(c);}
+async function reloadKeepSel(c){var d=await sb.from('linda_customers').select('*');CUSTS=(d.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});SELECTED=CUSTS.find(function(x){return x.customer_id===c.customer_id&&x.account_label===c.account_label;})||null;TRACK=null;renderSide();renderMain();}
+async function loadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars…';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');if(SELECTED)renderMain();}catch(e){alert('Load failed: '+(e.message||e));}btn.disabled=false;btn.textContent=o;}
+
+async function load(){var c=await sb.from('linda_customers').select('*');CUSTS=(c.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});renderSide();}
+async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('loadall').onclick=function(){loadAll(document.getElementById('loadall'));};document.getElementById('carsearch').oninput=function(e){SEARCH=e.target.value;renderSide();};document.querySelectorAll('.gpsdrychk').forEach(function(cb){cb.onchange=function(){GPS_DRYRUN=cb.checked;};});await load();try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');}catch(e){}}
 document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
 document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
-document.getElementById('refresh').onclick=()=>load();
 boot();
 </script>
 </body></html>
