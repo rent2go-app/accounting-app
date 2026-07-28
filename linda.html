@@ -263,7 +263,6 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="cards" id="lsum"></div>
 <div id="ldisc"></div>
 <div id="lplans"></div>
-<div id="lvmap"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
 <div id="laccounts"></div>
@@ -274,6 +273,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="lpaid"></div>
 <h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
 <div id="llearn"></div>
+<div id="lvmap" style="margin-top:22px"></div>
 </main></div>
 
 <script>
@@ -595,6 +595,7 @@ async function gpsPick(i,sel){var c=GPSROWS[i];var id=sel.value;if(!id)return;va
 async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await load();}
 function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open map</a>':'')+'</div>'+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
 async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
+async function gpsLocate(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">pinging the car for a fresh location\u2026</span>';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});el.innerHTML='<span class="hint">ping sent \u2014 fetching the fresh position in ~15s\u2026</span>';setTimeout(function(){gpsTrack(i);},15000);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Locate failed: '+esc(e.message||e)+'</span>';}}
 async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
 async function gpsCommand(c,kind){
   if(!c.sarekon_device_id)return null;
@@ -604,7 +605,7 @@ async function gpsCommand(c,kind){
   catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
 }
 function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
-  if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
+  if(c.sarekon_device_id){return '<div class="gpsrow linked">Car: <b>'+esc(c.sarekon_device_label||c.sarekon_device_id)+'</b> <button class="btn small" data-gpslocate="'+i+'" title="Force a fresh GPS ping now">\uD83D\uDCCD Locate</button> <button class="btn small" data-gpstrack="'+i+'">Track</button> <button class="btn small danger" data-gpsdisable="'+i+'">Disable starter</button> <button class="btn small ok" data-gpsenable="'+i+'">Enable starter</button> <button class="btn small" data-gpsunlink="'+i+'">unlink</button><div class="gpsresult" id="gpsr'+i+'"></div></div>';}
   var devs=GPSDEV[gpsKeyFor(c.account_label)];
   if(!devs){return '<div class="gpsrow">Car: <button class="btn small" data-gpsload="'+i+'">Link GPS car</button> <span class="hint">or use \u201cLoad all cars\u201d above</span></div>';}
   var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
@@ -900,6 +901,7 @@ function wire(){
   document.querySelectorAll('[data-gpspick]').forEach(b=>b.onchange=()=>gpsPick(b.dataset.gpspick,b));
   document.querySelectorAll('[data-gpsloadall]').forEach(b=>b.onclick=()=>gpsLoadAll(b));
   document.querySelectorAll('[data-gpsunlink]').forEach(b=>b.onclick=()=>gpsUnlink(b.dataset.gpsunlink));
+  document.querySelectorAll('[data-gpslocate]').forEach(b=>b.onclick=()=>gpsLocate(b.dataset.gpslocate));
   document.querySelectorAll('[data-gpstrack]').forEach(b=>b.onclick=()=>gpsTrack(b.dataset.gpstrack));
   document.querySelectorAll('[data-gpsdisable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsdisable,'disable'));
   document.querySelectorAll('[data-gpsenable]').forEach(b=>b.onclick=()=>gpsSend(b.dataset.gpsenable,'enable'));

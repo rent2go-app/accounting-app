@@ -15,6 +15,7 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 const CMD: Record<string, { id: number; params: Record<string, number> }> = {
   disable: { id: 1253, params: { data_type_23110: 0 } },
   enable: { id: 1252, params: {} },
+  locate: { id: 6000, params: {} },
 };
 
 function gpsFor(label: string) { return GPS.find((g: any) => g.match === label) || GPS.find((g: any) => g.match === "default"); }
