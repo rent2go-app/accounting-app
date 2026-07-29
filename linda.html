@@ -587,6 +587,7 @@ function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('l
 // ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
 var DISCROWS=[];
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
+function discDraftFor(i){var c=DISCROWS[i];return DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});}
 function durText(a,b){var s=Math.max(0,(new Date(b).getTime()-new Date(a).getTime())/1000);var h=Math.floor(s/3600),m=Math.round((s%3600)/60);return (h?h+'h ':'')+m+'m';}
 function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'+00:00';}catch(e){return '-04:00';}}
 // interpret a manually-entered HH:MM (and optional date) as America/New_York and return an ISO instant
@@ -642,6 +643,7 @@ function renderDisconnections(){
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
     var nsent=dnf&&dnf.status==='sent';
     var noticeLine='<div class="dnotice '+(nsent?'sent':'unsent')+'">'+(nsent?'📧 Disconnection notice emailed today · '+shortET(dnf.sent_at)+' ET':(dnf&&dnf.reviewed_at?'✉️ Notice reviewed but NOT emailed yet today':'✉️ Disconnection notice NOT emailed yet today'))+'</div>';
+    var noticeActions=dnf?('<div class="dact">'+(nsent?'<span class="hint">✅ notice sent'+(dnf.sent_at?' '+shortET(dnf.sent_at)+' ET':'')+'</span> <button class="btn small" data-dnccopy="'+i+'">📋 Copy again</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button>':'<button class="btn small ok" data-dncsend="'+i+'"'+(dnf.email?'':' disabled title="no email on file — use Copy"')+'>📧 Send disconnection notice</button> <button class="btn small" data-dnccopy="'+i+'">📋 Copy</button> <button class="btn small" data-dncsent="'+i+'">✅ Mark sent</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button>')+'</div>'):'<div class="dact"><span class="hint">No notice generated yet — run an Audit Sweep on this account.</span></div>';
     var tl=(r.signal_sent_at||r.restored_at)?('<div class="dtimeline">'
       +(r.signal_sent_at?'<span class="tl-trig">🔴 Disconnection triggered: <b>'+fullET(r.signal_sent_at)+'</b></span>':'')
       +(r.restored_at?'<span class="tl-rest">🟢 Restored to service: <b>'+fullET(r.restored_at)+'</b></span>':'')
@@ -649,7 +651,7 @@ function renderDisconnections(){
       +'</div>'):'';
     return '<div class="disccard'+(r.restored?' restored':gA?' grace':r.signal_sent?' active':'')+'">'
       +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
-      +noticeLine
+      +noticeLine+noticeActions
       +tl
       +'<div class="dchecks">'
         +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b> <span class="hint">(fires starter-disable if a car is linked)</span>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
@@ -904,6 +906,9 @@ function wire(){
   document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
   document.querySelectorAll('[data-refreshledger]').forEach(b=>b.onclick=()=>refreshLedger(b));
   document.querySelectorAll('[data-discsig]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discsig];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'disable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{signal_sent:b.checked,signal_sent_at:b.checked?new Date().toISOString():null});});
+  document.querySelectorAll('[data-dncsend]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsend);if(d)send(d.id,b);else alert('No notice found — run an Audit Sweep on this account.');});
+  document.querySelectorAll('[data-dnccopy]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dnccopy);if(d)copyDraft(d.id,b);});
+  document.querySelectorAll('[data-dncsent]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsent);if(d)markSent(d.id);});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
   document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
