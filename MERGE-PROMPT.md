@@ -9,7 +9,7 @@ You are wiring the **Rent 2 Go customer prototype** (front-end) into an **existi
 ## Shared backend (already live — use as-is)
 - **Supabase project:** `https://fsapfxhyjbgxjydahdlx.supabase.co`
 - **Anon key (public client):** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM`
-- **Prototype intake token (public-client):** `rintake_513def25b66a4c5e0bcaa26bdf22b776a65e227f`
+- **Prototype intake token (public-client):** `<<ASK NTANDO — not committed to this public repo>>` (stored as the `RENTER_INTAKE_TOKEN` Supabase secret; shared with the prototype builder directly)
 
 ## HARD RULES — do not break these
 1. **Do NOT create, drop, `alter`, truncate, or reseed** the tables `owners`, `vehicles`, or `renters`. They already exist with the exact schema below and hold **live data** (11 real owners, 35 real vehicles, plus renters). Migrating over them or `create table` (even `if not exists` with a different shape) is forbidden.
