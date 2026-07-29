@@ -114,6 +114,12 @@ Deno.serve(async (req) => {
     // the licence. This returns those images so an admin can read the DOB off the
     // document and confirm it against what the renter typed.
     // Identity files are restricted (no file_links), so we proxy the bytes.
+    // Admin-only: list the fleet accounts and their customer-portal URLs.
+    // Returns labels and portals ONLY — never the Stripe keys.
+    if (body.action === "accounts" && isAdmin) {
+      return json({ ok: true, accounts: ACCTS.map((a: any) => ({ label: a.label, portal: a.portal || null })) });
+    }
+
     if (body.action === "files") {
       if (!isAdmin) return json({ error: "admins only" }, 403);
       if (!body.session_id) return json({ error: "session_id required" });
