@@ -145,6 +145,33 @@ Deno.serve(async (req) => {
     const s = await createSession({ name, email }, renter_id, key, body.return_url ? String(body.return_url) : undefined);
     if (s.error) return json({ error: s.error.message || JSON.stringify(s.error), renter_id });
     await sbPatch(`renters?id=eq.${enc(renter_id)}`, { stripe_account: label, session_id: s.id, verify_url: s.url, status: s.status, updated_at: new Date().toISOString() });
+    // Welcome email — they have just handed over documents and a signature, so
+    // silence here reads as "did that work?". Never let a mail failure break signup.
+    try {
+      const rk = Deno.env.get("RESEND_API_KEY");
+      if (rk && email) {
+        const from = Deno.env.get("RESEND_FROM") || "Rent 2 Go <noreply@rentaride2go.com>";
+        const first = (name || "").split(" ")[0] || "there";
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + rk, "Content-Type": "application/json" },
+          body: JSON.stringify({ from, to: [email], subject: "We've got your application — Rent 2 Go", html:
+            `<div style="font-family:Arial,Helvetica,sans-serif;color:#131820;line-height:1.55;max-width:560px">
+             <h2 style="color:#0f8a4d;margin:0 0 12px">Thanks, ${first} — we've got everything</h2>
+             <p>Your Rent 2 Go application is in. Here's what happens next:</p>
+             <ol style="line-height:1.9">
+               <li><b>Identity check</b> — Stripe confirms your driver's licence. Usually under a minute.</li>
+               <li><b>Final review</b> — our team checks your licence and proof of address by hand, normally within one business day.</li>
+             </ol>
+             <p>We'll email you at each step. You can sign in any time to see where you are:</p>
+             <p><a href="https://rent2go-app.github.io/Rent2Go/#dashboard" style="background:#0f8a4d;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Open my dashboard</a></p>
+             <p style="color:#5c6a7a;font-size:13px">Reminder: 7-day minimum rental, and vehicles stay within 100 miles of Charlotte, NC.</p>
+             <hr style="border:none;border-top:1px solid #e2e8e4;margin:22px 0 10px">
+             <div style="color:#5c6a7a;font-size:12px">Rent 2 Go · Suite 111, 9711 David Taylor Drive, Charlotte, NC 28262 · 980 272 8122</div></div>` }),
+        });
+      }
+    } catch (_) { /* signup must never fail because email did */ }
+
     return json({ ok: true, renter_id, url: s.url, session_id: s.id, client_secret: s.client_secret, status: s.status });
   } catch (e) { return json({ error: String(e) }, 500); }
 });

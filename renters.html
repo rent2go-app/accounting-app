@@ -347,7 +347,48 @@ function bind(){
 async function addRenter(){var n=document.getElementById('rt_name').value.trim();var e=document.getElementById('rt_email').value.trim();var p=document.getElementById('rt_phone').value.trim();if(!n){alert('Enter a name.');return;}var r=await sb.from('renters').insert([{name:n,email:e,phone:p,status:'new'}]);if(r.error){alert(r.error.message);return;}document.getElementById('rt_name').value='';document.getElementById('rt_email').value='';document.getElementById('rt_phone').value='';toast('Renter added ✓');await load();}
 async function genLink(i){var c=RENTERS[i];if(!c.email){alert('Add an email for this renter first (the link is emailed / sent to them).');return;}try{var d=await inv({action:'create',renter_id:c.id,renter:{name:c.name,email:c.email,phone:c.phone}});toast('ID link generated ✓');await load();try{await navigator.clipboard.writeText(d.url);toast('Link copied — send it to the renter');}catch(e){}}catch(e){alert('Could not generate link: '+(e.message||e));}}
 async function refresh(i){var c=RENTERS[i];try{var d=await inv({action:'status',session_id:c.session_id});toast('Status: '+(d.status||'?'));await load();}catch(e){alert('Refresh failed: '+(e.message||e));}}
-async function decide(i,dec){var c=RENTERS[i];if(dec==='rejected'&&!confirm('Reject '+(c.name||'this renter')+'?'))return;var r=await sb.from('renters').update({decision:dec,decision_at:new Date().toISOString()}).eq('id',c.id);if(r.error){alert(r.error.message);return;}toast(dec==='approved'?'Approved ✓':'Rejected');await load();}
+// Email helper — send-doc (Resend) accepts an admin JWT.
+async function mailRenter(to,subject,html){
+  if(!to)return;
+  try{
+    const ss=await sb.auth.getSession(); const tok=ss.data.session&&ss.data.session.access_token;
+    await fetch(window.R2G_CONFIG.SUPABASE_URL+'/functions/v1/send-doc',{method:'POST',
+      headers:{'Content-Type':'application/json',apikey:window.R2G_CONFIG.SUPABASE_ANON_KEY,
+               Authorization:'Bearer '+tok},
+      body:JSON.stringify({to,subject,html})});
+  }catch(e){console.error('email failed',e);}
+}
+const mailShell=(t,b)=>'<div style="font-family:Arial,Helvetica,sans-serif;color:#131820;line-height:1.55;max-width:560px">'
+  +'<h2 style="color:#0f8a4d;margin:0 0 12px">'+t+'</h2>'+b
+  +'<hr style="border:none;border-top:1px solid #e2e8e4;margin:22px 0 10px">'
+  +'<div style="color:#5c6a7a;font-size:12px">Rent 2 Go · Suite 111, 9711 David Taylor Drive, Charlotte, NC 28262 · 980 272 8122</div></div>';
+
+async function decide(i,dec){
+  var c=RENTERS[i];
+  if(dec==='rejected'&&!confirm('Reject '+(c.name||'this renter')+'?'))return;
+  var r=await sb.from('renters').update({decision:dec,decision_at:new Date().toISOString()}).eq('id',c.id).select().single();
+  if(r.error){alert(r.error.message);return;}
+  var d=r.data||c;
+  if(dec==='approved'){
+    var dep=d.deposit_total?Number(d.deposit_total).toFixed(2):'150.00';
+    var extra='';
+    if(Number(d.deposit_out_of_town)>0)extra+='<li>Out-of-town renter — $150</li>';
+    if(Number(d.deposit_young)>0)extra+='<li>Younger renter (21–24) — $150</li>';
+    await mailRenter(d.email,'You\u2019re approved — Rent 2 Go', mailShell('You\u2019re approved to rent',
+      '<p>Good news'+(d.name?', '+String(d.name).split(' ')[0]:'')+' — your account has been reviewed and approved.</p>'
+      +'<p>You can sign in and book a car now:</p>'
+      +'<p><a href="https://rent2go-app.github.io/Rent2Go/#catalogue" style="background:#0f8a4d;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Browse vehicles</a></p>'
+      +'<p><b>Your refundable deposit is $'+dep+'</b>'+(extra?'<ul style="margin:6px 0">'+'<li>Standard deposit — $150</li>'+extra+'</ul>':'')+'</p>'
+      +'<p style="color:#5c6a7a;font-size:13px">Reminder: 7-day minimum rental, and vehicles stay within 100 miles of Charlotte.</p>'));
+    toast('Approved ✓ — email sent');
+  } else {
+    await mailRenter(d.email,'About your Rent 2 Go application', mailShell('We couldn\u2019t approve your account',
+      '<p>Thanks for applying to rent with Rent 2 Go. Unfortunately we are not able to approve your account at this time.</p>'
+      +'<p>If you think this is a mistake, please call us on <b>980 272 8122</b> and we will gladly take another look.</p>'));
+    toast('Rejected — email sent');
+  }
+  await load(); render();
+}
 async function saveNote(i){var c=RENTERS[i];var v=document.querySelector('[data-noteinput="'+i+'"]').value;var r=await sb.from('renters').update({notes:v}).eq('id',c.id);if(r.error){alert(r.error.message);return;}toast('Note saved ✓');}
 async function delRenter(i){var c=RENTERS[i];if(!confirm('Remove '+(c.name||'this renter')+'?'))return;await sb.from('renters').delete().eq('id',c.id);await load();}
 async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('rt_add').onclick=addRenter;await load();}
