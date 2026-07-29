@@ -100,6 +100,7 @@ Deno.serve(async (req) => {
     if (city) homeFields.home_city = city;
     if (st)   homeFields.home_state = st;
     if (zip)  homeFields.home_postal = zip;
+    if (body.promo_code) homeFields.promo_code = String(body.promo_code).trim().toUpperCase();
 
     const label = body.account_label || DEFAULT_ACCT;
     const key = keyFor(label);
