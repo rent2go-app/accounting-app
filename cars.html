@@ -1,0 +1,347 @@
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M9%2041c0-1%201-2%202-3l3-1%204-8c1-2%202-3%205-3h18c3%200%204%201%205%203l4%208%203%201c1%201%202%202%202%203v5c0%201-1%202-2%202h-3a5%205%200%200%201-10%200H23a5%205%200%200%201-10%200h-2c-1%200-2-1-2-2z%22%20fill%3D%22%230f8a4d%22/%3E%3C/svg%3E">
+<title>Fleet — Rent 2 Go</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--out:#c22a2a;--warn:#b4750f;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--out:#f36f6f;--warn:#e0a33c}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;line-height:1.4}
+.topbar{display:flex;align-items:center;gap:14px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brandlogo{height:30px;display:block}.sub{font-size:12.5px;color:var(--muted);font-weight:700}.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.pri:hover{color:#fff;opacity:.92}
+.btn.danger{color:var(--out)}.btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+.wrap{max-width:1240px;margin:0 auto;padding:16px 20px 70px}
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
+.ctl input,.ctl select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.health{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin:14px 0}
+.hc{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
+.hc .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.hc .v{font-size:23px;font-weight:800;margin-top:2px}
+.hc.bad .v{color:var(--out)}.hc.warn .v{color:var(--warn)}.hc.ok .v{color:var(--brand)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px;margin-top:14px}
+.car{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.ph{height:132px;background:var(--surface-2) center/cover no-repeat;position:relative;display:grid;place-items:center;color:var(--muted);font-size:12px}
+.ph .pill{position:absolute;top:8px;right:8px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;background:var(--surface);box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.ph .pill.live{background:var(--brand);color:#fff}.ph .pill.out{background:var(--warn);color:#fff}.ph .pill.off{background:#7a8290;color:#fff}
+.cb{padding:11px 13px;display:flex;flex-direction:column;gap:6px;flex:1}
+.cb b{font-size:14.5px}.cb .m{font-size:12px;color:var(--muted)}
+.flags{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.flag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--surface-2);color:var(--muted)}
+.flag.bad{background:color-mix(in srgb,var(--out) 14%,transparent);color:var(--out)}
+.flag.ok{background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand)}
+.flag.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.cf{display:flex;gap:6px;padding:9px 13px;border-top:1px solid var(--line)}
+.ov{position:fixed;inset:0;background:rgba(10,14,20,.6);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.ov.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.4);width:660px;max-width:100%;padding:22px 24px;margin:auto}
+.modal h3{margin:0 0 4px;font-size:19px}.modal p.s{margin:0 0 14px;color:var(--muted);font-size:13px}
+.modal label.f{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:11px 0 4px}
+.modal input,.modal select,.modal textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:560px){.f2,.f3{grid-template-columns:1fr}}
+.mact{display:flex;gap:9px;margin-top:18px}.mact .btn{flex:1}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumb{width:88px;height:66px;border-radius:9px;overflow:hidden;border:1px solid var(--line);position:relative;background:var(--surface-2)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .x{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;width:19px;height:19px;border-radius:50%;font-size:11px;cursor:pointer;padding:0}
+.thumb .cov{position:absolute;bottom:0;left:0;right:0;background:rgba(15,138,77,.9);color:#fff;font-size:9px;text-align:center}
+.docrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.docrow:first-of-type{border-top:none}
+.docrow .n{flex:1;min-width:120px}
+.sect{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.sect h4{margin:0 0 2px;font-size:14px}.sect p{margin:0 0 8px;font-size:12px;color:var(--muted)}
+.loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
+.logincard h1{margin:0 0 4px;font-size:22px}.logincard p{margin:0 0 16px;color:var(--muted);font-size:13px}
+.logincard label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.logincard input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+.logincard button{width:100%;margin-top:16px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+.loginlogo{text-align:center;margin-bottom:8px}.loginlogo img{height:58px;max-width:100%}
+.err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:80;max-width:90vw;text-align:center}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.png" alt="Rent 2 Go"></div><p>Fleet — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
+
+<div id="appwrap" style="display:none">
+<div class="topbar">
+  <img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go">
+  <span class="sub">· Fleet</span><span class="spacer"></span>
+  <button class="btn" onclick="location.href='renters.html'">🧑 Renters</button>
+  <button class="btn" onclick="location.href='owners.html'">👥 Owners</button>
+  <button class="btn" onclick="location.href='index.html'">← Ledger</button>
+  <button class="btn" id="signout">Sign out</button>
+</div>
+<main class="wrap" id="main"></main>
+</div>
+<div class="ov" id="ovCar"><div class="modal" id="mdCar"></div></div>
+<div id="toastHost"></div>
+
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL,window.R2G_CONFIG.SUPABASE_ANON_KEY,
+  {auth:{storageKey:'r2g-admin-auth'}});   // keep admin + renter sessions apart
+const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com','thandobnkala@gmail.com'];
+const TYPES=['Sedan','SUV','Hatchback','Van','Truck','Luxury','Electric'];
+const STATUSES=['live','pending','maintenance','retired'];
+let CARS=[],OWNERS=[],HEALTH={},FILTER='',SHOW='all';
+
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+const money=v=>'$'+(+v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+function toast(m){$('toastHost').innerHTML='<div class="toast">'+esc(m)+'</div>';setTimeout(()=>{$('toastHost').innerHTML='';},2600);}
+const pub=p=>window.R2G_CONFIG.SUPABASE_URL+'/storage/v1/object/public/vehicle-photos/'+p;
+
+async function load(){
+  const [c,o,h]=await Promise.all([
+    sb.from('vehicles').select('*').order('name'),
+    sb.from('owners').select('id,name').order('name'),
+    sb.from('v_fleet_health').select('*').single()
+  ]);
+  if(c.error)console.error(c.error);
+  CARS=c.data||[];OWNERS=o.data||[];HEALTH=h.data||{};
+}
+
+function flags(v){
+  const f=[];
+  if(!(v.images||[]).length)          f.push('<span class="flag bad">no photo</span>');
+  if(v.rate_source==='placeholder')   f.push('<span class="flag warn">placeholder price</span>');
+  if(!(v.docs&&v.docs.reg))           f.push('<span class="flag bad">no registration</span>');
+  if(!(v.docs&&v.docs.ins))           f.push('<span class="flag bad">no insurance</span>');
+  if(v.reg_expiry&&v.reg_expiry<new Date().toISOString().slice(0,10))       f.push('<span class="flag bad">reg expired</span>');
+  if(v.insurance_expiry&&v.insurance_expiry<new Date().toISOString().slice(0,10)) f.push('<span class="flag bad">insurance expired</span>');
+  if(!f.length) f.push('<span class="flag ok">ready</span>');
+  return f.join('');
+}
+
+function render(){
+  const q=FILTER.toLowerCase();
+  let list=CARS.filter(v=>!q||[v.name,v.make,v.model,v.plate,v.color].join(' ').toLowerCase().includes(q));
+  if(SHOW==='nophoto')  list=list.filter(v=>!(v.images||[]).length);
+  if(SHOW==='nodocs')   list=list.filter(v=>!(v.docs&&v.docs.reg)||!(v.docs&&v.docs.ins));
+  if(SHOW==='placeholder')list=list.filter(v=>v.rate_source==='placeholder');
+  if(SHOW==='live')     list=list.filter(v=>v.status==='live');
+
+  $('main').innerHTML=
+   '<div class="ctl">'
+   +'<input id="q" placeholder="Search make, model, plate…" value="'+esc(FILTER)+'" style="flex:1;min-width:200px">'
+   +'<select id="show">'+[['all','All cars'],['live','Live only'],['nophoto','Missing photos'],['nodocs','Missing documents'],['placeholder','Placeholder prices']]
+       .map(o=>'<option value="'+o[0]+'"'+(SHOW===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'
+   +'<span class="spacer"></span><button class="btn" id="refresh">↻ Refresh</button>'
+   +'<button class="btn pri" id="addcar">+ Add car</button></div>'
+   +'<div class="health">'
+     +hc('Total fleet',HEALTH.total,'')+hc('Live',HEALTH.live,'ok')
+     +hc('No photo',HEALTH.no_photos,HEALTH.no_photos?'bad':'ok')
+     +hc('Placeholder price',HEALTH.placeholder_price,HEALTH.placeholder_price?'warn':'ok')
+     +hc('No registration',HEALTH.no_registration,HEALTH.no_registration?'bad':'ok')
+     +hc('No insurance',HEALTH.no_insurance,HEALTH.no_insurance?'bad':'ok')
+   +'</div>'
+   +(list.length?'<div class="grid">'+list.map(card).join('')+'</div>'
+      :'<div class="empty">No cars match.</div>');
+  wire();
+}
+const hc=(l,v,c)=>'<div class="hc '+(c||'')+'"><div class="l">'+l+'</div><div class="v">'+(v==null?'—':v)+'</div></div>';
+
+function card(v){
+  const img=(v.images||[])[0];
+  const pill=v.status!=='live'?'<span class="pill off">'+esc(v.status)+'</span>'
+            :(v.available?'<span class="pill live">available</span>':'<span class="pill out">rented</span>');
+  return '<div class="car">'
+   +'<div class="ph"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'>'+(img?'':'no photo')+pill+'</div>'
+   +'<div class="cb"><b>'+esc([v.year,v.make,v.model].filter(Boolean).join(' ')||v.name||'Vehicle')+'</b>'
+   +'<div class="m">'+esc(v.color||'—')+' · '+esc(v.type||'—')+' · '+esc(v.plate||'no plate')+'</div>'
+   +'<div class="m"><b>'+(v.daily_rate?money(v.daily_rate)+'/day':'not priced')+'</b>'
+     +(v.rate_source==='billing'?' <span class="flag ok">from billing</span>':'')+'</div>'
+   +'<div class="flags">'+flags(v)+'</div></div>'
+   +'<div class="cf"><button class="btn sm" data-edit="'+v.id+'" style="flex:1">Edit</button>'
+   +'<button class="btn sm" data-photos="'+v.id+'">📷</button>'
+   +'<button class="btn sm" data-docs="'+v.id+'">📄</button></div></div>';
+}
+
+/* ---------- edit ---------- */
+function openCar(id){
+  const v=id?CARS.find(x=>x.id===id):{status:'pending',available:false,images:[],docs:{}};
+  const sel=(cur,opts)=>opts.map(o=>'<option'+(cur===o?' selected':'')+'>'+o+'</option>').join('');
+  $('mdCar').innerHTML=
+   '<h3>'+(id?esc([v.year,v.make,v.model].filter(Boolean).join(' ')||v.name):'Add a car')+'</h3>'
+   +'<p class="s">'+(id?'ID '+esc(v.id):'A new vehicle starts as pending and hidden from the catalogue.')+'</p>'
+   +'<div class="f3"><div><label class="f">Make</label><input id="c_make" value="'+esc(v.make)+'"></div>'
+     +'<div><label class="f">Model</label><input id="c_model" value="'+esc(v.model)+'"></div>'
+     +'<div><label class="f">Year</label><input id="c_year" type="number" value="'+esc(v.year)+'"></div></div>'
+   +'<div class="f3"><div><label class="f">Colour</label><input id="c_color" value="'+esc(v.color)+'"></div>'
+     +'<div><label class="f">Type</label><select id="c_type">'+sel(v.type,TYPES)+'</select></div>'
+     +'<div><label class="f">Plate</label><input id="c_plate" value="'+esc(v.plate)+'"></div></div>'
+   +'<div class="f2"><div><label class="f">VIN</label><input id="c_vin" value="'+esc(v.vin)+'"></div>'
+     +'<div><label class="f">Owner</label><select id="c_owner"><option value="">— house fleet —</option>'
+       +OWNERS.map(o=>'<option value="'+esc(o.id)+'"'+(v.owner_id===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('')+'</select></div></div>'
+   +'<div class="sect"><h4>Pricing &amp; availability</h4><p>The daily rate is what a renter pays. It is separate from the owner’s platform tier fee.</p>'
+   +'<div class="f3"><div><label class="f">Daily rate ($)</label><input id="c_rate" type="number" step="0.01" value="'+(v.daily_rate!=null?v.daily_rate:'')+'"></div>'
+     +'<div><label class="f">Status</label><select id="c_status">'+sel(v.status,STATUSES)+'</select></div>'
+     +'<div><label class="f">Available</label><select id="c_avail"><option value="true"'+(v.available?' selected':'')+'>Yes — bookable</option><option value="false"'+(!v.available?' selected':'')+'>No — out with a renter</option></select></div></div>'
+   +'<div class="f3"><div><label class="f">Seats</label><input id="c_seats" type="number" value="'+esc(v.seats)+'"></div>'
+     +'<div><label class="f">Doors</label><input id="c_doors" type="number" value="'+esc(v.doors)+'"></div>'
+     +'<div><label class="f">Transmission</label><input id="c_trans" value="'+esc(v.transmission)+'"></div></div></div>'
+   +'<div class="sect"><h4>Notes</h4><textarea id="c_notes" style="min-height:60px">'+esc(v.notes)+'</textarea></div>'
+   +'<div class="mact"><button class="btn" data-close>Cancel</button>'
+     +(id?'<button class="btn danger" id="c_del">Delete</button>':'')
+     +'<button class="btn pri" id="c_save">Save</button></div>';
+  $('ovCar').classList.add('open');
+  $('mdCar').querySelector('[data-close]').onclick=()=>$('ovCar').classList.remove('open');
+  $('c_save').onclick=()=>saveCar(id);
+  if($('c_del'))$('c_del').onclick=()=>delCar(id,v);
+}
+async function saveCar(id){
+  const val=i=>{const e=$(i);return e?e.value.trim():'';};
+  const row={make:val('c_make')||null,model:val('c_model')||null,
+    year:val('c_year')?+val('c_year'):null,color:val('c_color')||null,type:val('c_type')||null,
+    plate:val('c_plate')||null,vin:val('c_vin')||null,owner_id:val('c_owner')||null,
+    daily_rate:val('c_rate')?+val('c_rate'):null,status:val('c_status'),
+    available:val('c_avail')==='true',
+    seats:val('c_seats')?+val('c_seats'):null,doors:val('c_doors')?+val('c_doors'):null,
+    transmission:val('c_trans')||null,notes:val('c_notes')||null,
+    name:[val('c_year'),val('c_make'),val('c_model')].filter(Boolean).join(' ')||null};
+  // a hand-typed price is a real decision, not a placeholder
+  const cur=CARS.find(x=>x.id===id);
+  if(row.daily_rate&&(!cur||Number(cur.daily_rate)!==row.daily_rate))row.rate_source='billing';
+  const r=id?await sb.from('vehicles').update(row).eq('id',id)
+            :await sb.from('vehicles').insert(Object.assign({source:'admin',images:[],docs:{}},row));
+  if(r.error){alert(r.error.message);return;}
+  $('ovCar').classList.remove('open');toast('Saved');await load();render();
+}
+async function delCar(id,v){
+  if(!confirm('Delete '+(v.name||'this car')+'? Bookings referencing it will keep their record but lose the link.'))return;
+  const r=await sb.from('vehicles').delete().eq('id',id);
+  if(r.error){alert(r.error.message);return;}
+  $('ovCar').classList.remove('open');toast('Deleted');await load();render();
+}
+
+/* ---------- photos ---------- */
+function openPhotos(id){
+  const v=CARS.find(x=>x.id===id);const imgs=v.images||[];
+  $('mdCar').innerHTML='<h3>Photos — '+esc(v.name||'Vehicle')+'</h3>'
+   +'<p class="s">The first photo is the one shown in the catalogue. Drag order isn’t supported yet — remove and re-add to change the cover.</p>'
+   +'<div class="thumbs" id="thumbs">'+imgs.map((u,i)=>'<div class="thumb"><img src="'+esc(u)+'">'
+       +'<button class="x" data-rm="'+i+'">×</button>'+(i===0?'<span class="cov">cover</span>':'')+'</div>').join('')
+     +(imgs.length?'':'<span style="color:var(--muted);font-size:13px">No photos yet.</span>')+'</div>'
+   +'<label class="f" style="margin-top:14px">Add photos</label>'
+   +'<input type="file" id="p_files" accept="image/*" multiple>'
+   +'<div class="mact"><button class="btn" data-close>Close</button></div>';
+  $('ovCar').classList.add('open');
+  $('mdCar').querySelector('[data-close]').onclick=()=>$('ovCar').classList.remove('open');
+  $('p_files').onchange=()=>addPhotos(id,$('p_files'));
+  $('mdCar').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>rmPhoto(id,+b.dataset.rm));
+}
+function resize(file,max){return new Promise(res=>{const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>{let w=im.width,h=im.height;if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(im,0,0,w,h);cv.toBlob(b=>res(b),'image/jpeg',.82);};im.onerror=()=>res(null);im.src=fr.result;};fr.onerror=()=>res(null);fr.readAsDataURL(file);});}
+async function addPhotos(id,input){
+  const v=CARS.find(x=>x.id===id);const files=Array.from(input.files||[]);if(!files.length)return;
+  toast('Uploading '+files.length+' photo(s)…');
+  const imgs=(v.images||[]).slice();
+  try{
+    for(const f of files){
+      const blob=await resize(f,1400);if(!blob)continue;
+      const path=id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,6)+'.jpg';
+      const up=await sb.storage.from('vehicle-photos').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+      if(up.error)throw up.error;
+      imgs.push(pub(path));
+    }
+    const r=await sb.from('vehicles').update({images:imgs}).eq('id',id);
+    if(r.error)throw r.error;
+    toast('Photos added — now live in the catalogue');await load();openPhotos(id);render();
+  }catch(e){alert('Upload failed: '+(e.message||e));}
+}
+async function rmPhoto(id,i){
+  const v=CARS.find(x=>x.id===id);const imgs=(v.images||[]).slice();imgs.splice(i,1);
+  const r=await sb.from('vehicles').update({images:imgs}).eq('id',id);
+  if(r.error){alert(r.error.message);return;}
+  await load();openPhotos(id);render();
+}
+
+/* ---------- registration & insurance ---------- */
+function openDocs(id){
+  const v=CARS.find(x=>x.id===id);const d=v.docs||{};
+  const row=(k,label)=>{
+    const doc=d[k];
+    return '<div class="docrow"><span class="n"><b>'+label+'</b><br>'
+      +(doc?'<span style="color:var(--brand);font-size:12px">✓ '+esc(doc.name)+'</span>'
+           :'<span style="color:var(--out);font-size:12px">not uploaded</span>')+'</span>'
+      +(doc?'<button class="btn sm" data-view="'+k+'">View</button>':'')
+      +'<label class="btn sm" style="cursor:pointer">'+(doc?'Replace':'Upload')
+      +'<input type="file" accept="image/*,application/pdf" style="display:none" data-up="'+k+'"></label></div>';
+  };
+  $('mdCar').innerHTML='<h3>Documents — '+esc(v.name||'Vehicle')+'</h3>'
+   +'<p class="s">Uber and Lyft drivers need both of these. Stored privately; a renter with this car on an active booking can view them, nobody else.</p>'
+   +row('reg','Vehicle registration')+row('ins','Insurance card')
+   +'<div class="f2" style="margin-top:12px"><div><label class="f">Registration expires</label><input id="d_regexp" type="date" value="'+esc(v.reg_expiry)+'"></div>'
+     +'<div><label class="f">Insurance expires</label><input id="d_insexp" type="date" value="'+esc(v.insurance_expiry)+'"></div></div>'
+   +'<div class="f2"><div><label class="f">Insurance company</label><input id="d_insco" value="'+esc(v.insurance_company)+'"></div>'
+     +'<div><label class="f">Policy number</label><input id="d_pol" value="'+esc(v.policy_number)+'"></div></div>'
+   +'<div class="mact"><button class="btn" data-close>Close</button><button class="btn pri" id="d_save">Save details</button></div>';
+  $('ovCar').classList.add('open');
+  $('mdCar').querySelector('[data-close]').onclick=()=>$('ovCar').classList.remove('open');
+  $('mdCar').querySelectorAll('[data-up]').forEach(el=>el.onchange=()=>upDoc(id,el.dataset.up,el));
+  $('mdCar').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>viewDoc(id,b.dataset.view));
+  $('d_save').onclick=async()=>{
+    const r=await sb.from('vehicles').update({
+      reg_expiry:$('d_regexp').value||null,insurance_expiry:$('d_insexp').value||null,
+      insurance_company:$('d_insco').value.trim()||null,policy_number:$('d_pol').value.trim()||null
+    }).eq('id',id);
+    if(r.error){alert(r.error.message);return;}
+    toast('Saved');await load();render();$('ovCar').classList.remove('open');
+  };
+}
+async function upDoc(id,key,input){
+  const f=input.files&&input.files[0];if(!f)return;
+  const v=CARS.find(x=>x.id===id);
+  try{
+    const ext=(f.name.split('.').pop()||'pdf').toLowerCase();
+    const path=id+'/'+key+'-'+Date.now()+'.'+ext;
+    const up=await sb.storage.from('vehicle-docs').upload(path,f,{upsert:true,contentType:f.type||'application/octet-stream'});
+    if(up.error)throw up.error;
+    const docs=Object.assign({},v.docs||{});
+    docs[key]={path,name:f.name,uploaded_at:new Date().toISOString()};
+    const r=await sb.from('vehicles').update({docs}).eq('id',id);
+    if(r.error)throw r.error;
+    toast((key==='reg'?'Registration':'Insurance')+' uploaded');await load();openDocs(id);render();
+  }catch(e){alert('Upload failed: '+(e.message||e));}
+}
+async function viewDoc(id,key){
+  const v=CARS.find(x=>x.id===id);const doc=(v.docs||{})[key];if(!doc)return;
+  const u=await sb.storage.from('vehicle-docs').createSignedUrl(doc.path,3600);
+  if(u.error||!u.data){alert('Could not open');return;}
+  window.open(u.data.signedUrl,'_blank','noopener');
+}
+
+function wire(){
+  $('q').oninput=e=>{FILTER=e.target.value;const p=e.target.selectionStart;render();const n=$('q');n.focus();n.setSelectionRange(p,p);};
+  $('show').onchange=e=>{SHOW=e.target.value;render();};
+  $('refresh').onclick=async()=>{toast('Refreshing…');await load();render();};
+  $('addcar').onclick=()=>openCar(null);
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openCar(b.dataset.edit));
+  document.querySelectorAll('[data-photos]').forEach(b=>b.onclick=()=>openPhotos(b.dataset.photos));
+  document.querySelectorAll('[data-docs]').forEach(b=>b.onclick=()=>openDocs(b.dataset.docs));
+}
+document.getElementById('ovCar').onclick=e=>{if(e.target.id==='ovCar')e.target.classList.remove('open');};
+
+async function start(){await load();$('appwrap').style.display='block';render();}
+async function gate(){
+  const s=await sb.auth.getSession();const u=s.data.session&&s.data.session.user;
+  if(!u){$('loginwrap').style.display='flex';return;}
+  if(ADMINS.indexOf((u.email||'').toLowerCase())<0){
+    $('loginwrap').style.display='none';$('noadmin').style.display='flex';
+    $('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}
+  $('loginwrap').style.display='none';$('noadmin').style.display='none';start();
+}
+$('li_form').addEventListener('submit',async ev=>{
+  ev.preventDefault();const b=$('li_btn'),er=$('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';
+  const r=await sb.auth.signInWithPassword({email:$('li_email').value.trim(),password:$('li_pass').value});
+  b.disabled=false;b.textContent='Sign in';
+  if(r.error){er.textContent=r.error.message;return;}location.reload();});
+$('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
+$('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
+gate();
+</script>
