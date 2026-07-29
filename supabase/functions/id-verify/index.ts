@@ -10,6 +10,36 @@ const ADMINS = ["gorentaride@gmail.com", "thurstonrdavis@gmail.com", "thandobnka
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const DEFAULT_ACCT = "RENT 2 GO - 1.0";
 function keyFor(label: string) { const a = ACCTS.find((x: any) => x.label === label); return a ? a.key : null; }
+// Stripe classes dob, document number, expiry and the licence images as
+// "sensitive verification results". A normal secret key CANNOT read them —
+// it needs a RESTRICTED key with Identity sensitive-results permission.
+// Set STRIPE_IDENTITY_KEY to that restricted key; we fall back to the normal
+// key so nothing breaks while it is absent (you just get no dob/images).
+const IDKEY = Deno.env.get("STRIPE_IDENTITY_KEY") || "";
+function sensitiveKey(fallback: string) { return IDKEY || fallback; }
+
+// Port the licence images into our own private bucket so the admin can read
+// them in renters.html without bouncing to Stripe, and so we keep a copy.
+async function portFiles(renter_id: string, ids: string[], key: string) {
+  const saved: any[] = [];
+  for (const id of ids) {
+    try {
+      const r = await fetch(`https://files.stripe.com/v1/files/${id}/contents`, { headers: { Authorization: `Bearer ${key}` } });
+      if (!r.ok) continue;
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      const mime = r.headers.get("content-type") || "image/jpeg";
+      const ext = mime.includes("png") ? "png" : "jpg";
+      const path = `${renter_id}/id-${id}.${ext}`;
+      const up = await fetch(`${SB}/storage/v1/object/renter-docs/${path}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${SR}`, apikey: SR, "Content-Type": mime, "x-upsert": "true" },
+        body: bytes,
+      });
+      if (up.ok) saved.push({ path, stripe_file: id, mime });
+    } catch (_) { /* one bad image must not stop the rest */ }
+  }
+  return saved;
+}
 async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
 async function stripeGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
 async function sbPost(path: string, bodyObj: unknown, prefer: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(bodyObj) }); return r.ok ? await r.json().catch(() => null) : null; }
@@ -97,8 +127,8 @@ Deno.serve(async (req) => {
       const out: any[] = [];
       for (const id of ids) {
         try {
-          const r = await fetch(`https://files.stripe.com/v1/files/${id}/contents`, { headers: { Authorization: `Bearer ${key}` } });
-          if (!r.ok) { out.push({ id, error: `HTTP ${r.status}` }); continue; }
+          const r = await fetch(`https://files.stripe.com/v1/files/${id}/contents`, { headers: { Authorization: `Bearer ${sensitiveKey(key)}` } });
+          if (!r.ok) { const body = await r.text().catch(() => ""); out.push({ id, error: `HTTP ${r.status}`, detail: body.slice(0, 300) }); continue; }
           const buf = new Uint8Array(await r.arrayBuffer());
           let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
           const mime = r.headers.get("content-type") || "image/jpeg";
@@ -114,7 +144,7 @@ Deno.serve(async (req) => {
         const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=session_id`);
         if (!mine || !mine[0] || mine[0].session_id !== body.session_id) return json({ error: "forbidden" }, 403);
       }
-      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report&expand[]=verified_outputs`, key);
+      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report&expand[]=verified_outputs`, sensitiveKey(key));
       if (s.error) return json({ error: s.error.message || JSON.stringify(s.error) });
       const vo = s.verified_outputs || {};
       const doc = (s.last_verification_report && s.last_verification_report.document) || {};
@@ -126,6 +156,17 @@ Deno.serve(async (req) => {
       if (doc.number) patch.verified_doc_number = doc.number;
       const exp = fmtDate(doc.expiration_date); if (exp) patch.verified_expiry = exp;
       const a = vo.address || doc.address; if (a) patch.verified_address = [a.line1, a.city, a.state, a.postal_code, a.country].filter(Boolean).join(", ");
+      // pull the licence images across too, if we have the permission to
+      try {
+        const rows = await sbGet(`renters?session_id=eq.${enc(body.session_id)}&select=id,id_images`);
+        const row = rows && rows[0];
+        const rep = s.last_verification_report || {};
+        const ids: string[] = [ ...(((rep.document || {}).files) || []), ...((rep.selfie && rep.selfie.selfie) ? [rep.selfie.selfie] : []) ].filter(Boolean);
+        if (row && ids.length && !(row.id_images && row.id_images.length)) {
+          const saved = await portFiles(row.id, ids, sensitiveKey(key));
+          if (saved.length) patch.id_images = saved;
+        }
+      } catch (_) { /* never block the status write on image porting */ }
       await sbPatch(`renters?session_id=eq.${enc(body.session_id)}`, patch);
       // Owners share the same Stripe Identity flow — mirror the result onto the owners row (verify_status,
       // not status, and flip id_verified when verified). No-op if no owner has this session_id.
