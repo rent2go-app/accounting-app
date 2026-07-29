@@ -16,8 +16,8 @@ async function sbPost(path: string, body: unknown, prefer: string) { const r = a
 async function sbPatch(path: string, body: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
 async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
 
-async function createSession(name: string, email: string, owner_id: string, key: string) {
-  const f = new URLSearchParams();
+async function createSession(name: string, email: string, owner_id: string, key: string, return_url?: string) {
+  const f = new URLSearchParams(, body.return_url ? String(body.return_url) : undefined);
   f.set("type", "document");
   f.set("options[document][require_matching_selfie]", "true");
   f.set("options[document][require_live_capture]", "true");
@@ -27,6 +27,8 @@ async function createSession(name: string, email: string, owner_id: string, key:
   if (email) f.set("metadata[owner_email]", email);
   if (name) f.set("metadata[owner_name]", name);
   f.set("metadata[owner_id]", owner_id);
+  // where Stripe returns the owner when they finish
+  if (return_url) f.set("return_url", return_url);
   f.set("metadata[source]", "prototype");
   return await stripeForm("https://api.stripe.com/v1/identity/verification_sessions", f, key);
 }
@@ -46,6 +48,8 @@ Deno.serve(async (req) => {
     const phone = String(body.phone || "").trim();
     if (!email && !name) return json({ error: "name or email required" });
 
+    // Supabase Auth id, so an owner can sign in to their own dashboard.
+    const authUid = body.auth_uid ? String(body.auth_uid) : null;
     const label = body.account_label || DEFAULT_ACCT;
     const key = keyFor(label);
     if (!key) return json({ error: "no Stripe key for " + label });
@@ -72,7 +76,7 @@ Deno.serve(async (req) => {
     let owner_id = existing?.id;
     if (!owner_id) {
       ownerFields.status = "pending"; ownerFields.source = "prototype";
-      const row = await sbPost("owners", [ownerFields], "return=representation");
+      const row = await sbPost("owners", [authUid ? { ...ownerFields, auth_uid: authUid } : ownerFields], "return=representation");
       owner_id = row && row[0] ? row[0].id : null;
       if (!owner_id) return json({ error: "could not create owner" }, 500);
     } else {
