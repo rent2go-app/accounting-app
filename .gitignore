@@ -11,3 +11,9 @@ ops-console-backup/
 seed-*.sql
 backups/
 *.pdf
+
+# credentials — never commit (this repo is public)
+.secrets*
+*.key
+*.pat
+supabase-*.local
