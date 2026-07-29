@@ -463,6 +463,7 @@ function draftCard(d){
     +'<div class="dbody">'+bodyToHtml(dynBody(d),false)+'</div>'
     +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
     +'<button class="btn small pri" data-copy="'+d.id+'" title="Copy with live links — paste into WhatsApp/SMS/email">📋 Copy</button>'
+    +'<button class="btn small" data-test="'+d.id+'" title="Email a TEST copy of this exact notice to yourself">🧪 Test</button>'
     +(!isSent?(d.email?'<button class="btn small ok" data-send="'+d.id+'" title="Email this notice to the customer now (from billing@rentaride2go.com)">📧 Send email</button>':'<span class="hint" style="align-self:center">⚠ no email — use Copy for SMS/WhatsApp</span>')
         +'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>'
         +'<button class="btn small'+(d.reviewed_at?' on':'')+'" data-review="'+d.id+'">'+(d.reviewed_at?'✓ Reviewed':'👁 Mark reviewed')+'</button>'
@@ -552,6 +553,20 @@ async function sendAllFees(btn,acc){
   }catch(e){alert('Send failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 // 🧪 TEST EMAIL BUTTON — remove after email delivery is confirmed
+async function sendTest(id,btn){
+  var d=DRAFTS.find(function(x){return x.id==id;});if(!d)return;
+  var to=prompt('Send a TEST copy of '+(d.customer_name||'this')+"'s notice to which email?",'gorentaride@gmail.com');
+  if(!to)return;to=to.trim();if(!to)return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Sending test…';
+  try{
+    var b=dynBody(d);
+    var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#222"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST copy of '+esc(d.customer_name||'')+"'s notice — NOT sent to the customer.</p>"+bodyToClean(b)+'</div>';
+    var r=await sb.functions.invoke('send-doc',{body:{to:to,subject:'[TEST] '+d.subject,html:html,text:bodyToPlain(b)}});
+    if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
+    toast('Test sent to '+to+' ✓');
+  }catch(e){alert('Test failed: '+(e.message||e));}
+  btn.disabled=false;btn.textContent=o;
+}
 async function sendTestNotice(btn){
   var to=prompt('Send a TEST notice email to which address?\n(Domain is verified — any address works now.)','gorentaride@gmail.com');
   if(!to)return;to=to.trim();
