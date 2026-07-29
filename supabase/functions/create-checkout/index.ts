@@ -91,6 +91,23 @@ Deno.serve(async (req) => {
     const rate = Number(v.daily_rate || 0);
     if (!(rate > 0)) return json({ error: "That car isn't priced yet — please choose another." }, 409);
 
+    // ---- a promo code entered at checkout ----
+    // Writing it to the renter fires the deposit trigger, so all the surcharge
+    // and waiver logic lives in one place rather than being duplicated here.
+    const promo = body.promo_code ? String(body.promo_code).trim().toUpperCase() : null;
+    if (promo && promo !== (renter.promo_code || "")) {
+      const chk = await fetch(`${SB}/rest/v1/rpc/r2g_check_promo`, {
+        method: "POST",
+        headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_code: promo }),
+      });
+      const cj = await chk.json().catch(() => null);
+      if (!cj || !cj.valid) return json({ error: "That promo code isn't valid.", reason: "bad_promo" }, 400);
+      await sbPatch(`renters?id=eq.${enc(renter.id)}`, { promo_code: promo });
+      const again = await sbGet(`renters?id=eq.${enc(renter.id)}&select=*`);
+      if (again && again[0]) Object.assign(renter, again[0]);
+    }
+
     // ---- the money ----
     const deposit   = Number(renter.deposit_total ?? 150);
     const subtotal  = Math.round(rate * days * 100) / 100;
