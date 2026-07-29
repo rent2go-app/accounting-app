@@ -13,7 +13,14 @@ function keyFor(label: string) { const a = ACCTS.find((x: any) => x.label === la
 async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
 async function stripeGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
 async function sbPost(path: string, bodyObj: unknown, prefer: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(bodyObj) }); return r.ok ? await r.json().catch(() => null) : null; }
-async function sbPatch(path: string, bodyObj: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(bodyObj) }); }
+// NOTE: this used to swallow failures silently. A trigger error (or a bad
+// column type) meant Stripe said "verified", this function said ok:true, and
+// the renters row never changed — with nothing anywhere to show why.
+async function sbPatch(path: string, bodyObj: unknown) {
+  const r = await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(bodyObj) });
+  if (!r.ok) { const t = await r.text().catch(() => ""); console.error("sbPatch failed", r.status, path, t); return { ok: false, status: r.status, error: t }; }
+  return { ok: true };
+}
 async function sbGet(path: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } }); return r.ok ? await r.json().catch(() => null) : null; }
 function json(o: any, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } }); }
 const enc = encodeURIComponent;

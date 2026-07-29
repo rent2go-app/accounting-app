@@ -86,6 +86,20 @@ Deno.serve(async (req) => {
     // Supabase Auth user id, so the renter can sign in and see their own row.
     // Sent by the prototype after it creates the account. RLS keys off this.
     const authUid = body.auth_uid ? String(body.auth_uid) : null;
+    // Home address + dob drive the deposit rules (out-of-town / young renter).
+    // These are what the renter TYPED — a database trigger recomputes the
+    // deposit from Stripe's verified dob and address once the check completes.
+    const dob   = body.dob ? String(body.dob) : null;
+    const addr  = body.home_address ? String(body.home_address).trim() : null;
+    const city  = body.home_city    ? String(body.home_city).trim()    : null;
+    const st    = body.home_state   ? String(body.home_state).trim()   : null;
+    const zip   = body.home_postal  ? String(body.home_postal).trim()  : null;
+    const homeFields: Record<string, unknown> = {};
+    if (dob)  homeFields.dob = dob;
+    if (addr) homeFields.home_address = addr;
+    if (city) homeFields.home_city = city;
+    if (st)   homeFields.home_state = st;
+    if (zip)  homeFields.home_postal = zip;
 
     const label = body.account_label || DEFAULT_ACCT;
     const key = keyFor(label);
@@ -109,6 +123,7 @@ Deno.serve(async (req) => {
       if (questionnaire) insert.questionnaire = questionnaire;
       if (signature) { insert.signature = signature; insert.agreed_at = agreedAt; }
       if (authUid) insert.auth_uid = authUid;
+      Object.assign(insert, homeFields);
       const row = await sbPost("renters", [insert], "return=representation");
       renter_id = row && row[0] ? row[0].id : null;
       if (!renter_id) return json({ error: "could not create renter" }, 500);
@@ -117,6 +132,7 @@ Deno.serve(async (req) => {
       if (questionnaire) patch.questionnaire = questionnaire;
       if (signature) { patch.signature = signature; patch.agreed_at = agreedAt; }
       if (authUid) patch.auth_uid = authUid;   // claim an admin-created row on first self-serve signup
+      Object.assign(patch, homeFields);
       await sbPatch(`renters?id=eq.${enc(renter_id)}`, patch);
     }
 
