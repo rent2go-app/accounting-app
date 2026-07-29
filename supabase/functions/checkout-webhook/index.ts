@@ -65,6 +65,53 @@ const shell = (title: string, body: string) => `<div style="font-family:Arial,He
 <div style="color:#5c6a7a;font-size:12px">Rent 2 Go · Suite 111, 9711 David Taylor Drive, Charlotte, NC 28262 · 980 272 8122</div></div>`;
 const usd = (n: unknown) => "$" + Number(n || 0).toFixed(2);
 
+/* ---- contact-less pickup instructions ----
+   Built from the real booking + vehicle at the moment payment lands, so the
+   time, date, car, colour and plate are always the ones the renter paid for.
+   Stored on the booking AND emailed, so it can be re-sent or shown in-app. */
+const ORD = (n: number) => n + (["th","st","nd","rd"][(n % 100 - 20) % 10] || ["th","st","nd","rd"][n % 100] || "th");
+function longDate(iso: string | null) {
+  if (!iso) return "TBC";
+  const d = new Date(iso + "T12:00:00");
+  if (isNaN(d.getTime())) return "TBC";
+  const wd = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"][d.getDay()];
+  const mo = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"][d.getMonth()];
+  return `${wd} ${ORD(d.getDate()).toUpperCase()} ${mo} ${d.getFullYear()}`;
+}
+function pickupText(b: any, v: any) {
+  const carName = [v?.make, v?.model].filter(Boolean).join(" ").toUpperCase() || String(b.vehicle_name || "YOUR VEHICLE").toUpperCase();
+  const desc = [v?.color, v?.type].filter(Boolean).join(" ").toUpperCase() || "";
+  const plate = (v?.plate || "TBC").toUpperCase();
+  return `📍 CONTACT-LESS PICK UP INSTRUCTIONS📍
+————————————————————
+PICK UP TIME: ${b.pickup_time || "TBC"}
+DATE: ${longDate(b.start_date)}
+—————————————————————-
+
+Go to
+🏢9711 David Taylor Dr, Charlotte,
+NC 28262, United States
+
+📍2. To get your ride - When you pull up to the car park the car is parked in the first few Bays to the right when you pull in to parking lot
+
+🚗3. ${carName}
+${desc}
+
+::: PLATE: ${plate}  :::
+
+🔑4. The keys are in the cup holder in center console
+
+🔒5. The car is disabled for safety reasons - so please let us know when you arrive so we can get you enabled and on your way
+
+🏁 PICK UP FORM - BEGIN YOUR RENTAL
+When you get to the Car - Please Complete the PICKUP by documenting the condition of the car Inside & outside as well as recording Gas and Mileage by using this pick up Form - Click This Link To Begin
+
+🚦Use This Link TO BEGIN Your Rental
+https://form.typeform.com/to/ITnIp22J
+
+🎗MAKE SURE TO READ ALL THE RULES to make sure you know what you need to do`;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   const raw = await req.text();
@@ -107,6 +154,13 @@ Deno.serve(async (req) => {
   const renter = rs && rs[0];
   const who = (renter && renter.name) || "A renter";
 
+  // real car details for the pickup note
+  const vv = b.vehicle_id ? await sbGet(`vehicles?id=eq.${enc(b.vehicle_id)}&select=make,model,color,type,plate`) : null;
+  const veh = vv && vv[0];
+  const pickup = pickupText(b, veh);
+  await sbPatch(`bookings?id=eq.${enc(bookingId)}`, { pickup_instructions: pickup, pickup_sent_at: new Date().toISOString() });
+  const pickupHtml = `<pre style="white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;font-size:13.5px;background:#f4f7f6;border:1px solid #e2e8e4;border-radius:12px;padding:16px 18px;line-height:1.55">${pickup.replace(/</g, "&lt;")}</pre>`;
+
   await sendMail(renter && renter.email, `Your ${b.vehicle_name} is booked — Rent 2 Go`,
     shell("You're booked", `
       <p>Thanks${renter && renter.name ? ", " + String(renter.name).split(" ")[0] : ""} — your rental is confirmed.</p>
@@ -116,8 +170,7 @@ Deno.serve(async (req) => {
         <tr><td style="padding:3px 14px 3px 0">Deposit</td><td>${usd(b.deposit)} <span style="color:#5c6a7a">(refundable)</span></td></tr>
         <tr><td style="padding:3px 14px 3px 0"><b>Paid today</b></td><td><b>${usd(b.total)}</b></td></tr>
       </table>
-      <p style="margin-top:14px"><b>Pickup:</b> Suite 111, 9711 David Taylor Drive, Charlotte, NC 28262${b.pickup_time ? " — " + b.pickup_time : ""}.
-      We'll send your contact-free pickup instructions separately.</p>
+      ${pickupHtml}
       <p style="color:#5c6a7a;font-size:13px">Reminder: 7-day minimum rental, daily payments due by midnight,
       and the vehicle stays within 100 miles of Charlotte.</p>`));
 
