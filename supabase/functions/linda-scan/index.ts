@@ -304,17 +304,20 @@ Deno.serve(async (req) => {
       const jCurrAmt = jCurr.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
       const lPastAmt = lPast.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
       const grand = Math.round((jPastAmt + jCurrAmt + lPastAmt) * 100) / 100;
+      // Customers only know "Rent 2 Go" — refer to the CAR they're driving, never the owner/Stripe account.
+      const jcar = jInv.length ? cleanlbl((jInv[0].lines?.data || [{}])[0]?.description || jInv[0].description || "") : "";
+      const lcar = lInv.length ? cleanlbl((lInv.find((i: any) => !isLateFee(i))?.lines?.data || [{}])[0]?.description || "") : "";
       const P: string[] = [];
-      P.push("Good morning Penny 👋\n\nHere's a combined summary of everything outstanding across both your Rent 2 Go accounts, with a pay link on each item.");
-      P.push("① Your JJM rental account:");
+      P.push("Good morning Penny 👋\n\nHere's a combined summary of everything outstanding on your Rent 2 Go rentals, with a pay link on each item.");
+      P.push("① Your current car" + (jcar ? " — " + jcar : "") + ":");
       if (jPast.length) P.push("Past due:\n\n" + jPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(jPastAmt));
       if (jCurr.length) P.push("Coming due (not yet late):\n\n" + jCurr.map((i: any) => invline(i, "✅")).join("\n\n") + "\n\nCurrent subtotal: " + m(jCurrAmt));
-      if (!jPast.length && !jCurr.length) P.push("No open invoices on this account right now.");
-      P.push("Pay these in your JJM account portal:" + footer(jjm.portal || "").replace(/^\n\n/, "\n"));
-      P.push("② Your previous account balance (RENT 2 GO LLC 2.0):");
+      if (!jPast.length && !jCurr.length) P.push("No open invoices on this car right now.");
+      P.push("Pay these in your Rent 2 Go payment portal:" + footer(jjm.portal || "").replace(/^\n\n/, "\n"));
+      P.push("② Your earlier Rent 2 Go rental" + (lcar ? " — " + lcar : "") + " (balance from before):");
       if (lPast.length) P.push("Past due (per your plan — clear the agreed $246 before 1 August):\n\n" + lPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(lPastAmt));
-      else P.push("No past-due invoices remain on your previous account — thank you.");
-      P.push("Pay these in your previous account portal:" + footer(llc.portal || "").replace(/^\n\n/, "\n"));
+      else P.push("No past-due balance remains on your earlier rental — thank you.");
+      P.push("Pay this earlier balance in your Rent 2 Go payment portal:" + footer(llc.portal || "").replace(/^\n\n/, "\n"));
       P.push("💰 Total across both accounts: " + m(grand));
       P.push("Please settle as soon as possible, or reach out right away to arrange payments or discuss a plan of action. Thank you, Penny.\n\nRent 2 Go");
       const pbody = P.join("\n\n");
