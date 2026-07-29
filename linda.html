@@ -202,6 +202,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .dlbl{color:var(--muted);min-width:82px}
 .dinput{flex:1;min-width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
 .dts{font-size:11px;color:var(--muted)}
+.draft.flash{animation:flashhl 1.8s ease}@keyframes flashhl{0%,100%{box-shadow:none}20%{box-shadow:0 0 0 3px var(--brand)}}
 .dnotice{font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;margin-bottom:8px;display:inline-block}
 .dnotice.sent{background:color-mix(in srgb,var(--in) 15%,var(--surface));color:var(--in)}
 .dnotice.unsent{background:color-mix(in srgb,var(--out) 13%,var(--surface));color:var(--out)}
@@ -588,6 +589,7 @@ function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('l
 var DISCROWS=[];
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
 function discDraftFor(i){var c=DISCROWS[i];return DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});}
+function gotoNotice(i){var d=discDraftFor(i);if(!d){alert('No notice yet — run an Audit Sweep on this account.');return;}var el=document.getElementById('d'+d.id);if(!el){alert('That notice is not on screen (it may be filtered or already sent/cleared).');return;}var det=el.closest('details.acct');if(det)det.open=true;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('flash');setTimeout(function(){el.classList.remove('flash');},1800);}
 function durText(a,b){var s=Math.max(0,(new Date(b).getTime()-new Date(a).getTime())/1000);var h=Math.floor(s/3600),m=Math.round((s%3600)/60);return (h?h+'h ':'')+m+'m';}
 function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'+00:00';}catch(e){return '-04:00';}}
 // interpret a manually-entered HH:MM (and optional date) as America/New_York and return an ISO instant
@@ -643,7 +645,7 @@ function renderDisconnections(){
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
     var nsent=dnf&&dnf.status==='sent';
     var noticeLine='<div class="dnotice '+(nsent?'sent':'unsent')+'">'+(nsent?'📧 Disconnection notice emailed today · '+shortET(dnf.sent_at)+' ET':(dnf&&dnf.reviewed_at?'✉️ Notice reviewed but NOT emailed yet today':'✉️ Disconnection notice NOT emailed yet today'))+'</div>';
-    var noticeActions=dnf?('<div class="dact">'+(nsent?'<span class="hint">✅ notice sent'+(dnf.sent_at?' '+shortET(dnf.sent_at)+' ET':'')+'</span> <button class="btn small" data-dnccopy="'+i+'">📋 Copy again</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button>':'<button class="btn small ok" data-dncsend="'+i+'"'+(dnf.email?'':' disabled title="no email on file — use Copy"')+'>📧 Send disconnection notice</button> <button class="btn small" data-dnccopy="'+i+'">📋 Copy</button> <button class="btn small" data-dncsent="'+i+'">✅ Mark sent</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button>')+'</div>'):'<div class="dact"><span class="hint">No notice generated yet — run an Audit Sweep on this account.</span></div>';
+    var noticeActions=dnf?('<div class="dact">'+(nsent?'<span class="hint">✅ notice sent'+(dnf.sent_at?' '+shortET(dnf.sent_at)+' ET':'')+'</span> <button class="btn small" data-dnccopy="'+i+'">📋 Copy again</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button> <button class="btn small pri" data-gotonotice="'+i+'">🔗 Open full notice ↓</button>':'<button class="btn small ok" data-dncsend="'+i+'"'+(dnf.email?'':' disabled title="no email on file — use Copy"')+'>📧 Send disconnection notice</button> <button class="btn small" data-dnccopy="'+i+'">📋 Copy</button> <button class="btn small" data-dncsent="'+i+'">✅ Mark sent</button> <button class="btn small" data-test="'+dnf.id+'">🧪 Test</button> <button class="btn small pri" data-gotonotice="'+i+'">🔗 Open full notice ↓</button>')+'</div>'):'<div class="dact"><span class="hint">No notice generated yet — run an Audit Sweep on this account.</span></div>';
     var tl=(r.signal_sent_at||r.restored_at)?('<div class="dtimeline">'
       +(r.signal_sent_at?'<span class="tl-trig">🔴 Disconnection triggered: <b>'+fullET(r.signal_sent_at)+'</b></span>':'')
       +(r.restored_at?'<span class="tl-rest">🟢 Restored to service: <b>'+fullET(r.restored_at)+'</b></span>':'')
@@ -909,6 +911,7 @@ function wire(){
   document.querySelectorAll('[data-dncsend]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsend);if(d)send(d.id,b);else alert('No notice found — run an Audit Sweep on this account.');});
   document.querySelectorAll('[data-dnccopy]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dnccopy);if(d)copyDraft(d.id,b);});
   document.querySelectorAll('[data-dncsent]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsent);if(d)markSent(d.id);});
+  document.querySelectorAll('[data-gotonotice]').forEach(b=>b.onclick=()=>gotoNotice(+b.dataset.gotonotice));
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
   document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
