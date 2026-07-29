@@ -41,7 +41,7 @@ async function uploadProof(renter_id: string, proof: any): Promise<{ path: strin
   } catch (_) { return null; }
 }
 
-async function createSession(renter: any, renter_id: string, key: string) {
+async function createSession(renter: any, renter_id: string, key: string, return_url?: string) {
   const f = new URLSearchParams();
   f.set("type", "document");
   f.set("options[document][require_matching_selfie]", "true");
@@ -53,6 +53,9 @@ async function createSession(renter: any, renter_id: string, key: string) {
   if (renter.name) f.set("metadata[renter_name]", String(renter.name));
   f.set("metadata[renter_id]", String(renter_id));
   f.set("metadata[source]", "prototype");
+  // where Stripe sends the renter when they're done. Without this they land on
+  // a Stripe dead-end page with no way back to the site.
+  if (return_url) f.set("return_url", return_url);
   return await stripeForm("https://api.stripe.com/v1/identity/verification_sessions", f, key);
 }
 
@@ -80,6 +83,9 @@ Deno.serve(async (req) => {
     // Anonymous visitors can't write to storage, so the upload happens here with
     // the service_role key instead.
     const proof = (body.proof && body.proof.data) ? body.proof : null;
+    // Supabase Auth user id, so the renter can sign in and see their own row.
+    // Sent by the prototype after it creates the account. RLS keys off this.
+    const authUid = body.auth_uid ? String(body.auth_uid) : null;
 
     const label = body.account_label || DEFAULT_ACCT;
     const key = keyFor(label);
@@ -102,6 +108,7 @@ Deno.serve(async (req) => {
       const insert: any = { name, email, phone, status: "new", notes: "Website signup", signup_source: "prototype" };
       if (questionnaire) insert.questionnaire = questionnaire;
       if (signature) { insert.signature = signature; insert.agreed_at = agreedAt; }
+      if (authUid) insert.auth_uid = authUid;
       const row = await sbPost("renters", [insert], "return=representation");
       renter_id = row && row[0] ? row[0].id : null;
       if (!renter_id) return json({ error: "could not create renter" }, 500);
@@ -109,6 +116,7 @@ Deno.serve(async (req) => {
       const patch: any = { name, phone };
       if (questionnaire) patch.questionnaire = questionnaire;
       if (signature) { patch.signature = signature; patch.agreed_at = agreedAt; }
+      if (authUid) patch.auth_uid = authUid;   // claim an admin-created row on first self-serve signup
       await sbPatch(`renters?id=eq.${enc(renter_id)}`, patch);
     }
 
@@ -118,7 +126,7 @@ Deno.serve(async (req) => {
       if (up) await sbPatch(`renters?id=eq.${enc(renter_id)}`, { proof_path: up.path, proof_name: up.name });
     }
 
-    const s = await createSession({ name, email }, renter_id, key);
+    const s = await createSession({ name, email }, renter_id, key, body.return_url ? String(body.return_url) : undefined);
     if (s.error) return json({ error: s.error.message || JSON.stringify(s.error), renter_id });
     await sbPatch(`renters?id=eq.${enc(renter_id)}`, { stripe_account: label, session_id: s.id, verify_url: s.url, status: s.status, updated_at: new Date().toISOString() });
     return json({ ok: true, renter_id, url: s.url, session_id: s.id, client_secret: s.client_secret, status: s.status });
