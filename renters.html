@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <link rel="icon" type="image/png" href="assets/linda-sm.png">
-<title>GPS Tracker Control — Rent 2 Go</title>
+<title>Renters &amp; ID Verification — Rent 2 Go</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/style.css">
 <style>
@@ -240,63 +240,37 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
 .hint{color:var(--muted);font-size:12.5px}
 
-.wrap{max-width:1180px;margin:0 auto;padding:14px 20px 40px}
-
-.gpstop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}
-.gpslayout{display:flex;gap:14px;align-items:stretch;height:calc(100vh - 200px);min-height:440px}
-.gpsside{flex:0 0 310px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
-.carsearchwrap{padding:8px;position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);z-index:2}
-#carsearch{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px}
-.caracc{font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 11px 4px}
-.carrow{padding:8px 11px;cursor:pointer;border-left:3px solid transparent}
-.carrow:hover{background:var(--surface-2)}
-.carrow.sel{background:color-mix(in srgb,var(--brand) 12%,var(--surface));border-left-color:var(--brand)}
-.carnm{font-weight:700;font-size:13px}
-.carsub{font-size:11.5px;color:var(--muted)}
-.carsub .nolink{color:var(--out)}
-.gpsmainpane{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
-.gpsbigmap{flex:1;min-height:300px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2)}
-.gpsbigmap iframe{width:100%;height:100%;border:0;display:block}
-.mapempty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;padding:20px;text-align:center}
-.gpsdetail{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
-.dethead{font-size:15px;margin-bottom:9px}
-.detctrl{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
-.detstat{display:flex;flex-direction:column;gap:8px;font-size:13px}
-.gpscard{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--surface-2);max-width:460px}
-.gpscard .gcr{display:flex;gap:12px;padding:2px 0}
-.gpscard .gk{color:var(--muted);min-width:66px;flex:0 0 66px}
-.gpscard .gv{color:var(--text)}
-.gpscard .coords{color:var(--muted);font-variant-numeric:tabular-nums}
-.gpscard .gclinks{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:var(--muted)}
-.gpscard .gclinks a{color:var(--brand);text-decoration:none;font-weight:700}
-.gpscard .gclinks span{margin:0 6px;color:var(--line-strong)}
-@media(max-width:820px){.gpslayout{flex-direction:column;height:auto}.gpsside{flex:none;max-height:260px}.gpsbigmap{min-height:320px}}
+.wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+.addrt{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 18px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.addrt input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px}
+.rtcard{border:1px solid var(--line);border-left:4px solid var(--line-strong);border-radius:12px;padding:12px 14px;margin:10px 0;background:var(--surface)}
+.rtcard.verified{border-left-color:var(--in)}.rtcard.pending{border-left-color:var(--gold)}.rtcard.failed{border-left-color:var(--out)}
+.rthead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rtname{font-weight:800;font-size:15px}.rtsub{font-size:12px;color:var(--muted)}
+.rtbadge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px;margin-left:auto}
+.rtbadge.verified{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
+.rtbadge.pending{background:color-mix(in srgb,var(--gold) 26%,var(--surface));color:#8a6516}
+.rtbadge.failed{background:color-mix(in srgb,var(--out) 16%,var(--surface));color:var(--out)}
+.rtbadge.new{background:var(--surface-2);color:var(--muted)}
+.rtbadge.dec-approved{background:var(--in);color:#fff;margin-left:6px}
+.rtbadge.dec-rejected{background:var(--out);color:#fff;margin-left:6px}
+.rtverif{margin-top:8px;padding:8px 10px;background:var(--surface-2);border-radius:8px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.rtverif b{color:var(--text)}
+.rtact{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.rtnote{flex:1;min-width:180px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px}
+.rtlink{font-size:11.5px;color:var(--brand);word-break:break-all}
 </style>
 </head><body>
-
-<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">GPS Tracker Control — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">Renters &amp; ID Verification — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
-
 <div id="appwrap" style="display:none">
-<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· GPS Tracker Control</span><div class="spacer"></div><button class="btn" onclick="location.href='linda.html'" title="Linda — Billing Agent"><img src="assets/linda-sm.png" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px" alt="">Linda</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='renters.html'">🪪 Renters</button><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
+<div class="topbar"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"><span class="sub">· Renters &amp; ID Verification</span><div class="spacer"></div><button class="btn" onclick="location.href='linda.html'"><img src="assets/linda-sm.png" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px" alt="">Linda</button><button class="btn" onclick="location.href='owners.html'">👥 Owners</button><button class="btn" onclick="location.href='gps.html'">🚗 GPS</button><button class="btn" onclick="location.href='index.html'">← Ledger</button><button class="btn" id="signout">Sign out</button></div>
 <main class="wrap">
-<div class="gpstop">
-  <h2 style="margin:0;flex:0 0 auto">🚗 GPS Tracker Control</h2>
-  <button class="btn small pri" id="loadall">🚗 Load all cars</button>
-  <label class="gpsdry" style="margin:0"><input type="checkbox" class="gpsdrychk" checked> 🧪 dry-run (safe) — uncheck to actually disable/enable</label>
-</div>
-<div class="gpslayout">
-  <aside class="gpsside">
-    <div class="carsearchwrap"><input id="carsearch" placeholder="Search customer / car / fleet…"></div>
-    <div id="carlist"></div>
-  </aside>
-  <section class="gpsmainpane">
-    <div class="gpsbigmap" id="gpsmap"><div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div></div>
-    <div class="gpsdetail" id="gpsdetail"><p class="hint" style="margin:0">Select a car from the list to view its status and controls.</p></div>
-  </section>
-</div>
+<h2 style="margin:6px 0 2px">🪪 Renters &amp; ID Verification</h2>
+<p class="hint" style="margin:0 0 8px">Add a renter, generate a Stripe Identity link (driver's licence + selfie), send it, then review the verified result and approve. ID images are stored by Stripe, not here.</p>
+<div class="addrt"><input id="rt_name" placeholder="Full name"><input id="rt_email" type="email" placeholder="Email (for the link)"><input id="rt_phone" placeholder="Phone (optional)"><button class="btn pri" id="rt_add">+ Add renter</button></div>
+<div id="rtlist"></div>
 </main></div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 <script>
@@ -304,74 +278,43 @@ const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com','thandobnkala@gmail.com'];
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(msg){var t=document.createElement('div');t.className='ltoast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.classList.add('show');},10);setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2800);}
-var GPSDEV={}, GPS_DRYRUN=true;
-function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
-async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
-async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
-let CUSTS=[], SELECTED=null, TRACK=null, SEARCH='';
-function fmtDT(str){if(!str)return '-';var m=String(str).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);if(!m)return str;var mon=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var h=+m[4],ap=h>=12?'PM':'AM',h12=((h+11)%12)+1;return h12+':'+m[5]+' '+ap+' \u00b7 '+mon[(+m[2])-1]+' '+(+m[3]);}
-
-function setMap(lat,lng){var m=document.getElementById('gpsmap');if(lat&&lng){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lng)+'&z=15&output=embed"></iframe>';}else{m.innerHTML='<div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div>';}}
-
-function renderSide(){
-  var q=SEARCH.toLowerCase();
-  var list=CUSTS.filter(function(c){return !q||((c.name||'').toLowerCase().indexOf(q)>=0)||((c.sarekon_device_label||'').toLowerCase().indexOf(q)>=0)||((c.account_label||'').toLowerCase().indexOf(q)>=0);});
-  var byAcc={}; list.forEach(function(c){(byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c);});
-  var html=Object.keys(byAcc).sort().map(function(acc){
-    var rows=byAcc[acc].slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(c){
-      var idx=CUSTS.indexOf(c), linked=!!c.sarekon_device_id;
-      var sel=(SELECTED&&SELECTED.customer_id===c.customer_id&&SELECTED.account_label===c.account_label)?' sel':'';
-      var top=linked?esc(c.sarekon_device_label||'linked'):esc(c.name);
-      var sub=linked?esc(c.name):'<span class="nolink">no car linked</span>';
-      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+top+'</div><div class="carsub">'+sub+'</div></div>';
-    }).join('');
-    return '<div class="caracc">'+esc(acc)+'</div>'+rows;
+function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+let RENTERS=[];
+function statusClass(s){return s==='verified'?'verified':(s==='canceled'||s==='requires_action')?'failed':(s==='new'?'new':'pending');}
+function statusLabel(s){return {new:'no link yet',requires_input:'link sent · awaiting renter',processing:'processing…',verified:'✅ verified',canceled:'canceled',requires_action:'⚠ needs attention'}[s]||s;}
+async function inv(b){var r=await sb.functions.invoke('id-verify',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
+async function load(){var r=await sb.from('renters').select('*').order('created_at',{ascending:false});RENTERS=r.data||[];render();}
+function render(){
+  var el=document.getElementById('rtlist');
+  if(!RENTERS.length){el.innerHTML='<p class="hint">No renters yet — add one above.</p>';return;}
+  el.innerHTML=RENTERS.map(function(c,i){
+    var sc=statusClass(c.status);
+    var dec=c.decision==='approved'?'<span class="rtbadge dec-approved">APPROVED</span>':c.decision==='rejected'?'<span class="rtbadge dec-rejected">REJECTED</span>':'';
+    var verif=(c.status==='verified')?'<div class="rtverif"><span>Verified name: <b>'+esc(c.verified_name||'—')+'</b></span><span>DOB: <b>'+esc(c.verified_dob||'—')+'</b> · Document: <b>'+esc(c.verified_doc_type||'—')+' '+esc(c.verified_doc_number||'')+'</b>'+(c.verified_expiry?' · expires <b>'+esc(c.verified_expiry)+'</b>':'')+'</span>'+(c.verified_address?'<span>Address: '+esc(c.verified_address)+'</span>':'')+'</div>':'';
+    var linkbtns='';
+    if(!c.session_id){linkbtns='<button class="btn small pri" data-gen="'+i+'">🪪 Generate ID link</button>';}
+    else{linkbtns='<button class="btn small" data-copy="'+i+'">🔗 Copy link</button> <a class="btn small" href="'+esc(c.verify_url||'#')+'" target="_blank" rel="noopener">Open</a> <button class="btn small" data-refresh="'+i+'">↻ Refresh status</button>';}
+    return '<div class="rtcard '+sc+'"><div class="rthead"><span class="rtname">'+esc(c.name||'(no name)')+'</span><span class="rtsub">'+esc(c.email||'no email')+(c.phone?' · '+esc(c.phone):'')+'</span><span class="rtbadge '+sc+'">'+statusLabel(c.status)+'</span>'+dec+'</div>'+verif
+      +'<div class="rtact">'+linkbtns+' <button class="btn small ok" data-approve="'+i+'">✅ Approve</button> <button class="btn small danger" data-reject="'+i+'">✕ Reject</button> <input class="rtnote" data-noteinput="'+i+'" placeholder="notes" value="'+esc(c.notes||'')+'"><button class="btn small" data-savenote="'+i+'">Save</button> <button class="btn small" data-del="'+i+'" title="Remove">✕</button></div></div>';
   }).join('');
-  document.getElementById('carlist').innerHTML=html||'<p class="hint" style="padding:12px">No matches.</p>';
-  document.querySelectorAll('[data-car]').forEach(function(b){b.onclick=function(){selectCar(+b.dataset.car);};});
+  bind();
 }
-function selectCar(idx){SELECTED=CUSTS[idx];TRACK=null;renderSide();renderMain();if(SELECTED.sarekon_device_id){setMap(null);trackSel();}else{setMap(null);}}
-
-function renderMain(){
-  var d=document.getElementById('gpsdetail');
-  if(!SELECTED){d.innerHTML='<p class="hint" style="margin:0">Select a car from the list.</p>';return;}
-  var c=SELECTED;
-  if(!c.sarekon_device_id){
-    var devs=GPSDEV[gpsKeyFor(c.account_label)];
-    var picker=devs?('<select class="gpssel" id="linksel"><option value="">- pick this car -</option>'+devs.map(function(x){return '<option value="'+esc(x.device_id)+'">'+esc(x.description)+'</option>';}).join('')+'</select> <button class="btn small pri" id="linkbtn">Link</button>'):'<button class="btn small" id="loadbtn">Load cars</button> <span class="hint">or hit “Load all cars” above</span>';
-    d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+'</span></div><div class="detrow">No GPS car linked yet. '+picker+'</div>';
-    var lb=document.getElementById('linkbtn'); if(lb)lb.onclick=linkSel;
-    var lo=document.getElementById('loadbtn'); if(lo)lo.onclick=async function(){await loadGpsDevices(c.account_label);renderMain();};
-    return;
-  }
-  var t=TRACK;
-  var badges=t?('<span class="ignbadge '+(t.ignition==='ON'?'on':'off')+'">Ignition '+(t.ignition||'?')+'</span> '+(t.motion?('<span class="gpsmot">'+esc(t.motion)+(t.motion_since?' since '+esc(t.motion_since):'')+(t.speed?' ('+esc(t.speed)+')':'')+'</span>'):'')):'<span class="hint">Tap Track to load live status.</span>';
-  var card=t?('<div class="gpscard">'
-    +'<div class="gcr"><span class="gk">Date</span><span class="gv">'+esc(fmtDT(t.last_event_time))+'</span></div>'
-    +'<div class="gcr"><span class="gk">Event</span><span class="gv"><b>'+esc(t.last_event||'-')+'</b></span></div>'
-    +'<div class="gcr"><span class="gk">Location</span><span class="gv">'+esc(t.address||'-')+((t.lat&&t.lng)?'<br><span class="coords">'+esc(t.lat)+', '+esc(t.lng)+'</span>':'')+'</span></div>'
-    +((t.lat&&t.lng)?'<div class="gclinks"><a href="'+esc(t.maps)+'" target="_blank" rel="noopener">Google Maps</a> <span>|</span> <a href="https://www.bing.com/maps?cp='+encodeURIComponent(t.lat+'~'+t.lng)+'&lvl=16" target="_blank" rel="noopener">Bing Maps</a></div>':'')
-    +'</div>'):'';
-  var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap"><summary>recent events</summary>'+t.events.slice(0,10).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('')+'</details>'):'';
-  d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+' · '+esc(c.sarekon_device_label||'')+'</span></div>'
-    +'<div class="detctrl"><button class="btn small" id="btnLocate">📍 Locate</button> <button class="btn small" id="btnTrack">↻ Track</button> <button class="btn small danger" id="btnDisable">🔴 Disable starter</button> <button class="btn small ok" id="btnEnable">🟢 Enable starter</button> <button class="btn small" id="btnUnlink">unlink</button></div>'
-    +'<div class="detstat">'+badges+card+ev+'<div id="detmsg" class="hint"></div></div>';
-  document.getElementById('btnLocate').onclick=locateSel;
-  document.getElementById('btnTrack').onclick=trackSel;
-  document.getElementById('btnDisable').onclick=function(){cmdSel('disable');};
-  document.getElementById('btnEnable').onclick=function(){cmdSel('enable');};
-  document.getElementById('btnUnlink').onclick=unlinkSel;
+function bind(){
+  document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>genLink(+b.dataset.gen));
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(RENTERS[+b.dataset.copy].verify_url||'');toast('Link copied ✓');});
+  document.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=()=>refresh(+b.dataset.refresh));
+  document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>decide(+b.dataset.approve,'approved'));
+  document.querySelectorAll('[data-reject]').forEach(b=>b.onclick=()=>decide(+b.dataset.reject,'rejected'));
+  document.querySelectorAll('[data-savenote]').forEach(b=>b.onclick=()=>saveNote(+b.dataset.savenote));
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delRenter(+b.dataset.del));
 }
-async function trackSel(){var c=SELECTED;if(!c||!c.sarekon_device_id)return;var m=document.getElementById('detmsg');if(m)m.textContent='locating…';try{TRACK=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});renderMain();if(TRACK.lat&&TRACK.lng)setMap(TRACK.lat,TRACK.lng);}catch(e){var m2=document.getElementById('detmsg');if(m2)m2.textContent='Track failed: '+(e.message||e);}}
-async function locateSel(){var c=SELECTED;var m=document.getElementById('detmsg');if(m)m.textContent='pinging the car for a fresh location…';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});if(m)m.textContent='ping sent — refreshing position in ~15s…';setTimeout(trackSel,15000);}catch(e){if(m)m.textContent='Locate failed: '+(e.message||e);}}
-async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var m=document.getElementById('detmsg');if(m)m.textContent='sending…';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(m)m.textContent=d.dry_run?('DRY-RUN — would send '+kind+' (nothing sent).'):('Sent: '+kind+' — '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' #'+d.command_queue_id:''));toast(kind+(d.dry_run?' (dry-run)':' sent'));}catch(e){if(m)m.textContent='Failed: '+(e.message||e);}}
-async function linkSel(){var c=SELECTED;var sel=document.getElementById('linksel');var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await reloadKeepSel(c);trackSel();}
-async function unlinkSel(){var c=SELECTED;if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await reloadKeepSel(c);}
-async function reloadKeepSel(c){var d=await sb.from('linda_customers').select('*');CUSTS=(d.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});SELECTED=CUSTS.find(function(x){return x.customer_id===c.customer_id&&x.account_label===c.account_label;})||null;TRACK=null;renderSide();renderMain();}
-async function loadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars…';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');if(SELECTED)renderMain();}catch(e){alert('Load failed: '+(e.message||e));}btn.disabled=false;btn.textContent=o;}
-
-async function load(){var c=await sb.from('linda_customers').select('*');CUSTS=(c.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});renderSide();}
-async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('loadall').onclick=function(){loadAll(document.getElementById('loadall'));};document.getElementById('carsearch').oninput=function(e){SEARCH=e.target.value;renderSide();};document.querySelectorAll('.gpsdrychk').forEach(function(cb){cb.onchange=function(){GPS_DRYRUN=cb.checked;};});await load();try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');}catch(e){}}
+async function addRenter(){var n=document.getElementById('rt_name').value.trim();var e=document.getElementById('rt_email').value.trim();var p=document.getElementById('rt_phone').value.trim();if(!n){alert('Enter a name.');return;}var r=await sb.from('renters').insert([{name:n,email:e,phone:p,status:'new'}]);if(r.error){alert(r.error.message);return;}document.getElementById('rt_name').value='';document.getElementById('rt_email').value='';document.getElementById('rt_phone').value='';toast('Renter added ✓');await load();}
+async function genLink(i){var c=RENTERS[i];if(!c.email){alert('Add an email for this renter first (the link is emailed / sent to them).');return;}try{var d=await inv({action:'create',renter_id:c.id,renter:{name:c.name,email:c.email,phone:c.phone}});toast('ID link generated ✓');await load();try{await navigator.clipboard.writeText(d.url);toast('Link copied — send it to the renter');}catch(e){}}catch(e){alert('Could not generate link: '+(e.message||e));}}
+async function refresh(i){var c=RENTERS[i];try{var d=await inv({action:'status',session_id:c.session_id});toast('Status: '+(d.status||'?'));await load();}catch(e){alert('Refresh failed: '+(e.message||e));}}
+async function decide(i,dec){var c=RENTERS[i];if(dec==='rejected'&&!confirm('Reject '+(c.name||'this renter')+'?'))return;var r=await sb.from('renters').update({decision:dec,decision_at:new Date().toISOString()}).eq('id',c.id);if(r.error){alert(r.error.message);return;}toast(dec==='approved'?'Approved ✓':'Rejected');await load();}
+async function saveNote(i){var c=RENTERS[i];var v=document.querySelector('[data-noteinput="'+i+'"]').value;var r=await sb.from('renters').update({notes:v}).eq('id',c.id);if(r.error){alert(r.error.message);return;}toast('Note saved ✓');}
+async function delRenter(i){var c=RENTERS[i];if(!confirm('Remove '+(c.name||'this renter')+'?'))return;await sb.from('renters').delete().eq('id',c.id);await load();}
+async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('rt_add').onclick=addRenter;await load();}
 document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
 document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};

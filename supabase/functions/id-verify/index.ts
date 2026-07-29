@@ -1,0 +1,74 @@
+// id-verify — renter ID verification via Stripe Identity (driver's license + selfie), persisted to `renters`.
+// Identity runs in the main account "RENT 2 GO - 1.0" (key from LINDA_ACCOUNTS). Actions:
+//   create → start a session for a renter (insert/link a renters row) → returns hosted URL for the renter
+//   status → fetch the session (+ verification report) → update the renters row with the verified result
+// Auth: verify_jwt=true — service_role or an admin email.
+const SB = Deno.env.get("SUPABASE_URL")!;
+const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ACCTS = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]");
+const ADMINS = ["gorentaride@gmail.com", "thurstonrdavis@gmail.com", "thandobnkala@gmail.com"];
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const DEFAULT_ACCT = "RENT 2 GO - 1.0";
+function keyFor(label: string) { const a = ACCTS.find((x: any) => x.label === label); return a ? a.key : null; }
+async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
+async function stripeGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
+async function sbPost(path: string, bodyObj: unknown, prefer: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(bodyObj) }); return r.ok ? await r.json().catch(() => null) : null; }
+async function sbPatch(path: string, bodyObj: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(bodyObj) }); }
+function json(o: any, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } }); }
+const enc = encodeURIComponent;
+function d2(x: any) { return x ? String(x).padStart(2, "0") : ""; }
+function fmtDate(o: any) { return (o && o.year) ? `${o.year}-${d2(o.month)}-${d2(o.day)}` : null; }
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const tok = (req.headers.get("Authorization") || "").replace("Bearer ", "");
+  let ok = tok === SR;
+  if (!ok) { try { const p = JSON.parse(atob(tok.split(".")[1])); if (p.role === "service_role") ok = true; else if (p.email && ADMINS.includes(String(p.email).toLowerCase())) ok = true; } catch (_) { /* */ } }
+  if (!ok) return json({ error: "unauthorized" }, 401);
+  try {
+    const body = await req.json().catch(() => ({}));
+    const label = body.account_label || DEFAULT_ACCT;
+    const key = keyFor(label);
+    if (!key) return json({ error: "no Stripe key for " + label });
+
+    if (body.action === "create") {
+      const f = new URLSearchParams();
+      f.set("type", "document");
+      f.set("options[document][require_matching_selfie]", "true");
+      f.set("options[document][require_live_capture]", "true");
+      f.append("options[document][allowed_types][]", "driving_license");
+      f.append("options[document][allowed_types][]", "id_card");
+      f.append("options[document][allowed_types][]", "passport");
+      if (body.renter?.email) f.set("metadata[renter_email]", String(body.renter.email));
+      if (body.renter?.name) f.set("metadata[renter_name]", String(body.renter.name));
+      if (body.renter_id) f.set("metadata[renter_id]", String(body.renter_id));
+      const s = await stripeForm("https://api.stripe.com/v1/identity/verification_sessions", f, key);
+      if (s.error) return json({ error: s.error.message || JSON.stringify(s.error), code: s.error.code });
+      const patch = { stripe_account: label, session_id: s.id, verify_url: s.url, status: s.status, updated_at: new Date().toISOString() };
+      let renter_id = body.renter_id;
+      if (renter_id) { await sbPatch(`renters?id=eq.${enc(renter_id)}`, patch); }
+      else { const row = await sbPost(`renters`, [{ name: body.renter?.name || "", email: body.renter?.email || "", phone: body.renter?.phone || "", ...patch }], "return=representation"); renter_id = row && row[0] ? row[0].id : null; }
+      return json({ ok: true, renter_id, session_id: s.id, url: s.url, client_secret: s.client_secret, status: s.status });
+    }
+
+    if (body.action === "status") {
+      if (!body.session_id) return json({ error: "session_id required" });
+      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report`, key);
+      if (s.error) return json({ error: s.error.message || JSON.stringify(s.error) });
+      const vo = s.verified_outputs || {};
+      const doc = (s.last_verification_report && s.last_verification_report.document) || {};
+      const patch: any = { status: s.status, updated_at: new Date().toISOString() };
+      const name = [vo.first_name || doc.first_name, vo.last_name || doc.last_name].filter(Boolean).join(" ");
+      if (name) patch.verified_name = name;
+      const dob = fmtDate(vo.dob || doc.dob); if (dob) patch.verified_dob = dob;
+      if (doc.type) patch.verified_doc_type = doc.type;
+      if (doc.number) patch.verified_doc_number = doc.number;
+      const exp = fmtDate(doc.expiration_date); if (exp) patch.verified_expiry = exp;
+      const a = vo.address || doc.address; if (a) patch.verified_address = [a.line1, a.city, a.state, a.postal_code, a.country].filter(Boolean).join(", ");
+      await sbPatch(`renters?session_id=eq.${enc(body.session_id)}`, patch);
+      return json({ ok: true, session_id: s.id, status: s.status, last_error: s.last_error, ...patch });
+    }
+
+    return json({ error: "action must be 'create' or 'status'" });
+  } catch (e) { return json({ error: String(e) }, 500); }
+});
