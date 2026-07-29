@@ -296,28 +296,27 @@ Deno.serve(async (req) => {
       const jInv = (await stripeAll(`https://api.stripe.com/v1/invoices?customer=${PENNY_JJM}&status=open&limit=100`, jjm.key)).sort((a: any, b: any) => (a.created || 0) - (b.created || 0));
       const lInv = (await stripeAll(`https://api.stripe.com/v1/invoices?customer=${PENNY_LLC}&status=open&limit=100`, llc.key)).filter((i: any) => (i.amount_remaining || 0) > 0);
       // JJM: oldest = the "for yesterday (27th)" invoice → treat as past due; the rest (28th) → current.
-      const jPast = jInv.slice(0, Math.max(1, jInv.length - 1));
-      const jCurr = jInv.slice(Math.max(1, jInv.length - 1));
+      // Classify by REAL past-due status + real invoice dates (no hardcoded dates).
+      const jPast = jInv.filter(isPastDue);
+      const jCurr = jInv.filter((i: any) => !isPastDue(i));
       const lPast = lInv.filter(isPastDue);
       const jPastAmt = jPast.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
       const jCurrAmt = jCurr.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
       const lPastAmt = lPast.reduce((a: number, i: any) => a + (i.amount_remaining || 0), 0) / 100;
       const grand = Math.round((jPastAmt + jCurrAmt + lPastAmt) * 100) / 100;
-      // Both JJM invoices were created today (the "27th" one was generated today with a note that it's
-      // for yesterday), so their created-date reads Jul 28. Force the business dates: past-due = Jul 27, current = Jul 28.
-      const jline = (i: any, icon: string, dateLabel: string) => { const lbl = cleanlbl((i.lines?.data || [{}])[0]?.description || i.description || "Rental"); const url = i.hosted_invoice_url || ""; return `${icon} ${dateLabel} · ${lbl.slice(0, 34)} · ${m((i.amount_remaining || 0) / 100)}${url ? ` · [Pay now](${url})` : ""}`; };
       const P: string[] = [];
-      P.push("Good morning Penny 👋\n\nWelcome to your new vehicle! Here's a quick summary of everything outstanding across your Rent 2 Go accounts so we can get you set up cleanly before your new plan begins tomorrow.");
-      P.push("① Your new rental account:");
-      if (jPast.length) P.push("Past due (for July 27):\n\n" + jPast.map((i: any) => jline(i, "❌", "Jul 27")).join("\n\n"));
-      if (jCurr.length) P.push("Due today (July 28):\n\n" + jCurr.map((i: any) => jline(i, "✅", "Jul 28")).join("\n\n"));
-      P.push("Pay these in your new account portal:" + footer(jjm.portal || "").replace(/^\n\n/, "\n"));
-      P.push("② Your previous account balance:");
-      if (lPast.length) P.push("Past due (please clear per your plan — the agreed $246 before 1 August):\n\n" + lPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(lPastAmt));
+      P.push("Good morning Penny 👋\n\nHere's a combined summary of everything outstanding across both your Rent 2 Go accounts, with a pay link on each item.");
+      P.push("① Your JJM rental account:");
+      if (jPast.length) P.push("Past due:\n\n" + jPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(jPastAmt));
+      if (jCurr.length) P.push("Coming due (not yet late):\n\n" + jCurr.map((i: any) => invline(i, "✅")).join("\n\n") + "\n\nCurrent subtotal: " + m(jCurrAmt));
+      if (!jPast.length && !jCurr.length) P.push("No open invoices on this account right now.");
+      P.push("Pay these in your JJM account portal:" + footer(jjm.portal || "").replace(/^\n\n/, "\n"));
+      P.push("② Your previous account balance (RENT 2 GO LLC 2.0):");
+      if (lPast.length) P.push("Past due (per your plan — clear the agreed $246 before 1 August):\n\n" + lPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(lPastAmt));
       else P.push("No past-due invoices remain on your previous account — thank you.");
       P.push("Pay these in your previous account portal:" + footer(llc.portal || "").replace(/^\n\n/, "\n"));
       P.push("💰 Total across both accounts: " + m(grand));
-      P.push("Please settle today, or reach out right away to arrange payments or discuss a plan of action. Thank you, Penny — we're glad to have you back on the road.\n\nRent 2 Go");
+      P.push("Please settle as soon as possible, or reach out right away to arrange payments or discuss a plan of action. Thank you, Penny.\n\nRent 2 Go");
       const pbody = P.join("\n\n");
       const em = "mitchellpenny746@gmail.com";
       // preserve across today's resets: mark reviewed so the daily reset + keepset leave it in place
