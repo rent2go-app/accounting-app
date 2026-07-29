@@ -80,6 +80,34 @@ Deno.serve(async (req) => {
       return json({ ok: true, renter_id, session_id: s.id, url: s.url, client_secret: s.client_secret, status: s.status });
     }
 
+    // Stripe does not hand back the date of birth — it hands back photographs of
+    // the licence. This returns those images so an admin can read the DOB off the
+    // document and confirm it against what the renter typed.
+    // Identity files are restricted (no file_links), so we proxy the bytes.
+    if (body.action === "files") {
+      if (!isAdmin) return json({ error: "admins only" }, 403);
+      if (!body.session_id) return json({ error: "session_id required" });
+      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report`, key);
+      if (s.error) return json({ error: s.error.message || "stripe error" });
+      const rep = s.last_verification_report || {};
+      const ids: string[] = [
+        ...(((rep.document || {}).files) || []),
+        ...((rep.selfie && rep.selfie.selfie) ? [rep.selfie.selfie] : []),
+      ].filter(Boolean);
+      const out: any[] = [];
+      for (const id of ids) {
+        try {
+          const r = await fetch(`https://files.stripe.com/v1/files/${id}/contents`, { headers: { Authorization: `Bearer ${key}` } });
+          if (!r.ok) { out.push({ id, error: `HTTP ${r.status}` }); continue; }
+          const buf = new Uint8Array(await r.arrayBuffer());
+          let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+          const mime = r.headers.get("content-type") || "image/jpeg";
+          out.push({ id, data: `data:${mime};base64,${btoa(bin)}` });
+        } catch (e) { out.push({ id, error: String(e) }); }
+      }
+      return json({ ok: true, session_id: body.session_id, count: out.length, files: out });
+    }
+
     if (body.action === "status") {
       if (!body.session_id) return json({ error: "session_id required" });
       if (!isAdmin) {

@@ -281,6 +281,26 @@ function toast(msg){var t=document.createElement('div');t.className='ltoast';t.t
 function shortET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 let RENTERS=[];
 function statusClass(s){return s==='verified'?'verified':(s==='canceled'||s==='requires_action')?'failed':(s==='new'?'new':'pending');}
+// Stripe gives us licence photographs but not the date of birth. An admin reads
+// it off the image (🪪 View licence) and records it here. Writing verified_dob
+// fires the database trigger, which recomputes the deposit, the age check and
+// the dob_match flag against whatever the renter typed at sign-up.
+async function confirmDob(i){
+  var c=RENTERS[i];
+  var typed=c.dob?('\n\nThe renter typed: '+c.dob):'\n\n(They did not give a date of birth at sign-up.)';
+  var v=prompt('Date of birth exactly as printed on the licence (YYYY-MM-DD):'+typed,c.verified_dob||c.dob||'');
+  if(v===null)return;
+  v=v.trim();
+  if(v&&!/^\d{4}-\d{2}-\d{2}$/.test(v)){alert('Please use YYYY-MM-DD, e.g. 1994-03-27');return;}
+  try{
+    var r=await sb.from('renters').update({verified_dob:v||null}).eq('id',c.id).select().single();
+    if(r.error)throw r.error;
+    var d=r.data;
+    toast('Saved — deposit $'+(d.deposit_total||'?')+(d.dob_match===false?' · ⚠ does NOT match what they typed':(d.dob_match===true?' · ✓ matches':'')));
+    if(d.eligibility==='under_21')alert('⚠ This renter is '+d.age_years+' — under 21 and not eligible to rent.');
+    await load(); render();
+  }catch(e){alert('Could not save: '+(e.message||e));}
+}
 function statusLabel(s){return {new:'no link yet',requires_input:'link sent · awaiting renter',processing:'processing…',verified:'✅ verified',canceled:'canceled',requires_action:'⚠ needs attention'}[s]||s;}
 async function inv(b){var r=await sb.functions.invoke('id-verify',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function load(){var r=await sb.from('renters').select('*').order('created_at',{ascending:false});RENTERS=r.data||[];render();}
@@ -294,6 +314,21 @@ function render(){
     var linkbtns='';
     if(!c.session_id){linkbtns='<button class="btn small pri" data-gen="'+i+'">🪪 Generate ID link</button>';}
     else{linkbtns='<button class="btn small" data-copy="'+i+'">🔗 Copy link</button> <a class="btn small" href="'+esc(c.verify_url||'#')+'" target="_blank" rel="noopener">Open</a> <button class="btn small" data-refresh="'+i+'">↻ Refresh status</button>';}
+    // Stripe returns no date of birth — only photographs of the licence, and the
+    // API cannot download those (403). They ARE viewable in the Stripe dashboard,
+    // so: open the licence there, read the DOB, key it in. That sets verified_dob,
+    // which recomputes the deposit and the dob_match check automatically.
+    if(c.session_id){
+      linkbtns+=' <a class="btn small" href="https://dashboard.stripe.com/identity/verification-sessions/'+esc(c.session_id)+'" target="_blank" rel="noopener" title="See the licence images Stripe captured">🪪 View licence</a>'
+        +' <button class="btn small" data-dob="'+i+'" title="Read the date of birth off the licence and record it">📅 '+(c.verified_dob?'DOB '+esc(c.verified_dob):'Confirm DOB')+'</button>';
+    }
+    if(c.deposit_total){
+      var bd=c.deposit_breakdown||{};
+      linkbtns+=' <span class="btn small" style="cursor:default" title="'+esc('base $'+(bd.base||150)+(bd.out_of_town?' + out of town $'+bd.out_of_town:'')+(bd.young_renter?' + young renter $'+bd.young_renter:''))+'">💵 deposit $'+esc(c.deposit_total)+'</span>';
+    }
+    if(c.needs_review&&c.review_reason){
+      linkbtns+=' <span class="btn small" style="cursor:default;color:#c22a2a" title="'+esc(c.review_reason)+'">⚠ review</span>';
+    }
     return '<div class="rtcard '+sc+'"><div class="rthead"><span class="rtname">'+esc(c.name||'(no name)')+'</span><span class="rtsub">'+esc(c.email||'no email')+(c.phone?' · '+esc(c.phone):'')+'</span><span class="rtbadge '+sc+'">'+statusLabel(c.status)+'</span>'+dec+'</div>'+verif
       +'<div class="rtact">'+linkbtns+' <button class="btn small ok" data-approve="'+i+'">✅ Approve</button> <button class="btn small danger" data-reject="'+i+'">✕ Reject</button> <input class="rtnote" data-noteinput="'+i+'" placeholder="notes" value="'+esc(c.notes||'')+'"><button class="btn small" data-savenote="'+i+'">Save</button> <button class="btn small" data-del="'+i+'" title="Remove">✕</button></div></div>';
   }).join('');
@@ -301,6 +336,7 @@ function render(){
 }
 function bind(){
   document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>genLink(+b.dataset.gen));
+  document.querySelectorAll('[data-dob]').forEach(b=>b.onclick=()=>confirmDob(+b.dataset.dob));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(RENTERS[+b.dataset.copy].verify_url||'');toast('Link copied ✓');});
   document.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=()=>refresh(+b.dataset.refresh));
   document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>decide(+b.dataset.approve,'approved'));
