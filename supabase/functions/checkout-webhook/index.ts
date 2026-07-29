@@ -10,6 +10,8 @@ const SB = Deno.env.get("SUPABASE_URL")!;
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WHSEC = Deno.env.get("STRIPE_CHECKOUT_WHSEC") || "";
 const ADMIN_NOTIFY = Deno.env.get("ADMIN_NOTIFY") || "gorentaride@gmail.com";
+// where the renter completes their pickup inspection (our own form, not Typeform)
+const SITE = Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/";
 const enc = encodeURIComponent;
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } }); }
 
@@ -107,7 +109,7 @@ ${desc}
 When you get to the Car - Please Complete the PICKUP by documenting the condition of the car Inside & outside as well as recording Gas and Mileage by using this pick up Form - Click This Link To Begin
 
 🚦Use This Link TO BEGIN Your Rental
-https://form.typeform.com/to/ITnIp22J
+${SITE}#pickup
 
 🎗MAKE SURE TO READ ALL THE RULES to make sure you know what you need to do`;
 }
