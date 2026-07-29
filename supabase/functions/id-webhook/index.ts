@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
   // The webhook payload redacts the document details — re-fetch expanded to get them.
   if (s0.status === "verified" && key) {
     const s = await stripeGET(
-      `https://api.stripe.com/v1/identity/verification_sessions/${sessionId}?expand[]=last_verification_report`, key,
+      `https://api.stripe.com/v1/identity/verification_sessions/${sessionId}?expand[]=last_verification_report&expand[]=verified_outputs`, key,
     );
     if (!s.error) {
       const vo = s.verified_outputs || {};

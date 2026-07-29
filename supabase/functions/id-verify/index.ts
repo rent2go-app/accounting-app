@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=session_id`);
         if (!mine || !mine[0] || mine[0].session_id !== body.session_id) return json({ error: "forbidden" }, 403);
       }
-      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report`, key);
+      const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report&expand[]=verified_outputs`, key);
       if (s.error) return json({ error: s.error.message || JSON.stringify(s.error) });
       const vo = s.verified_outputs || {};
       const doc = (s.last_verification_report && s.last_verification_report.document) || {};
