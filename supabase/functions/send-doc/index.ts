@@ -26,8 +26,8 @@ Deno.serve(async (req) => {
 
     const payload: Record<string, unknown> = { from, to: [to], subject, html };
     if (replyTo) payload.reply_to = replyTo;
-    // Always BCC the business inbox so we can confirm every message went out (override via RESEND_BCC).
-    const bcc = (Deno.env.get("RESEND_BCC") || "gorentaride@gmail.com").trim();
+    // Optional BCC only if RESEND_BCC is explicitly set (default: none).
+    const bcc = (Deno.env.get("RESEND_BCC") || "").trim();
     if (bcc && bcc.toLowerCase() !== to.toLowerCase()) payload.bcc = [bcc];
 
     const r = await fetch("https://api.resend.com/emails", {
