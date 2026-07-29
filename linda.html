@@ -602,7 +602,7 @@ async function setDisc(c,patch){
   if(r.error){alert('Could not save: '+r.error.message);return;}
   toast('Saved ✓');await load();
 }
-var GPSDEV={}; var GPS_DRYRUN=false; var GPSROWS=[];
+var GPSDEV={}; var GPS_DRYRUN=false; var GPSROWS=[]; var OPENSEC={};
 function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
@@ -666,7 +666,7 @@ function renderDisconnections(){
         +gpsRow(c)
       +'</div></div>';
   }).join('');
-  el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
+  el.innerHTML='<details class="discwrap" data-sec="disc"'+(OPENSEC.disc?' open':'')+'><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<div class="hint" style="color:var(--out);font-weight:700;margin:2px 0 10px">\u26a1 GPS commands are LIVE \u2014 Disable/Enable act on the real vehicle and update the status here.</div>'
     +cards+'</details>';
@@ -707,7 +707,7 @@ function renderPlans(){
         +'<div class="dact"><button class="btn small" data-plancontact="'+i+'">📝 Log contact / note</button> <button class="btn small" data-planremove="'+i+'">Remove from plan</button>'+(behind?' <button class="btn small danger" data-planrecdisc="'+i+'">🔴 Recommend for disconnection</button>':'')+'</div>'
       +'</div></div>';
   }).join('');
-  el.innerHTML='<details class="discwrap plans"><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
+  el.innerHTML='<details class="discwrap plans" data-sec="plans"'+(OPENSEC.plans?' open':'')+'><summary>📋 Payment Plans — <b>'+PLANROWS.length+'</b> on plan <span class="hint">· '+(PLANROWS.length-behindN)+' on track · '+behindN+' behind</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Linda checks each plan daily. <b>On track</b> = yesterday\'s agreed payments came in. <b>Behind</b> = they didn\'t — the notice warns them, and you can recommend disconnection.</p>'
     +cards+'</details>';
 }
@@ -758,7 +758,7 @@ function renderFeeLedger(){
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
   var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-pull the invoice/fee ledger from the database now">🔄 Refresh ledger</button></div>';
-  var main='<details class="feewrap"><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
+  var main='<details class="feewrap" data-sec="fees"'+(OPENSEC.fees?' open':'')+'><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
     +refreshBar
     +groups
     +'<p class="hint"><b>📝 Raise draft</b> → $10 draft in Stripe (not sent). <b>📧 Send</b> → finalizes &amp; <b>emails the invoice</b> to the customer to pay (never auto-charged). <b>✓ Done</b> → clears it from this list. <b>✕ Dismiss</b> spares the customer today. Fees <b>stay through raise → send → done</b>.</p></details>';
@@ -912,6 +912,7 @@ function wire(){
   document.querySelectorAll('[data-dnccopy]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dnccopy);if(d)copyDraft(d.id,b);});
   document.querySelectorAll('[data-dncsent]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsent);if(d)markSent(d.id);});
   document.querySelectorAll('[data-gotonotice]').forEach(b=>b.onclick=()=>gotoNotice(+b.dataset.gotonotice));
+  document.querySelectorAll('[data-sec]').forEach(function(dd){dd.ontoggle=function(){OPENSEC[dd.dataset.sec]=dd.open;};});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
   document.querySelectorAll('[data-discact]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discact],{action_taken:document.getElementById('dai'+b.dataset.discact).value,action_at:new Date().toISOString()}));
