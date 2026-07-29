@@ -14,6 +14,7 @@ async function stripeForm(url: string, form: URLSearchParams, key: string) { con
 async function stripeGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
 async function sbPost(path: string, bodyObj: unknown, prefer: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(bodyObj) }); return r.ok ? await r.json().catch(() => null) : null; }
 async function sbPatch(path: string, bodyObj: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(bodyObj) }); }
+async function sbGet(path: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } }); return r.ok ? await r.json().catch(() => null) : null; }
 function json(o: any, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } }); }
 const enc = encodeURIComponent;
 function d2(x: any) { return x ? String(x).padStart(2, "0") : ""; }
@@ -21,9 +22,18 @@ function fmtDate(o: any) { return (o && o.year) ? `${o.year}-${d2(o.month)}-${d2
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  // Three kinds of caller: service_role, an admin email, or a signed-in
+  // renter acting on their OWN row (that last one is what self-serve signup uses).
   const tok = (req.headers.get("Authorization") || "").replace("Bearer ", "");
-  let ok = tok === SR;
-  if (!ok) { try { const p = JSON.parse(atob(tok.split(".")[1])); if (p.role === "service_role") ok = true; else if (p.email && ADMINS.includes(String(p.email).toLowerCase())) ok = true; } catch (_) { /* */ } }
+  let ok = tok === SR, isAdmin = tok === SR, callerUid = "";
+  if (!ok) {
+    try {
+      const p = JSON.parse(atob(tok.split(".")[1]));
+      if (p.role === "service_role") { ok = true; isAdmin = true; }
+      else if (p.email && ADMINS.includes(String(p.email).toLowerCase())) { ok = true; isAdmin = true; }
+      else if (p.sub) { ok = true; callerUid = String(p.sub); }
+    } catch (_) { /* */ }
+  }
   if (!ok) return json({ error: "unauthorized" }, 401);
   try {
     const body = await req.json().catch(() => ({}));
@@ -32,6 +42,16 @@ Deno.serve(async (req) => {
     if (!key) return json({ error: "no Stripe key for " + label });
 
     if (body.action === "create") {
+      // A renter may only ever start a check against their own row. Resolve it
+      // BEFORE calling Stripe so a bad caller can't run up billable sessions.
+      let ownRenterId: string | null = null;
+      if (!isAdmin) {
+        const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=id,status`);
+        const row = mine && mine[0];
+        if (!row) return json({ error: "no renter profile for this login" }, 403);
+        if (row.status === "verified") return json({ error: "already verified" }, 400);
+        ownRenterId = row.id;
+      }
       const f = new URLSearchParams();
       f.set("type", "document");
       f.set("options[document][require_matching_selfie]", "true");
@@ -42,10 +62,12 @@ Deno.serve(async (req) => {
       if (body.renter?.email) f.set("metadata[renter_email]", String(body.renter.email));
       if (body.renter?.name) f.set("metadata[renter_name]", String(body.renter.name));
       if (body.renter_id) f.set("metadata[renter_id]", String(body.renter_id));
+      // where Stripe sends the renter when they finish (self-serve signup)
+      if (body.return_url) f.set("return_url", String(body.return_url));
       const s = await stripeForm("https://api.stripe.com/v1/identity/verification_sessions", f, key);
       if (s.error) return json({ error: s.error.message || JSON.stringify(s.error), code: s.error.code });
       const patch = { stripe_account: label, session_id: s.id, verify_url: s.url, status: s.status, updated_at: new Date().toISOString() };
-      let renter_id = body.renter_id;
+      let renter_id = ownRenterId || body.renter_id;
       if (renter_id) { await sbPatch(`renters?id=eq.${enc(renter_id)}`, patch); }
       else { const row = await sbPost(`renters`, [{ name: body.renter?.name || "", email: body.renter?.email || "", phone: body.renter?.phone || "", ...patch }], "return=representation"); renter_id = row && row[0] ? row[0].id : null; }
       return json({ ok: true, renter_id, session_id: s.id, url: s.url, client_secret: s.client_secret, status: s.status });
@@ -53,6 +75,10 @@ Deno.serve(async (req) => {
 
     if (body.action === "status") {
       if (!body.session_id) return json({ error: "session_id required" });
+      if (!isAdmin) {
+        const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=session_id`);
+        if (!mine || !mine[0] || mine[0].session_id !== body.session_id) return json({ error: "forbidden" }, 403);
+      }
       const s = await stripeGET(`https://api.stripe.com/v1/identity/verification_sessions/${body.session_id}?expand[]=last_verification_report`, key);
       if (s.error) return json({ error: s.error.message || JSON.stringify(s.error) });
       const vo = s.verified_outputs || {};
@@ -66,6 +92,11 @@ Deno.serve(async (req) => {
       const exp = fmtDate(doc.expiration_date); if (exp) patch.verified_expiry = exp;
       const a = vo.address || doc.address; if (a) patch.verified_address = [a.line1, a.city, a.state, a.postal_code, a.country].filter(Boolean).join(", ");
       await sbPatch(`renters?session_id=eq.${enc(body.session_id)}`, patch);
+      // Owners share the same Stripe Identity flow — mirror the result onto the owners row (verify_status,
+      // not status, and flip id_verified when verified). No-op if no owner has this session_id.
+      const opatch: any = { ...patch, verify_status: s.status }; delete opatch.status;
+      if (s.status === "verified") opatch.id_verified = true;
+      await sbPatch(`owners?session_id=eq.${enc(body.session_id)}`, opatch);
       return json({ ok: true, session_id: s.id, status: s.status, last_error: s.last_error, ...patch });
     }
 
