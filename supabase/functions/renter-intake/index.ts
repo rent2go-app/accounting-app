@@ -17,6 +17,30 @@ async function sbPost(path: string, body: unknown, prefer: string) { const r = a
 async function sbPatch(path: string, body: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
 async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
 
+// Proof of address. The visitor is anonymous and cannot write to storage, so the
+// file rides in as a base64 data URL and is uploaded here with the service_role
+// key. Requires the `renter-docs` bucket (supabase-renters-alter.sql).
+async function uploadProof(renter_id: string, proof: any): Promise<{ path: string; name: string } | null> {
+  try {
+    const m = String(proof.data || "").match(/^data:([^;]+);base64,(.*)$/);
+    if (!m) return null;
+    const mime = m[1];
+    const bin = atob(m[2]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if (bytes.length > 10 * 1024 * 1024) return null;           // 10 MB cap
+    const ext = mime.includes("pdf") ? "pdf" : (mime.split("/")[1] || "jpg");
+    const path = `${renter_id}/proof-${Date.now()}.${ext}`;
+    const r = await fetch(`${SB}/storage/v1/object/renter-docs/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SR}`, apikey: SR, "Content-Type": mime, "x-upsert": "true" },
+      body: bytes,
+    });
+    if (!r.ok) return null;
+    return { path, name: String(proof.name || `proof.${ext}`) };
+  } catch (_) { return null; }
+}
+
 async function createSession(renter: any, renter_id: string, key: string) {
   const f = new URLSearchParams();
   f.set("type", "document");
@@ -45,6 +69,18 @@ Deno.serve(async (req) => {
     const phone = String(body.phone || "").trim();
     if (!email && !name) return json({ error: "name or email required" });
 
+    // Compliance data from the sign-up wizard. All optional so existing
+    // callers keep working, but the prototype must send these — the six
+    // acknowledgements and the signed agreement are what make the rental
+    // enforceable, and proof of address is an insurance requirement.
+    const questionnaire = (body.questionnaire && typeof body.questionnaire === "object") ? body.questionnaire : null;
+    const signature = body.signature ? String(body.signature).trim() : null;
+    const agreedAt  = body.agreed_at ? String(body.agreed_at) : (signature ? new Date().toISOString() : null);
+    // proof of address arrives as { name, data } where data is a base64 data URL.
+    // Anonymous visitors can't write to storage, so the upload happens here with
+    // the service_role key instead.
+    const proof = (body.proof && body.proof.data) ? body.proof : null;
+
     const label = body.account_label || DEFAULT_ACCT;
     const key = keyFor(label);
     if (!key) return json({ error: "no Stripe key for " + label });
@@ -63,11 +99,23 @@ Deno.serve(async (req) => {
     // Insert (or reuse the row id) then start a real Identity session.
     let renter_id = existing?.id;
     if (!renter_id) {
-      const row = await sbPost("renters", [{ name, email, phone, status: "new", notes: "Website signup" }], "return=representation");
+      const insert: any = { name, email, phone, status: "new", notes: "Website signup", signup_source: "prototype" };
+      if (questionnaire) insert.questionnaire = questionnaire;
+      if (signature) { insert.signature = signature; insert.agreed_at = agreedAt; }
+      const row = await sbPost("renters", [insert], "return=representation");
       renter_id = row && row[0] ? row[0].id : null;
       if (!renter_id) return json({ error: "could not create renter" }, 500);
     } else {
-      await sbPatch(`renters?id=eq.${enc(renter_id)}`, { name, phone });
+      const patch: any = { name, phone };
+      if (questionnaire) patch.questionnaire = questionnaire;
+      if (signature) { patch.signature = signature; patch.agreed_at = agreedAt; }
+      await sbPatch(`renters?id=eq.${enc(renter_id)}`, patch);
+    }
+
+    // proof of address — needs renter_id for the storage path, so it happens here
+    if (proof && renter_id) {
+      const up = await uploadProof(renter_id, proof);
+      if (up) await sbPatch(`renters?id=eq.${enc(renter_id)}`, { proof_path: up.path, proof_name: up.name });
     }
 
     const s = await createSession({ name, email }, renter_id, key);
