@@ -301,6 +301,49 @@ async function confirmDob(i){
     await load(); render();
   }catch(e){alert('Could not save: '+(e.message||e));}
 }
+/* Stripe holds the licence images behind a permission we do not have, but the
+   dashboard lets you download them. Upload them once here and they live in our
+   own private bucket — no more bouncing to Stripe to check a renter. */
+async function uploadIdImages(i,input){
+  const c=RENTERS[i]; const files=Array.from(input.files||[]); if(!files.length)return;
+  toast('Uploading '+files.length+' file(s)…');
+  const stored=(c.id_images||[]).slice();
+  try{
+    for(const f of files){
+      const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+      const path=c.id+'/licence-'+Date.now()+'-'+Math.random().toString(36).slice(2,6)+'.'+ext;
+      const up=await sb.storage.from('renter-docs').upload(path,f,{upsert:true,contentType:f.type||'image/jpeg'});
+      if(up.error)throw up.error;
+      stored.push({path,name:f.name,mime:f.type||'image/jpeg',source:'admin-upload'});
+    }
+    const r=await sb.from('renters').update({id_images:stored}).eq('id',c.id);
+    if(r.error)throw r.error;
+    toast('Saved to the renter\u2019s profile ✓');
+    await load(); render();
+  }catch(e){alert('Upload failed: '+(e.message||e));}
+  input.value='';
+}
+async function showDocs(i){
+  const c=RENTERS[i];
+  const items=[...(c.id_images||[])];
+  if(c.proof_path)items.push({path:c.proof_path,name:c.proof_name||'Proof of address',proof:true});
+  if(!items.length){alert('Nothing stored yet.');return;}
+  let html='<div style="position:fixed;inset:0;background:rgba(10,14,20,.72);z-index:999;overflow:auto;padding:24px" onclick="if(event.target===this)this.remove()">'
+    +'<div style="max-width:820px;margin:0 auto;background:var(--surface);border-radius:16px;padding:22px">'
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><b style="font-size:17px">'+esc(c.name||'Renter')+' — documents</b>'
+    +'<span style="flex:1"></span><button class="btn" onclick="this.closest(\'div[style*=fixed]\').remove()">Close</button></div>';
+  for(const it of items){
+    const u=await sb.storage.from('renter-docs').createSignedUrl(it.path,3600);
+    const url=(u.data&&u.data.signedUrl)||'';
+    const pdf=/\.pdf$/i.test(it.path);
+    html+='<div style="margin-bottom:16px"><div style="font-size:12px;color:var(--muted);margin-bottom:5px">'
+      +(it.proof?'📄 Proof of address':'🪪 Licence / ID')+' — '+esc(it.name||'')+'</div>'
+      +(url?(pdf?'<a class="btn" href="'+url+'" target="_blank">Open PDF</a>'
+            :'<img src="'+url+'" style="max-width:100%;border-radius:10px;border:1px solid var(--line)">')
+          :'<span style="color:var(--out)">could not load</span>')+'</div>';
+  }
+  document.body.insertAdjacentHTML('beforeend',html+'</div></div>');
+}
 function statusLabel(s){return {new:'no link yet',requires_input:'link sent · awaiting renter',processing:'processing…',verified:'✅ verified',canceled:'canceled',requires_action:'⚠ needs attention'}[s]||s;}
 async function inv(b){var r=await sb.functions.invoke('id-verify',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function load(){var r=await sb.from('renters').select('*').order('created_at',{ascending:false});RENTERS=r.data||[];render();}
@@ -322,6 +365,11 @@ function render(){
       linkbtns+=' <a class="btn small" href="https://dashboard.stripe.com/identity/verification-sessions/'+esc(c.session_id)+'" target="_blank" rel="noopener" title="See the licence images Stripe captured">🪪 View licence</a>'
         +' <button class="btn small" data-dob="'+i+'" title="Read the date of birth off the licence and record it">📅 '+(c.verified_dob?'DOB '+esc(c.verified_dob):'Confirm DOB')+'</button>';
     }
+    linkbtns+=' <label class="btn small" style="cursor:pointer" title="Download from Stripe, then upload here so you never have to go back">'
+      +'\u2b06 Upload licence<input type="file" accept="image/*,application/pdf" multiple style="display:none" data-idup="'+i+'"></label>';
+    if((c.id_images||[]).length||c.proof_path){
+      linkbtns+=' <button class="btn small" data-docs="'+i+'">\ud83d\uddbc Documents ('+((c.id_images||[]).length+(c.proof_path?1:0))+')</button>';
+    }
     if(c.deposit_total){
       var bd=c.deposit_breakdown||{};
       linkbtns+=' <span class="btn small" style="cursor:default" title="'+esc('base $'+(bd.base||150)+(bd.out_of_town?' + out of town $'+bd.out_of_town:'')+(bd.young_renter?' + young renter $'+bd.young_renter:''))+'">💵 deposit $'+esc(c.deposit_total)+'</span>';
@@ -337,6 +385,8 @@ function render(){
 function bind(){
   document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>genLink(+b.dataset.gen));
   document.querySelectorAll('[data-dob]').forEach(b=>b.onclick=()=>confirmDob(+b.dataset.dob));
+  document.querySelectorAll('[data-idup]').forEach(el=>el.onchange=()=>uploadIdImages(+el.dataset.idup,el));
+  document.querySelectorAll('[data-docs]').forEach(b=>b.onclick=()=>showDocs(+b.dataset.docs));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(RENTERS[+b.dataset.copy].verify_url||'');toast('Link copied ✓');});
   document.querySelectorAll('[data-refresh]').forEach(b=>b.onclick=()=>refresh(+b.dataset.refresh));
   document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>decide(+b.dataset.approve,'approved'));
