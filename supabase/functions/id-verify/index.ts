@@ -120,6 +120,42 @@ Deno.serve(async (req) => {
       return json({ ok: true, accounts: ACCTS.map((a: any) => ({ label: a.label, portal: a.portal || null })) });
     }
 
+    // Admin-only: sweep EVERY fleet account for Identity verification sessions.
+    // Renters were verified on whichever account their fleet bills from, so a
+    // single-account lookup misses most of them.
+    if (body.action === "sweep" && isAdmin) {
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        try {
+          // page through every session - Stripe caps a page at 100
+          const maxPages = Math.min(40, Math.max(1, parseInt(String(body.pages || "40"), 10) || 40));
+          let after = String(body.after || ""), pages = 0; const all: any[] = [];
+          while (pages++ < maxPages) {
+            const r = await fetch(`https://api.stripe.com/v1/identity/verification_sessions?limit=100${after ? "&starting_after=" + after : ""}&expand[]=data.verified_outputs`, { headers: { Authorization: `Bearer ${a.key}` } });
+            const j = await r.json();
+            if (j.error) { out.push({ label: a.label, error: j.error.message }); break; }
+            const d = j.data || [];
+            all.push(...d);
+            if (!j.has_more || !d.length) break;
+            after = d[d.length - 1].id;
+          }
+          for (const vs of all) {
+            out.push({
+              label: a.label, id: vs.id, status: vs.status,
+              created: vs.created,
+              email: (vs.metadata && (vs.metadata.renter_email || vs.metadata.email)) || vs.provided_details?.email || null,
+              name: (vs.metadata && vs.metadata.renter_name) || null,
+              renter_id: (vs.metadata && vs.metadata.renter_id) || null,
+              vo: vs.verified_outputs || null,
+            });
+          }
+        } catch (e) { out.push({ label: a.label, error: String(e) }); }
+      }
+      const ids = out.filter((x) => x.id);
+      return json({ ok: true, count: ids.length, next: ids.length ? ids[ids.length - 1].id : null, sessions: out });
+    }
+
     if (body.action === "files") {
       if (!isAdmin) return json({ error: "admins only" }, 403);
       if (!body.session_id) return json({ error: "session_id required" });
