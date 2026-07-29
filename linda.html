@@ -203,6 +203,11 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .dinput{flex:1;min-width:200px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
 .dts{font-size:11px;color:var(--muted)}
 .draft.flash{animation:flashhl 1.8s ease}@keyframes flashhl{0%,100%{box-shadow:none}20%{box-shadow:0 0 0 3px var(--brand)}}
+.msgrow{border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin:8px 0;background:var(--surface)}
+.msgrow.mdone{opacity:.6}
+.msgtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.msgtime{margin-left:auto;font-size:11px;color:var(--muted)}
+.msgbody{font-size:13px;margin:6px 0 8px;white-space:pre-wrap}
 .dnotice{font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;margin-bottom:8px;display:inline-block}
 .dnotice.sent{background:color-mix(in srgb,var(--in) 15%,var(--surface));color:var(--in)}
 .dnotice.unsent{background:color-mix(in srgb,var(--out) 13%,var(--surface));color:var(--out)}
@@ -263,6 +268,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="reauditbar"><button class="btn pri big" id="reaudit">🔄 RE-AUDIT — sweep all accounts for payments &amp; updates</button><button class="btn big" id="testNotice" title="Send a TEST notice email to yourself">🧪 Send test email</button><span class="hint" id="lastscan"></span></div>
 <div id="lbrief" class="briefbar"></div>
 <div class="cards" id="lsum"></div>
+<div id="lmsgs"></div>
 <div id="ldisc"></div>
 <div id="lplans"></div>
 <div id="lfeeledger"></div>
@@ -280,7 +286,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <script>
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
-let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null,LEDGER_REFRESHED=null,DISCONN=[];
+let DRAFTS=[],CUSTS=[],FEES=[],ADMIN_EMAIL='',LEARN=[],PAY=[],NOTES=[],DISM=[],ACCTMETA=[],RAISED=[],DAYSNAP=null,LEDGER_REFRESHED=null,DISCONN=[],MSGS=[];
 const fmt=a=>'$'+(+a||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const IC_FEE='<svg class="icfee" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#eab54e"/><text x="10" y="14.7" text-anchor="middle" font-size="12" font-weight="800" fill="#5c4708">$</text></svg>';
@@ -335,6 +341,7 @@ async function load(){
   try{var rf=await sb.from('linda_fees').select('*').eq('status','raised');RAISED=rf.data||[];}catch(e){RAISED=[];}
   try{var ld=await sb.from('linda_day').select('*').eq('day',todayET());DAYSNAP=(ld.data&&ld.data[0])||null;}catch(e){DAYSNAP=null;}
   try{var dc=await sb.from('linda_disconnections').select('*');DISCONN=dc.data||[];}catch(e){DISCONN=[];}
+  try{var mg=await sb.from('messages').select('*').order('received_at',{ascending:false}).limit(200);MSGS=mg.data||[];}catch(e){MSGS=[];}
   LEDGER_REFRESHED=new Date().toISOString();
   render();
 }
@@ -370,6 +377,7 @@ function render(){
     card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   GPSROWS=[];
+  renderMessages();
   renderDisconnections();
   renderPlans();
   renderFeeLedger();
@@ -587,6 +595,24 @@ async function sendTestNotice(btn){
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
 // ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
 var DISCROWS=[];
+function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'-04:00';}catch(e){return '-04:00';}}
+function tomorrowGraceISO(){var t=new Date(Date.now()+86400000);var ymd=t.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T17:00:00'+etOffsetStr()).toISOString();}
+async function graceFromMsg(id){var m=MSGS.find(function(x){return x.id===id;});if(!m)return;if(!m.customer_id){alert('This message is not matched to a customer (unknown number) — handle it manually.');return;}var until=tomorrowGraceISO();if(!confirm('Grant '+(m.customer_name||'this customer')+' grace until tomorrow 5:00 PM ET, from their message?'))return;var r=await sb.from('linda_disconnections').upsert({account_label:m.account_label,customer_id:m.customer_id,customer_name:m.customer_name,grace_until:until,grace_note:'Requested by text: "'+(m.body||'').slice(0,140)+'"',updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});if(r.error){alert(r.error.message);return;}await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace granted'}).eq('id',id);toast('Grace granted to tomorrow 5 PM ✓');await load();}
+async function markMsgHandled(id){await sb.from('messages').update({handled:true,handled_at:new Date().toISOString()}).eq('id',id);await load();}
+async function delMsg(id){if(!confirm('Remove this message?'))return;await sb.from('messages').delete().eq('id',id);await load();}
+function renderMessages(){
+  var el=document.getElementById('lmsgs');if(!el)return;
+  if(!MSGS.length){el.innerHTML='';return;}
+  var open=MSGS.filter(function(m){return !m.handled;});var graceN=open.filter(function(m){return m.is_grace_request;}).length;
+  var rows=MSGS.slice(0,80).map(function(m){
+    var who=esc(m.customer_name||m.from_name||m.from_number||'Unknown');
+    var matched=m.customer_id?'<span class="status plan">✓ '+esc(m.customer_name||'')+'</span>':'<span class="hint">unmatched · '+esc(m.from_number||'?')+'</span>';
+    var grace=m.is_grace_request?'<span class="dbadge grace">⏸ grace request</span>':'';
+    var acts=(!m.handled?('<button class="btn small pri" data-msggrace="'+m.id+'"'+(m.customer_id?'':' disabled title="unmatched number"')+'>⏸ Grace to tomorrow</button> <button class="btn small ok" data-msgdone="'+m.id+'">✓ Handled</button>'):'<span class="hint">✓ handled</span>')+' <button class="btn small" data-msgdel="'+m.id+'">✕</button>';
+    return '<div class="msgrow'+(m.handled?' mdone':'')+'"><div class="msgtop"><b>'+who+'</b> '+matched+' '+grace+'<span class="msgtime">'+shortET(m.received_at)+' ET · '+esc(m.source||'')+'</span></div><div class="msgbody">'+esc(m.body||'')+'</div><div class="dact">'+acts+'</div></div>';
+  }).join('');
+  el.innerHTML='<details class="discwrap" data-sec="msgs"'+(OPENSEC.msgs?' open':'')+'><summary>💬 Incoming messages — <b>'+open.length+'</b> open'+(graceN?' · <span style="color:var(--out)">'+graceN+' grace request'+(graceN==1?'':'s')+'</span>':'')+'</summary><p class="hint" style="margin:6px 0 10px">Texts ported from Google Voice / Quo, matched to a customer by phone. For a grace request, tap ⏸ to extend the disconnection into tomorrow.</p>'+rows+'</details>';
+}
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
 function discDraftFor(i){var c=DISCROWS[i];return DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});}
 function gotoNotice(i){var d=discDraftFor(i);if(!d){alert('No notice yet — run an Audit Sweep on this account.');return;}var el=document.getElementById('d'+d.id);if(!el){alert('That notice is not on screen (it may be filtered or already sent/cleared).');return;}var det=el.closest('details.acct');if(det)det.open=true;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('flash');setTimeout(function(){el.classList.remove('flash');},1800);}
@@ -912,6 +938,9 @@ function wire(){
   document.querySelectorAll('[data-dnccopy]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dnccopy);if(d)copyDraft(d.id,b);});
   document.querySelectorAll('[data-dncsent]').forEach(b=>b.onclick=()=>{var d=discDraftFor(+b.dataset.dncsent);if(d)markSent(d.id);});
   document.querySelectorAll('[data-gotonotice]').forEach(b=>b.onclick=()=>gotoNotice(+b.dataset.gotonotice));
+  document.querySelectorAll('[data-msggrace]').forEach(b=>b.onclick=()=>graceFromMsg(b.dataset.msggrace));
+  document.querySelectorAll('[data-msgdone]').forEach(b=>b.onclick=()=>markMsgHandled(b.dataset.msgdone));
+  document.querySelectorAll('[data-msgdel]').forEach(b=>b.onclick=()=>delMsg(b.dataset.msgdel));
   document.querySelectorAll('[data-sec]').forEach(function(dd){dd.ontoggle=function(){OPENSEC[dd.dataset.sec]=dd.open;};});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
