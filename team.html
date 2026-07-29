@@ -1,0 +1,774 @@
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M9%2041c0-1%201-2%202-3l3-1%204-8c1-2%202-3%205-3h18c3%200%204%201%205%203l4%208%203%201c1%201%202%202%202%203v5c0%201-1%202-2%202h-3a5%205%200%200%201-10%200H23a5%205%200%200%201-10%200h-2c-1%200-2-1-2-2z%22%20fill%3D%22%230f8a4d%22/%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2246%22%20r%3D%224%22%20fill%3D%22%230b5f36%22/%3E%3Ccircle%20cx%3D%2242%22%20cy%3D%2246%22%20r%3D%224%22%20fill%3D%22%230b5f36%22/%3E%3C/svg%3E">
+<title>Team — Rent 2 Go</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#b4750f;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a33c}}
+:root[data-theme=light]{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#b4750f}
+:root[data-theme=dark]{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--line-strong:#3c4757;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a33c}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;line-height:1.4}
+.topbar{display:flex;align-items:center;gap:14px;padding:11px 20px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brand{font-weight:800;font-size:17px}.brandlogo{height:30px;display:block}
+.sub{font-size:12.5px;color:var(--muted);font-weight:700}.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}.btn.pri:hover{color:#fff;opacity:.92}
+.btn.danger{color:var(--out)}.btn.danger:hover{border-color:var(--out)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+.btn.off{opacity:.45}
+.wrap{max-width:1060px;margin:0 auto;padding:16px 20px 70px}
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
+.ctl label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ctl input,.ctl select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.tnum{font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+@media(max-width:700px){.stats{grid-template-columns:1fr 1fr}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;box-shadow:var(--shadow)}
+.stat .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.stat .v{font-size:22px;font-weight:800;margin-top:2px}
+.stat .v.owed{color:var(--out)}.stat .v.good{color:var(--brand)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-top:16px;overflow:hidden}
+.chead{display:flex;align-items:center;gap:12px;padding:13px 17px;background:linear-gradient(0deg,color-mix(in srgb,var(--brand) 6%,var(--surface)),var(--surface));border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chead b{font-size:15.5px}
+.cbody{padding:12px 17px 15px}
+.pill{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap;border:1px solid var(--line)}
+.pill.ok{background:color-mix(in srgb,var(--brand) 14%,transparent);color:var(--brand);border-color:transparent}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);border-color:transparent}
+.pill.bad{background:color-mix(in srgb,var(--out) 14%,transparent);color:var(--out);border-color:transparent}
+.role{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--surface-2);color:var(--muted)}
+.trow{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13.5px}
+.trow:first-child{border-top:none}.trow .tt{flex:1;min-width:0}
+.task{border:1px solid var(--line);border-radius:13px;padding:13px 15px;margin-bottom:11px;background:var(--surface)}
+.task.started{border-left:3px solid var(--warn)}.task.done{border-left:3px solid var(--brand)}
+.thead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.thead .ti b{font-size:14.5px}
+.pay{font-weight:800;color:var(--brand)}
+.meta{font-size:12px;color:var(--muted);margin-top:2px}
+.route{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;margin:9px 0;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.timer{font-weight:800;font-size:17px;color:var(--warn);margin:8px 0;font-variant-numeric:tabular-nums}
+.evid{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}
+.ev{width:74px;text-align:center;font-size:9.5px;color:var(--muted);position:relative}
+.ev img{width:74px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block;margin-bottom:2px;cursor:pointer;background:var(--surface-2)}
+.ev .x{position:absolute;top:-6px;right:-6px;width:19px;height:19px;border-radius:50%;border:none;background:var(--out);color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0}
+.acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.evbtn{position:relative;overflow:hidden}
+.evbtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.sel,.inp{border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;background:var(--surface);color:var(--text);font-family:inherit}
+.notes{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px;font-size:13px;min-height:42px;resize:vertical;margin:8px 0 2px;font-family:inherit;background:var(--surface);color:var(--text)}
+.daynav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 13px;margin:14px 0;box-shadow:var(--shadow)}
+.daynav .mid{display:flex;align-items:center;gap:10px;flex:1;min-width:200px;flex-wrap:wrap}
+.daynav input[type=date]{border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px}
+.carry{background:color-mix(in srgb,var(--warn) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line));border-radius:13px;padding:13px 15px;margin-bottom:14px}
+.carry .h{font-weight:800;font-size:13px;color:var(--warn);margin-bottom:8px}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px solid color-mix(in srgb,var(--warn) 25%,var(--line))}
+.crow:first-of-type{border-top:none}
+.empty{text-align:center;color:var(--muted);padding:34px 20px}
+.hint{color:var(--muted);font-size:12px;margin-top:14px}
+.warnbar{background:color-mix(in srgb,var(--warn) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line));border-radius:11px;padding:10px 14px;font-size:12.5px;margin-top:14px}
+.tabs{display:flex;gap:7px;flex-wrap:wrap}
+.tabs .btn.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.ov{position:fixed;inset:0;background:rgba(10,14,20,.55);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.ov.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);width:560px;max-width:100%;padding:20px 22px;margin:auto}
+.modal h3{margin:0 0 4px;font-size:18px}.modal p.s{margin:0 0 14px;color:var(--muted);font-size:13px}
+.modal label.f{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:11px 0 4px}
+.modal input,.modal select,.modal textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.modal textarea{resize:vertical;min-height:56px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.f2{grid-template-columns:1fr}}
+.mact{display:flex;gap:9px;margin-top:16px}.mact .btn{flex:1}
+.stop{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.stop .sl{min-width:48px;font-size:11px;font-weight:800;color:var(--muted)}
+.stop input{flex:1}
+.psum{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin:8px 0}
+.psum .r{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px}
+.psum .r.tot{border-top:1px solid var(--line);margin-top:5px;padding-top:7px;font-weight:800}
+.proof img{width:100%;max-height:190px;object-fit:contain;border-radius:9px;border:1px solid var(--line);margin-top:8px;background:var(--surface-2)}
+.led{border:1px solid var(--line);border-radius:12px;padding:12px 15px;margin-bottom:10px;background:var(--surface)}
+.ledh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.lrow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:13px}
+.lrow:first-of-type{border-top:none}
+.ltot{display:flex;justify-content:flex-end;gap:8px;border-top:2px solid var(--line-strong);margin-top:6px;padding-top:7px;font-weight:800;font-size:13.5px}
+.loginwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:28px;width:340px;max-width:100%}
+.logincard h1{margin:0 0 4px;font-size:22px}.logincard h1 span{color:var(--brand)}
+.logincard p{margin:0 0 16px;color:var(--muted);font-size:13px}
+.logincard label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.logincard input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px}
+.logincard button{width:100%;margin-top:16px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+.loginlogo{text-align:center;margin-bottom:8px}.loginlogo img{height:58px;max-width:100%}
+.err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:80;max-width:90vw;text-align:center}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+
+<div id="loginwrap" class="loginwrap"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.png" alt="Rent 2 Go"></div><p>Team &amp; payouts — sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
+<div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
+
+<div id="appwrap" style="display:none">
+<div class="topbar">
+  <div class="brand"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"></div>
+  <div class="sub">· Team &amp; Payouts</div>
+  <div class="spacer"></div>
+  <button class="btn" onclick="location.href='index.html'">← Ledger</button>
+  <button class="btn" id="signout">Sign out</button>
+</div>
+<main class="wrap" id="main"></main>
+</div>
+
+<div class="ov" id="ovAssign"><div class="modal" id="mdAssign"></div></div>
+<div class="ov" id="ovPayout"><div class="modal" id="mdPayout"></div></div>
+<div class="ov" id="ovMember"><div class="modal" id="mdMember"></div></div>
+<div class="ov" id="ovImg"><div class="modal" id="mdImg" style="width:680px"></div></div>
+<div class="ov" id="ovRefund"><div class="modal" id="mdRefund"></div></div>
+<div id="toastHost"></div>
+
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL,window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com'];
+const BUCKET='team-evidence';
+const FORMS=['Vehicle pickup inspection','Vehicle drop-off inspection','Recovery inspection report','Cleaning checklist','Fuel / car-wash receipt','General task report'];
+const COST_KINDS=['Lyft ride','Uber ride','Car wash','Fuel','Parts','Other'];
+const METHODS=['CashApp','Apple Pay','Zelle','Card','Cash','Bank transfer'];
+
+let MEMBERS=[],TASKS=[],PAYOUTS=[],REFUNDS=[],CATALOG=[],CARS=[];
+let VIEW='board',CUR=null,DAY=todayET(),ME='';
+let TIMER=null,ASSIGN={stops:['',''],perMile:0,editId:null,memberId:null},PROOF=null,RECEIPT=null;
+const SIGNED={};
+
+/* ---------- helpers ---------- */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+const r2=n=>Math.round((+n||0)*100)/100;
+const money=v=>'$'+(+v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
+function shiftDay(iso,n){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function niceDay(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
+function shortDay(iso){const d=new Date(iso+'T12:00:00');return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
+function fmtEl(sec){const m=Math.floor(sec/60),s=sec%60;return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;}
+function elapsed(t){if(!t.started_at)return 0;const end=t.finished_at?new Date(t.finished_at).getTime():Date.now();return Math.max(0,Math.floor((end-new Date(t.started_at).getTime())/1000));}
+function toast(m){const h=document.getElementById('toastHost');h.innerHTML='<div class="toast">'+esc(m)+'</div>';setTimeout(()=>{h.innerHTML='';},2600);}
+function openOv(id){document.getElementById(id).classList.add('open');}
+function closeOv(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.ov').forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove('open');});
+const member=id=>MEMBERS.find(m=>m.id===id);
+const memberTasks=id=>TASKS.filter(t=>t.member_id===id);
+function dayTasks(id,d){return memberTasks(id).filter(t=>t.day===d).sort((a,b)=>(a.status==='done'?1:0)-(b.status==='done'?1:0));}
+function overdue(id){const td=todayET();return memberTasks(id).filter(t=>t.day<td&&t.status!=='done').sort((a,b)=>a.day<b.day?-1:1);}
+const earned=(id,d)=>r2(dayTasks(id,d).filter(t=>t.status==='done').reduce((s,t)=>s+(+t.payout||0),0));
+const potential=(id,d)=>r2(dayTasks(id,d).reduce((s,t)=>s+(+t.payout||0),0));
+const logged=(id,d)=>r2(dayTasks(id,d).reduce((s,t)=>s+(t.costs||[]).reduce((a,c)=>a+(+c.amount||0),0),0));
+const payoutFor=(id,d)=>PAYOUTS.find(p=>p.member_id===id&&p.day===d);
+function owedFor(id,d){return r2(dayTasks(id,d).filter(t=>t.status==='done'&&!t.paid).reduce((s,t)=>s+(+t.payout||0),0));}
+
+/* resize before upload — never store full-resolution photos */
+function resizeImage(file,max){return new Promise(res=>{const fr=new FileReader();fr.onload=()=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(b=>res(b),'image/jpeg',0.72);};img.onerror=()=>res(null);img.src=fr.result;};fr.onerror=()=>res(null);fr.readAsDataURL(file);});}
+async function upload(path,blob){const r=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:true});if(r.error)throw r.error;return path;}
+async function signed(path){if(!path)return'';if(SIGNED[path])return SIGNED[path];const r=await sb.storage.from(BUCKET).createSignedUrl(path,3600);if(r.error||!r.data)return'';SIGNED[path]=r.data.signedUrl;return r.data.signedUrl;}
+async function paintSigned(){const els=document.querySelectorAll('[data-sp]');for(const el of els){const u=await signed(el.dataset.sp);if(u)el.src=u;}}
+
+/* ---------- data ---------- */
+async function load(){
+  const [m,t,p,rf,c,f]=await Promise.all([
+    sb.from('team_members').select('*').order('name'),
+    sb.from('team_tasks').select('*').order('day',{ascending:false}).limit(4000),
+    sb.from('team_payouts').select('*').order('day',{ascending:false}),
+    sb.from('team_refunds').select('*').order('created_at',{ascending:false}),
+    sb.from('team_task_catalog').select('*').eq('active',true).order('sort_order'),
+    sb.from('owners_program').select('owners').eq('id',1).single()
+  ]);
+  [m,t,p,rf,c].forEach(r=>{if(r.error)console.error(r.error);});
+  MEMBERS=m.data||[];TASKS=t.data||[];PAYOUTS=p.data||[];REFUNDS=rf.data||[];CATALOG=c.data||[];
+  CARS=[];((f.data&&f.data.owners)||[]).forEach(o=>(o.cars||[]).forEach(cr=>{
+    if(cr&&cr.id)CARS.push({id:cr.id,name:(cr.name||cr.plate||'Car'),plate:cr.plate||'',owner:o.name||''});
+  }));
+}
+async function reload(){await load();render();}
+
+/* ---------- render ---------- */
+function render(){
+  const el=document.getElementById('main');
+  if(VIEW==='board')el.innerHTML=boardHTML();
+  else if(VIEW==='member')el.innerHTML=memberHTML();
+  else el.innerHTML=ledgerHTML();
+  wire();paintSigned();startTimer();
+}
+
+function boardHTML(){
+  const staff=MEMBERS.filter(m=>m.active!==false&&(m.role==='RC'||m.role==='V'));
+  let issued=0,done=0,paid=0,owed=0;
+  const cards=staff.map(s=>{
+    const ts=dayTasks(s.id,DAY);
+    if(!ts.length)return'';
+    const dn=ts.filter(t=>t.status==='done');
+    const e=r2(dn.reduce((a,t)=>a+(+t.payout||0),0));
+    const pd=r2(dn.filter(t=>t.paid).reduce((a,t)=>a+(+t.payout||0),0));
+    const ow=r2(e-pd);
+    issued+=ts.length;done+=dn.length;paid+=pd;owed+=ow;
+    return '<div class="card"><div class="chead"><b>'+esc(s.name||'Unnamed')+'</b><span class="role">'+esc(s.role)+'</span>'
+      +'<span class="spacer"></span><span class="pill '+(dn.length===ts.length?'ok':'warn')+'">'+dn.length+'/'+ts.length+' done</span>'
+      +(ow>0?'<span class="pill bad">owed '+money(ow)+'</span>':'<span class="pill ok">settled</span>')
+      +'<button class="btn sm" data-open="'+s.id+'">Open</button>'
+      +(ow>0?'<button class="btn sm pri" data-pay="'+s.id+'">Pay</button>':'')
+      +'</div><div class="cbody">'
+      +ts.map(t=>'<div class="trow"><span class="tt"><b>'+esc(t.title)+'</b> <span class="meta">· '+money(t.payout)+(t.kind==='distance'?' · '+(+t.miles||0)+' mi':'')+'</span></span>'
+        +'<span class="pill '+(t.status==='done'?(t.paid?'ok':'warn'):(t.status==='started'?'warn':''))+'">'
+        +(t.status==='done'?(t.paid?'Paid':'Done · unpaid'):(t.status==='started'?'In progress':'Scheduled'))+'</span></div>').join('')
+      +'</div></div>';
+  }).join('');
+  return ''
+  +'<div class="ctl"><div class="tabs"><button class="btn on">Work board</button></div>'
+    +'<span class="spacer"></span>'
+    +'<button class="btn" data-refresh>↻ Refresh</button>'
+    +'<button class="btn pri" data-addmember>+ Add member</button></div>'
+  +daynavHTML()
+  +'<div class="stats">'
+    +'<div class="stat"><div class="l">Tasks issued</div><div class="v tnum">'+issued+'</div></div>'
+    +'<div class="stat"><div class="l">Completed</div><div class="v tnum">'+done+'/'+issued+'</div></div>'
+    +'<div class="stat"><div class="l">Paid out</div><div class="v tnum good">'+money(paid)+'</div></div>'
+    +'<div class="stat"><div class="l">Outstanding</div><div class="v tnum '+(owed>0?'owed':'')+'">'+money(owed)+'</div></div>'
+  +'</div>'
+  +(cards||'<div class="card"><div class="empty">No tasks issued for '+shortDay(DAY)+'.<br><br>Open a team member below to assign one.</div></div>')
+  +teamStripHTML()
+  +'<div class="warnbar"><b>Coordinator logins are not enabled yet.</b> The <code>team_*</code> tables are scoped correctly, but <code>day_blocks</code>, <code>owners_program</code>, <code>linda_*</code> and <code>fleet</code> are still readable by any signed-in user — a coordinator login would be able to read the whole ledger. Tighten those first.</div>';
+}
+
+function teamStripHTML(){
+  if(!MEMBERS.length)return'<div class="card"><div class="empty">No team members yet. Add your first coordinator or vendor.</div></div>';
+  return '<div class="card"><div class="chead"><b>Team</b><span class="spacer"></span><span class="pill">'+MEMBERS.length+'</span></div><div class="cbody">'
+    +MEMBERS.map(s=>{
+      const un=memberTasks(s.id).filter(t=>t.status==='done'&&!t.paid);
+      const ow=r2(un.reduce((a,t)=>a+(+t.payout||0),0));
+      return '<div class="trow"><span class="tt"><b>'+esc(s.name||'Unnamed')+'</b> <span class="role">'+esc(s.role)+'</span>'
+        +'<div class="meta">'+esc(s.email||'no email')+(s.phone?' · '+esc(s.phone):'')+' · pays via '+esc(s.pay_method||'—')
+        +(s.auth_uid?' · has login':' · no login')+'</div></span>'
+        +(ow>0?'<span class="pill bad">'+money(ow)+' owed</span>':'')
+        +'<button class="btn sm" data-open="'+s.id+'">Open</button>'
+        +'<button class="btn sm" data-editmember="'+s.id+'">Edit</button></div>';
+    }).join('')+'</div></div>';
+}
+
+function daynavHTML(){
+  const td=todayET();
+  const cls=DAY===td?'ok':(DAY<td?'':'warn');
+  const lbl=DAY===td?'Today':(DAY<td?'Past day':'Upcoming');
+  return '<div class="daynav"><button class="btn sm" data-day="-1">← Prev</button>'
+    +'<div class="mid"><span class="pill '+cls+'">'+lbl+'</span>'
+    +'<input type="date" id="dayPick" value="'+DAY+'">'
+    +'<b>'+niceDay(DAY)+'</b></div>'
+    +'<button class="btn sm" data-day="1">Next →</button>'
+    +(DAY!==td?'<button class="btn sm pri" data-today>Jump to today</button>':'')+'</div>';
+}
+
+function memberHTML(){
+  const s=member(CUR);if(!s)return'<div class="card"><div class="empty">Member not found.</div></div>';
+  const ts=dayTasks(CUR,DAY),od=overdue(CUR),td=todayET();
+  const pay=payoutFor(CUR,DAY),e=earned(CUR,DAY);
+  return ''
+  +'<div class="ctl"><button class="btn" data-go="board">← Work board</button>'
+    +'<div class="tabs"><button class="btn on">Day view</button><button class="btn" data-go="ledger">Ledger</button></div>'
+    +'<span class="spacer"></span>'
+    +'<button class="btn" data-editmember="'+s.id+'">Edit member</button>'
+    +'<button class="btn pri" data-assign="'+s.id+'">+ Assign task</button></div>'
+  +'<div class="card" style="margin-top:14px"><div class="chead"><b>'+esc(s.name||'Unnamed')+'</b><span class="role">'+esc(s.role)+'</span>'
+    +'<span class="spacer"></span>'
+    +(e>0?(pay?'<span class="pill ok">Paid '+money(pay.amount)+' · '+esc(pay.method)+'</span>':'<span class="pill bad">Not paid yet</span>'):'')
+    +(owedFor(CUR,DAY)>0?'<button class="btn sm pri" data-pay="'+s.id+'">Process payout</button>':'')
+    +'</div></div>'
+  +'<div class="stats">'
+    +'<div class="stat"><div class="l">Earned this day</div><div class="v tnum good">'+money(e)+'</div></div>'
+    +'<div class="stat"><div class="l">Potential</div><div class="v tnum">'+money(potential(CUR,DAY))+'</div></div>'
+    +'<div class="stat"><div class="l">Costs logged</div><div class="v tnum">'+money(logged(CUR,DAY))+'</div></div>'
+    +'<div class="stat"><div class="l">Tasks done</div><div class="v tnum">'+ts.filter(t=>t.status==='done').length+'/'+ts.length+'</div></div>'
+  +'</div>'
+  +(DAY===td&&od.length?'<div class="carry" style="margin-top:14px"><div class="h">Carried over / not finished ('+od.length+')</div>'
+      +od.map(t=>'<div class="crow"><div><b>'+esc(t.title)+'</b> <span class="pay">'+money(t.payout)+'</span>'
+        +'<div class="meta">was '+shortDay(t.day)+' · '+(t.status==='started'?'in progress':'not started')+'</div></div>'
+        +'<div><button class="btn sm pri" data-carry="'+t.id+'">↪ Carry to today</button> '
+        +'<input type="date" class="inp" id="cd_'+t.id+'" value="'+td+'" style="max-width:145px"> '
+        +'<button class="btn sm" data-carryto="'+t.id+'">Move</button></div></div>').join('')+'</div>':'')
+  +daynavHTML()
+  +(ts.length?ts.map(taskHTML).join(''):'<div class="card"><div class="empty">No tasks for '+shortDay(DAY)+'.<br><br><button class="btn pri" data-assign="'+s.id+'">+ Assign a task</button></div></div>');
+}
+
+function taskHTML(t){
+  const ev=t.evidence||[],cs=t.costs||[],el=elapsed(t);
+  const done=t.status==='done',started=t.status==='started';
+  const ct=r2(cs.reduce((a,c)=>a+(+c.amount||0),0));
+  return '<div class="task '+t.status+'">'
+    +'<div class="thead"><div class="ti"><b>'+esc(t.title)+'</b> <span class="pay">'+money(t.payout)+'</span>'
+      +(t.paid?' <span class="pill ok">paid</span>':'')
+      +'<div class="meta">'+(t.kind==='distance'?'Distance':t.kind==='wait'?'Wait-time':'Standard')
+      +' · '+(t.time_mode==='fixed'?(esc(t.fixed_time||'set time')):'Flexible')
+      +(t.due_by?' · due '+esc(t.due_by):'')+(t.car_name?' · '+esc(t.car_name):'')+'</div></div>'
+      +'<span class="pill '+(done?'ok':(started?'warn':''))+'">'+(done?'Done':started?'In progress':'Scheduled')+'</span></div>'
+    +(t.detail?'<div class="meta" style="margin:6px 0">'+esc(t.detail)+'</div>':'')
+    +(t.kind==='distance'?'<div class="route"><div><b>Route:</b> '+esc((t.stops||[]).filter(Boolean).join(' → ')||'—')+'</div>'
+      +'<div><b>'+(+t.miles||0)+' mi</b>'+(+t.per_mile?' × '+money(t.per_mile)+'/mi = '+money(t.payout):'')
+      +((t.stops||[]).filter(Boolean).length>1?' <button class="btn sm" data-map="'+t.id+'">Map</button>':'')+'</div>'
+      +'<div class="meta">Stops &amp; mileage are set by admin — view only.</div></div>':'')
+    +((started||done)&&el?'<div class="timer" id="tm_'+t.id+'">'+fmtEl(done?(t.elapsed_sec||el):el)+(done?' (logged)':'')+'</div>':'')
+    +(ev.length?'<div class="evid">'+ev.map((e,i)=>'<div class="ev"><img data-sp="'+esc(e.path)+'" data-view="'+esc(e.path)+'" alt="">'
+        +'<span>'+esc(e.form||'Evidence')+'</span>'
+        +(done?'':'<button class="x" data-delev="'+t.id+'|'+i+'">×</button>')+'</div>').join('')+'</div>':'')
+    +(ct?'<div class="meta">Associated costs: <b>'+money(ct)+'</b> ('+esc(cs.map(c=>c.kind).join(', '))+')</div>':'')
+    +((t.date_log||[]).length?'<div class="meta">↪ '+(t.date_log||[]).slice(-2).map(l=>'carried '+shortDay(l.from)+' → '+shortDay(l.to)+' by '+esc(l.by)).join(' · ')+'</div>':'')
+    +(done?'':'<textarea class="notes" id="nt_'+t.id+'" placeholder="Notes about this task…" data-notes="'+t.id+'">'+esc(t.notes||'')+'</textarea>')
+    +(done&&t.notes?'<div class="meta">'+esc(t.notes)+'</div>':'')
+    +'<div class="acts">'
+    +(done?'<span class="pill ok">Completed'+(t.elapsed_sec?' · '+fmtEl(t.elapsed_sec):'')+'</span>'
+      +'<span class="spacer"></span><button class="btn sm" data-edittask="'+t.id+'">Edit</button>'
+      :((t.status==='scheduled'?'<button class="btn sm" data-start="'+t.id+'">▶ Start timer</button>':'')
+        +(started?'<button class="btn sm" data-stop="'+t.id+'">⏸ Stop timer</button>':'')
+        +'<select class="sel" id="ef_'+t.id+'">'+FORMS.map(f=>'<option>'+esc(f)+'</option>').join('')+'</select>'
+        +'<label class="btn sm evbtn">📷 Camera<input type="file" accept="image/*" capture="environment" multiple data-ev="'+t.id+'"></label>'
+        +'<label class="btn sm evbtn">🖼 Library<input type="file" accept="image/*" multiple data-ev="'+t.id+'"></label>'
+        +'<button class="btn sm" data-cost="'+t.id+'">+ Cost</button>'
+        +'<button class="btn sm '+(ev.length?'pri':'off')+'" data-done="'+t.id+'">✓ Complete task</button>'
+        +'<span class="spacer"></span><button class="btn sm" data-edittask="'+t.id+'">Edit</button>'
+        +'<button class="btn sm danger" data-deltask="'+t.id+'">Delete</button>'))
+    +'</div>'
+    +(!done&&!ev.length?'<div class="meta" style="margin-top:6px">Add at least one photo to complete — no task is paid without evidence. A timer is optional.</div>':'')
+    +'</div>';
+}
+
+function ledgerHTML(){
+  const s=member(CUR);if(!s)return'<div class="card"><div class="empty">Member not found.</div></div>';
+  const done=memberTasks(CUR).filter(t=>t.status==='done');
+  const days={};done.forEach(t=>{(days[t.day]=days[t.day]||[]).push(t);});
+  const dates=Object.keys(days).sort().reverse();
+  const pays=PAYOUTS.filter(p=>p.member_id===CUR);
+  const totalPaid=r2(pays.reduce((a,p)=>a+(+p.amount||0),0));
+  const rfs=REFUNDS.filter(r=>r.member_id===CUR);
+  return ''
+  +'<div class="ctl"><button class="btn" data-go="board">← Work board</button>'
+    +'<div class="tabs"><button class="btn" data-go="member">Day view</button><button class="btn on">Ledger</button></div>'
+    +'<span class="spacer"></span><button class="btn" data-refund="'+CUR+'">+ Refund request</button></div>'
+  +'<div class="stats">'
+    +'<div class="stat"><div class="l">Total paid out</div><div class="v tnum good">'+money(totalPaid)+'</div></div>'
+    +'<div class="stat"><div class="l">Payouts</div><div class="v tnum">'+pays.length+'</div></div>'
+    +'<div class="stat"><div class="l">Days worked</div><div class="v tnum">'+dates.length+'</div></div>'
+    +'<div class="stat"><div class="l">Unpaid</div><div class="v tnum '+(done.some(t=>!t.paid)?'owed':'')+'">'+money(r2(done.filter(t=>!t.paid).reduce((a,t)=>a+(+t.payout||0),0)))+'</div></div>'
+  +'</div>'
+  +'<div class="card"><div class="chead"><b>Work history</b></div><div class="cbody">'
+  +(dates.length?dates.map(d=>{
+      const list=days[d],e=r2(list.reduce((a,t)=>a+(+t.payout||0),0)),p=pays.find(x=>x.day===d);
+      return '<div class="led"><div class="ledh"><b>'+shortDay(d)+'</b>'
+        +(p?'<span class="pill ok">Paid '+money(p.amount)+' · '+esc(p.method)+'</span>':'<span class="pill bad">Awaiting payout</span>')+'</div>'
+        +list.map(t=>'<div class="lrow"><span>'+esc(t.title)+(t.elapsed_sec?' · '+fmtEl(t.elapsed_sec):'')+'</span><b>'+money(t.payout)+'</b></div>').join('')
+        +'<div class="ltot">Day total: '+money(e)+'</div>'
+        +(p?'<div class="meta" style="margin-top:7px">'+esc(p.method)+(p.ref?' · ref '+esc(p.ref):'')+' · '+new Date(p.created_at).toLocaleString()+(p.paid_by?' · by '+esc(p.paid_by):'')
+            +(p.ledger_posted?' · <span class="pill ok">in ledger</span>':' · <span class="pill">not posted to ledger</span>')
+            +' '+(p.proof_path?'<button class="btn sm" data-view="'+esc(p.proof_path)+'">View proof</button>':'<span class="pill bad">no proof on file</span>')+'</div>':'')
+        +'</div>';
+    }).join(''):'<div class="empty">No completed work yet.</div>')
+  +'</div></div>'
+  +'<div class="card"><div class="chead"><b>Refund requests</b></div><div class="cbody">'
+  +(rfs.length?rfs.map(r=>'<div class="trow"><span class="tt"><b>'+money(r.amount)+' · '+esc(r.kind)+'</b><div class="meta">'+esc(r.detail||'')+' · '+new Date(r.created_at).toLocaleDateString()+'</div></span>'
+      +(r.receipt_path?'<button class="btn sm" data-view="'+esc(r.receipt_path)+'">Receipt</button>':'')
+      +'<span class="pill '+(r.status==='Approved'||r.status==='Paid'?'ok':'')+'">'+esc(r.status)+'</span>'
+      +(r.status==='Pending'?'<button class="btn sm pri" data-approve="'+r.id+'">Approve</button>':'')+'</div>').join('')
+    :'<div class="empty">No refund requests.</div>')
+  +'</div></div>';
+}
+
+/* ---------- timer ---------- */
+function startTimer(){
+  if(TIMER)clearInterval(TIMER);
+  TIMER=setInterval(()=>{
+    let any=false;
+    TASKS.filter(t=>t.status==='started').forEach(t=>{
+      const el=document.getElementById('tm_'+t.id);
+      if(el){el.textContent=fmtEl(elapsed(t));any=true;}
+    });
+    if(!any){clearInterval(TIMER);TIMER=null;}
+  },1000);
+}
+
+/* ---------- task actions ---------- */
+async function patchTask(id,patch){
+  const r=await sb.from('team_tasks').update(patch).eq('id',id).select().single();
+  if(r.error){console.error(r.error);toast('Save failed: '+r.error.message);return null;}
+  const i=TASKS.findIndex(t=>t.id===id);if(i>=0)TASKS[i]=r.data;
+  return r.data;
+}
+function notesPatch(id){const el=document.getElementById('nt_'+id);if(!el)return{};const t=TASKS.find(x=>x.id===id);return(t&&t.notes!==el.value)?{notes:el.value}:{};}
+
+async function startTask(id){await patchTask(id,Object.assign(notesPatch(id),{status:'started',started_at:new Date().toISOString(),finished_at:null}));render();toast('Timer started');}
+async function stopTask(id){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  const fin=t.finished_at||new Date().toISOString();
+  await patchTask(id,Object.assign(notesPatch(id),{finished_at:fin,elapsed_sec:elapsed(Object.assign({},t,{finished_at:fin}))}));
+  render();toast('Timer stopped');
+}
+async function completeTask(id){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  if(!(t.evidence||[]).length){toast('Add at least one photo of evidence first — required for payment');return;}
+  const fin=t.finished_at||(t.started_at?new Date().toISOString():null);
+  const patch=Object.assign(notesPatch(id),{status:'done'});
+  if(fin){patch.finished_at=fin;patch.elapsed_sec=elapsed(Object.assign({},t,{finished_at:fin}));}
+  await patchTask(id,patch);render();toast('Task complete');
+}
+async function addEvidence(id,input){
+  const files=Array.from(input.files||[]);if(!files.length)return;
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  const sel=document.getElementById('ef_'+id);const form=sel?sel.value:'Evidence';
+  toast('Uploading '+files.length+' photo(s)…');
+  const ev=(t.evidence||[]).slice();
+  try{
+    for(const f of files){
+      const blob=await resizeImage(f,1400);if(!blob)continue;
+      const path=t.member_id+'/'+t.id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.jpg';
+      await upload(path,blob);
+      ev.push({path,form,name:f.name});
+    }
+    await patchTask(id,Object.assign(notesPatch(id),{evidence:ev}));
+    render();toast(files.length+' photo(s) added: '+form);
+  }catch(e){console.error(e);toast('Upload failed: '+(e.message||e));}
+  input.value='';
+}
+async function delEvidence(id,i){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  const ev=(t.evidence||[]).slice();const gone=ev.splice(i,1)[0];
+  if(gone&&gone.path){try{await sb.storage.from(BUCKET).remove([gone.path]);}catch(e){}}
+  await patchTask(id,{evidence:ev});render();
+}
+async function addCost(id){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  const kind=prompt('Cost type:\n'+COST_KINDS.map((k,i)=>(i+1)+'. '+k).join('\n')+'\n\nEnter a number, or type your own:','1');
+  if(kind===null)return;
+  const k=/^\d+$/.test(kind)?(COST_KINDS[+kind-1]||'Other'):kind;
+  const amt=prompt('Amount ($) for '+k+':','');if(amt===null)return;
+  const costs=(t.costs||[]).concat([{kind:k,amount:+amt||0,when:new Date().toISOString()}]);
+  await patchTask(id,{costs});render();toast(k+' '+money(+amt||0)+' added');
+}
+async function carryTask(id,to){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  const dest=(to&&to.trim())||todayET();
+  if(dest===t.day){toast('Task is already on that date');return;}
+  const log=(t.date_log||[]).concat([{from:t.day,to:dest,by:ME||'Admin',when:new Date().toISOString()}]);
+  await patchTask(id,{day:dest,date_log:log});render();toast('Task carried to '+shortDay(dest));
+}
+async function delTask(id){
+  const t=TASKS.find(x=>x.id===id);if(!t)return;
+  if(!confirm('Delete "'+(t.title||'this task')+'"? This cannot be undone.'))return;
+  const r=await sb.from('team_tasks').delete().eq('id',id);
+  if(r.error){toast('Delete failed');return;}
+  TASKS=TASKS.filter(x=>x.id!==id);render();toast('Task deleted');
+}
+
+/* ---------- assign / edit task ---------- */
+function openAssign(memberId,taskId){
+  const s=member(memberId);if(!s)return;
+  const t=taskId?TASKS.find(x=>x.id===taskId):null;
+  ASSIGN={stops:(t&&(t.stops||[]).length?t.stops.slice():['','']),perMile:(t&&+t.per_mile)||0,editId:taskId||null,memberId:memberId};
+  document.getElementById('mdAssign').innerHTML=''
+    +'<h3>'+(t?'Edit task':'Assign task to '+esc(s.name))+'</h3>'
+    +'<p class="s">'+(t?'Editing an existing task.':'A task is only payable once evidence is attached and it is completed.')+'</p>'
+    +'<label class="f">Quick task (sets title &amp; price)</label>'
+    +'<select id="a_quick"><option value="">— choose from price list —</option>'
+      +CATALOG.map((c,i)=>'<option value="'+i+'">'+esc(c.name)+' — '+(+c.per_mile?money(c.per_mile)+'/mile':money(c.price))+'</option>').join('')+'</select>'
+    +'<label class="f">Task title</label><input id="a_title" value="'+esc(t?t.title:'')+'" placeholder="e.g. Deliver Camry to renter">'
+    +'<label class="f">Details / notes</label><textarea id="a_detail">'+esc(t?t.detail:'')+'</textarea>'
+    +'<label class="f">Assigned vehicle (optional)</label>'
+    +'<select id="a_car"><option value="">— none —</option>'
+      +CARS.map(c=>'<option value="'+esc(c.id)+'"'+(t&&t.car_id===c.id?' selected':'')+'>'+esc(c.name)+(c.plate?' · '+esc(c.plate):'')+(c.owner?' ('+esc(c.owner)+')':'')+'</option>').join('')+'</select>'
+    +'<label class="f">Task kind</label>'
+    +'<select id="a_kind">'+['standard','distance','wait'].map(k=>'<option value="'+k+'"'+(t&&t.kind===k?' selected':'')+'>'+(k==='standard'?'Standard':k==='distance'?'Distance (multi-stop mileage)':'Wait-time (timed)')+'</option>').join('')+'</select>'
+    +'<div id="a_route" style="display:none">'
+      +'<label class="f">Route &amp; mileage</label>'
+      +'<div id="a_stops"></div>'
+      +'<button class="btn sm" type="button" id="a_addstop" style="margin-top:4px">+ Add stop</button>'
+      +'<label class="f">Total mileage</label><input id="a_miles" type="number" step="0.1" min="0" value="'+(t&&+t.miles?t.miles:'')+'" placeholder="miles">'
+    +'</div>'
+    +'<div class="f2"><div><label class="f">Date</label><input id="a_day" type="date" value="'+(t?t.day:DAY)+'"></div>'
+      +'<div><label class="f">Payout ($) <span id="a_pm" style="text-transform:none;font-weight:600"></span></label><input id="a_pay" type="number" step="0.01" min="0" value="'+(t&&+t.payout?t.payout:'')+'" placeholder="0.00"></div></div>'
+    +'<div class="f2"><div><label class="f">Timing</label><select id="a_tmode">'
+      +['flexible','fixed'].map(m=>'<option value="'+m+'"'+(t&&t.time_mode===m?' selected':'')+'>'+(m==='flexible'?'Flexible':'Fixed time')+'</option>').join('')+'</select></div>'
+      +'<div><label class="f">Time (if fixed)</label><input id="a_time" value="'+esc(t?t.fixed_time:'')+'" placeholder="e.g. 2:00 PM"></div></div>'
+    +'<label class="f">Must be complete by (optional)</label><input id="a_due" value="'+esc(t?t.due_by:'')+'" placeholder="e.g. 5 PM today">'
+    +'<div class="mact"><button class="btn" id="a_cancel">Cancel</button><button class="btn pri" id="a_save">'+(t?'Save changes':'Assign task')+'</button></div>';
+  openOv('ovAssign');
+  const kindSel=document.getElementById('a_kind');
+  function renderStops(){
+    const w=document.getElementById('a_stops');if(!w)return;
+    if(ASSIGN.stops.length<2)ASSIGN.stops=['',''];
+    w.innerHTML=ASSIGN.stops.map((a,i)=>{
+      const lbl=i===0?'Start':(i===ASSIGN.stops.length-1?'End':'Stop '+i);
+      const rm=ASSIGN.stops.length>2&&i!==0&&i!==ASSIGN.stops.length-1;
+      return '<div class="stop"><span class="sl">'+lbl+'</span><input value="'+esc(a)+'" data-stop="'+i+'" placeholder="'+lbl+' address">'
+        +(rm?'<button class="btn sm" type="button" data-rmstop="'+i+'">×</button>':'')+'</div>';
+    }).join('');
+    w.querySelectorAll('[data-stop]').forEach(el=>el.oninput=()=>{ASSIGN.stops[+el.dataset.stop]=el.value;});
+    w.querySelectorAll('[data-rmstop]').forEach(b=>b.onclick=()=>{ASSIGN.stops.splice(+b.dataset.rmstop,1);renderStops();});
+  }
+  function recalc(){
+    const pm=ASSIGN.perMile,mi=+document.getElementById('a_miles').value||0;
+    document.getElementById('a_pm').textContent=pm?('· '+money(pm)+'/mile × miles'):'';
+    if(kindSel.value==='distance'&&pm)document.getElementById('a_pay').value=r2(pm*mi).toFixed(2);
+  }
+  function syncKind(){
+    const d=kindSel.value==='distance';
+    document.getElementById('a_route').style.display=d?'block':'none';
+    if(d)renderStops();
+    recalc();
+  }
+  kindSel.onchange=syncKind;
+  document.getElementById('a_miles').oninput=recalc;
+  document.getElementById('a_addstop').onclick=()=>{ASSIGN.stops.splice(ASSIGN.stops.length-1,0,'');renderStops();};
+  document.getElementById('a_quick').onchange=e=>{
+    const c=CATALOG[+e.target.value];if(!c)return;
+    document.getElementById('a_title').value=c.name;
+    document.getElementById('a_pay').value=(+c.per_mile||c.manual)?'':(+c.price||0);
+    kindSel.value=c.kind;ASSIGN.perMile=+c.per_mile||0;syncKind();
+  };
+  document.getElementById('a_cancel').onclick=()=>closeOv('ovAssign');
+  document.getElementById('a_save').onclick=saveAssign;
+  syncKind();
+}
+async function saveAssign(){
+  const title=document.getElementById('a_title').value.trim();
+  if(!title){toast('Add a task title');return;}
+  const kind=document.getElementById('a_kind').value;
+  const stops=kind==='distance'?ASSIGN.stops.map(s=>s.trim()).filter(Boolean):[];
+  const miles=kind==='distance'?(+document.getElementById('a_miles').value||0):0;
+  const pm=ASSIGN.perMile||0;
+  const payout=(pm&&miles)?r2(pm*miles):(+document.getElementById('a_pay').value||0);
+  const carId=document.getElementById('a_car').value;
+  const car=CARS.find(c=>c.id===carId);
+  const row={title,detail:document.getElementById('a_detail').value.trim(),
+    day:document.getElementById('a_day').value||todayET(),
+    payout:payout,per_mile:pm,miles:miles,stops:stops,kind:kind,
+    car_id:carId||null,car_name:car?car.name:null,
+    time_mode:document.getElementById('a_tmode').value,
+    fixed_time:document.getElementById('a_time').value.trim(),
+    due_by:document.getElementById('a_due').value.trim()};
+  const btn=document.getElementById('a_save');btn.disabled=true;btn.textContent='Saving…';
+  let r;
+  if(ASSIGN.editId)r=await sb.from('team_tasks').update(row).eq('id',ASSIGN.editId).select().single();
+  else r=await sb.from('team_tasks').insert(Object.assign({member_id:ASSIGN.memberId},row)).select().single();
+  btn.disabled=false;btn.textContent=ASSIGN.editId?'Save changes':'Assign task';
+  if(r.error){console.error(r.error);toast('Failed: '+r.error.message);return;}
+  if(ASSIGN.editId){const i=TASKS.findIndex(t=>t.id===ASSIGN.editId);if(i>=0)TASKS[i]=r.data;}
+  else TASKS.unshift(r.data);
+  closeOv('ovAssign');render();toast(ASSIGN.editId?'Task updated':'Task assigned');
+}
+
+/* ---------- payout ---------- */
+function openPayout(memberId){
+  const s=member(memberId);if(!s)return;
+  const due=dayTasks(memberId,DAY).filter(t=>t.status==='done'&&!t.paid);
+  const amount=r2(due.reduce((a,t)=>a+(+t.payout||0),0));
+  PROOF=null;
+  const md=document.getElementById('mdPayout');
+  if(!due.length){
+    const already=payoutFor(memberId,DAY);
+    md.innerHTML='<h3>Process payout — '+esc(s.name)+'</h3><p class="s">For <b>'+niceDay(DAY)+'</b></p>'
+      +'<div class="empty">'+(already?'This day is already paid out ('+money(already.amount)+' via '+esc(already.method)+').':'No completed tasks ready for payout on this day yet. Complete tasks (with evidence) first, or switch days.')+'</div>'
+      +'<div class="mact"><button class="btn pri" data-close="ovPayout">Close</button></div>';
+    openOv('ovPayout');bindClose();return;
+  }
+  md.innerHTML='<h3>Process payout — '+esc(s.name)+'</h3>'
+    +'<p class="s">End-of-day payout for <b>'+niceDay(DAY)+'</b>. A payout screenshot is required as proof.</p>'
+    +'<div class="psum">'+due.map(t=>'<div class="r"><span>'+esc(t.title)+'</span><span>'+money(t.payout)+'</span></div>').join('')
+      +'<div class="r tot"><span>'+due.length+' task(s)</span><span>'+money(amount)+'</span></div></div>'
+    +'<label class="f">Payment method</label><select id="p_method">'+METHODS.map(m=>'<option'+(s.pay_method===m?' selected':'')+'>'+esc(m)+'</option>').join('')+'</select>'
+    +'<label class="f">Reference / note (optional)</label><input id="p_ref" placeholder="e.g. CashApp confirmation #">'
+    +'<label class="f">Payout screenshot (required)</label>'
+    +'<label class="btn evbtn" style="display:inline-block">📷 Upload payout screenshot<input type="file" accept="image/*" id="p_shot"></label>'
+    +'<div class="proof" id="p_prev"></div>'
+    +'<div class="meta" style="margin-top:8px">The exact time is stamped automatically when you confirm.</div>'
+    +'<div class="mact"><button class="btn" data-close="ovPayout">Cancel</button><button class="btn pri" id="p_go">Mark as paid</button></div>';
+  openOv('ovPayout');bindClose();
+  document.getElementById('p_shot').onchange=async e=>{
+    const f=e.target.files&&e.target.files[0];if(!f)return;
+    const blob=await resizeImage(f,1400);if(!blob){toast('Could not read that image');return;}
+    PROOF=blob;
+    document.getElementById('p_prev').innerHTML='<img src="'+URL.createObjectURL(blob)+'" alt="proof"><div class="meta">Screenshot attached</div>';
+  };
+  document.getElementById('p_go').onclick=()=>confirmPayout(memberId,amount,due);
+}
+async function confirmPayout(memberId,amount,due){
+  if(!PROOF){toast('Upload the payout screenshot as proof first');return;}
+  const btn=document.getElementById('p_go');btn.disabled=true;btn.textContent='Saving…';
+  try{
+    const path=memberId+'/payouts/'+DAY+'-'+Date.now()+'.jpg';
+    await upload(path,PROOF);
+    const ins=await sb.from('team_payouts').insert({member_id:memberId,day:DAY,amount:amount,
+      method:document.getElementById('p_method').value,ref:document.getElementById('p_ref').value.trim(),
+      proof_path:path,task_count:due.length,paid_by:ME||'Admin'}).select().single();
+    if(ins.error)throw ins.error;
+    const ids=due.map(t=>t.id);
+    const upd=await sb.from('team_tasks').update({paid:true,payout_id:ins.data.id}).in('id',ids).select();
+    if(upd.error)throw upd.error;
+    PAYOUTS.unshift(ins.data);
+    (upd.data||[]).forEach(t=>{const i=TASKS.findIndex(x=>x.id===t.id);if(i>=0)TASKS[i]=t;});
+    PROOF=null;closeOv('ovPayout');render();
+    toast('Paid '+money(amount)+' — proof saved');
+  }catch(e){console.error(e);toast('Payout failed: '+(e.message||e));
+    btn.disabled=false;btn.textContent='Mark as paid';}
+}
+
+/* ---------- members ---------- */
+function openMember(id){
+  const s=id?member(id):{role:'RC',pay_method:'CashApp',active:true};
+  document.getElementById('mdMember').innerHTML=''
+    +'<h3>'+(id?'Edit team member':'Add team member')+'</h3><p class="s">Coordinators and vendors are paid per completed task.</p>'
+    +'<label class="f">Full name</label><input id="m_name" value="'+esc(s.name||'')+'">'
+    +'<label class="f">Role</label><select id="m_role">'
+      +[['RC','Rental Coordinator'],['V','Vendor'],['MM','Maintenance Manager'],['SA','Super Admin']]
+        .map(r=>'<option value="'+r[0]+'"'+(s.role===r[0]?' selected':'')+'>'+r[0]+' — '+r[1]+'</option>').join('')+'</select>'
+    +'<div class="f2"><div><label class="f">Email</label><input id="m_email" value="'+esc(s.email||'')+'"></div>'
+      +'<div><label class="f">Phone</label><input id="m_phone" value="'+esc(s.phone||'')+'"></div></div>'
+    +'<label class="f">WhatsApp</label><input id="m_wa" value="'+esc(s.whatsapp||'')+'">'
+    +'<div class="f2"><div><label class="f">Payout method</label><select id="m_pay">'
+      +METHODS.map(m=>'<option'+(s.pay_method===m?' selected':'')+'>'+esc(m)+'</option>').join('')+'</select></div>'
+      +'<div><label class="f">Available hours</label><input id="m_hours" value="'+esc(s.hours||'')+'" placeholder="Mon–Sat, 8am–6pm"></div></div>'
+    +'<label class="f">What else do they do?</label><input id="m_other" value="'+esc(s.other_work||'')+'">'
+    +'<label class="f" style="margin-top:12px"><input type="checkbox" id="m_active" style="width:auto;margin-right:6px"'+(s.active!==false?' checked':'')+'> Active</label>'
+    +'<div class="mact"><button class="btn" data-close="ovMember">Cancel</button>'
+      +(id?'<button class="btn danger" id="m_del">Remove</button>':'')
+      +'<button class="btn pri" id="m_save">Save</button></div>';
+  openOv('ovMember');bindClose();
+  document.getElementById('m_save').onclick=async()=>{
+    const name=document.getElementById('m_name').value.trim();
+    if(!name){toast('Enter a name');return;}
+    const row={name:name,role:document.getElementById('m_role').value,
+      email:document.getElementById('m_email').value.trim()||null,
+      phone:document.getElementById('m_phone').value.trim()||null,
+      whatsapp:document.getElementById('m_wa').value.trim()||null,
+      pay_method:document.getElementById('m_pay').value,
+      hours:document.getElementById('m_hours').value.trim()||null,
+      other_work:document.getElementById('m_other').value.trim()||null,
+      active:document.getElementById('m_active').checked};
+    const r=id?await sb.from('team_members').update(row).eq('id',id).select().single()
+              :await sb.from('team_members').insert(row).select().single();
+    if(r.error){toast('Failed: '+r.error.message);return;}
+    if(id){const i=MEMBERS.findIndex(m=>m.id===id);if(i>=0)MEMBERS[i]=r.data;}else MEMBERS.push(r.data);
+    MEMBERS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    closeOv('ovMember');render();toast('Saved');
+  };
+  const del=document.getElementById('m_del');
+  if(del)del.onclick=async()=>{
+    if(!confirm('Remove '+(s.name||'this member')+'? Their tasks and payout history are deleted too.'))return;
+    const r=await sb.from('team_members').delete().eq('id',id);
+    if(r.error){toast('Failed: '+r.error.message);return;}
+    MEMBERS=MEMBERS.filter(m=>m.id!==id);TASKS=TASKS.filter(t=>t.member_id!==id);PAYOUTS=PAYOUTS.filter(p=>p.member_id!==id);
+    closeOv('ovMember');VIEW='board';CUR=null;render();toast('Member removed');
+  };
+}
+
+/* ---------- refunds ---------- */
+function openRefund(memberId){
+  RECEIPT=null;
+  document.getElementById('mdRefund').innerHTML=''
+    +'<h3>Refund / expense reimbursement</h3><p class="s">Car wash, fuel or other out-of-pocket costs. A receipt photo is required.</p>'
+    +'<label class="f">Type</label><select id="r_kind">'+['Car wash','Fuel','Parts','Lyft / Uber','Other'].map(k=>'<option>'+k+'</option>').join('')+'</select>'
+    +'<label class="f">Amount ($)</label><input id="r_amt" type="number" step="0.01" min="0">'
+    +'<label class="f">Explanation</label><textarea id="r_detail"></textarea>'
+    +'<label class="f">Receipt</label><label class="btn evbtn" style="display:inline-block">📷 Attach receipt<input type="file" accept="image/*" id="r_shot"></label>'
+    +'<div class="proof" id="r_prev"></div>'
+    +'<div class="mact"><button class="btn" data-close="ovRefund">Cancel</button><button class="btn pri" id="r_go">Submit</button></div>';
+  openOv('ovRefund');bindClose();
+  document.getElementById('r_shot').onchange=async e=>{
+    const f=e.target.files&&e.target.files[0];if(!f)return;
+    const blob=await resizeImage(f,1400);if(!blob)return;
+    RECEIPT=blob;document.getElementById('r_prev').innerHTML='<img src="'+URL.createObjectURL(blob)+'" alt="receipt"><div class="meta">Receipt attached</div>';
+  };
+  document.getElementById('r_go').onclick=async()=>{
+    const amt=+document.getElementById('r_amt').value||0;
+    const detail=document.getElementById('r_detail').value.trim();
+    if(!amt||!detail){toast('Add an amount and explanation');return;}
+    if(!RECEIPT){toast('Attach a receipt photo');return;}
+    try{
+      const path=memberId+'/refunds/'+Date.now()+'.jpg';
+      await upload(path,RECEIPT);
+      const r=await sb.from('team_refunds').insert({member_id:memberId,kind:document.getElementById('r_kind').value,
+        amount:amt,detail:detail,receipt_path:path}).select().single();
+      if(r.error)throw r.error;
+      REFUNDS.unshift(r.data);RECEIPT=null;closeOv('ovRefund');render();toast('Refund request submitted');
+    }catch(e){toast('Failed: '+(e.message||e));}
+  };
+}
+
+async function viewImg(path){
+  const u=await signed(path);
+  document.getElementById('mdImg').innerHTML='<h3>Attachment</h3>'
+    +(u?'<img src="'+u+'" alt="" style="width:100%;border-radius:10px;border:1px solid var(--line)">':'<div class="empty">Could not load this file.</div>')
+    +'<div class="mact"><button class="btn" data-close="ovImg">Close</button>'
+    +(u?'<a class="btn pri" href="'+u+'" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Open full size</a>':'')+'</div>';
+  openOv('ovImg');bindClose();
+}
+function bindClose(){document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeOv(b.dataset.close));}
+
+/* ---------- wiring ---------- */
+function wire(){
+  const on=(sel,fn)=>document.querySelectorAll(sel).forEach(fn);
+  on('[data-go]',el=>el.onclick=()=>{const g=el.dataset.go;if(g==='board'){VIEW='board';CUR=null;}else VIEW=g;render();});
+  on('[data-open]',el=>el.onclick=()=>{CUR=el.dataset.open;VIEW='member';render();});
+  on('[data-refresh]',el=>el.onclick=async()=>{toast('Refreshing…');await reload();});
+  on('[data-addmember]',el=>el.onclick=()=>openMember(null));
+  on('[data-editmember]',el=>el.onclick=()=>openMember(el.dataset.editmember));
+  on('[data-assign]',el=>el.onclick=()=>openAssign(el.dataset.assign,null));
+  on('[data-edittask]',el=>el.onclick=()=>{const t=TASKS.find(x=>x.id===el.dataset.edittask);if(t)openAssign(t.member_id,t.id);});
+  on('[data-deltask]',el=>el.onclick=()=>delTask(el.dataset.deltask));
+  on('[data-pay]',el=>el.onclick=()=>openPayout(el.dataset.pay));
+  on('[data-refund]',el=>el.onclick=()=>openRefund(el.dataset.refund));
+  on('[data-start]',el=>el.onclick=()=>startTask(el.dataset.start));
+  on('[data-stop]',el=>el.onclick=()=>stopTask(el.dataset.stop));
+  on('[data-done]',el=>el.onclick=()=>completeTask(el.dataset.done));
+  on('[data-cost]',el=>el.onclick=()=>addCost(el.dataset.cost));
+  on('[data-ev]',el=>el.onchange=()=>addEvidence(el.dataset.ev,el));
+  on('[data-delev]',el=>el.onclick=()=>{const p=el.dataset.delev.split('|');delEvidence(p[0],+p[1]);});
+  on('[data-view]',el=>el.onclick=()=>viewImg(el.dataset.view));
+  on('[data-carry]',el=>el.onclick=()=>carryTask(el.dataset.carry,todayET()));
+  on('[data-carryto]',el=>el.onclick=()=>{const i=document.getElementById('cd_'+el.dataset.carryto);carryTask(el.dataset.carryto,i?i.value:'');});
+  on('[data-notes]',el=>el.onchange=()=>patchTask(el.dataset.notes,{notes:el.value}));
+  on('[data-day]',el=>el.onclick=()=>{DAY=shiftDay(DAY,+el.dataset.day);render();});
+  on('[data-today]',el=>el.onclick=()=>{DAY=todayET();render();});
+  on('[data-approve]',el=>el.onclick=async()=>{
+    const r=await sb.from('team_refunds').update({status:'Approved'}).eq('id',el.dataset.approve).select().single();
+    if(r.error){toast('Failed');return;}
+    const i=REFUNDS.findIndex(x=>x.id===el.dataset.approve);if(i>=0)REFUNDS[i]=r.data;render();toast('Refund approved');
+  });
+  on('[data-map]',el=>el.onclick=()=>{
+    const t=TASKS.find(x=>x.id===el.dataset.map);if(!t)return;
+    const pts=(t.stops||[]).filter(Boolean);if(pts.length<2){toast('No route addresses set');return;}
+    const e=encodeURIComponent;
+    const way=pts.slice(1,-1).map(e).join('%7C');
+    window.open('https://www.google.com/maps/dir/?api=1&origin='+e(pts[0])+'&destination='+e(pts[pts.length-1])+(way?'&waypoints='+way:''),'_blank','noopener');
+  });
+  const dp=document.getElementById('dayPick');
+  if(dp)dp.onchange=()=>{if(dp.value){DAY=dp.value;render();}};
+}
+
+/* ---------- boot ---------- */
+async function start(){await load();document.getElementById('appwrap').style.display='block';render();}
+function showApp(){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='none';}
+async function gate(){
+  const s=await sb.auth.getSession();
+  const u=s.data.session&&s.data.session.user;
+  if(!u){document.getElementById('loginwrap').style.display='flex';return;}
+  ME=u.email||'';
+  if(ADMINS.indexOf(ME.toLowerCase())<0){
+    document.getElementById('loginwrap').style.display='none';
+    document.getElementById('noadmin').style.display='flex';
+    document.getElementById('noadmin_who').textContent='Signed in as '+ME+' — this page is limited to admins.';
+    return;
+  }
+  showApp();start();
+}
+document.getElementById('li_form').addEventListener('submit',async function(ev){
+  ev.preventDefault();
+  const b=document.getElementById('li_btn'),er=document.getElementById('li_err');
+  er.textContent='';b.disabled=true;b.textContent='Signing in…';
+  const r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});
+  b.disabled=false;b.textContent='Sign in';
+  if(r.error){er.textContent=r.error.message;return;}
+  location.reload();
+});
+document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
+document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
+gate();
+</script>
