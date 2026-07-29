@@ -455,7 +455,7 @@ function draftCard(d){
   var planBehind=!!(cust&&cust.state==='plan_behind');
   var chips='';
   if(onPlan)chips+='<span class="status plan'+(planBehind?' behind':'')+'" title="'+(planBehind?'Missed yesterday’s 2 rentals + 2 late fees — falling behind the plan':'On a payment plan — never disconnected')+'">📋 '+(planBehind?'plan · ⚠ behind':'payment plan')+'</span>';
-  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr){if(dr.restored)chips+='<span class="status disc-restored" title="Back on service'+(dr.restored_at?' · '+shortET(dr.restored_at):'')+'">🟢 restored</span>';else if(graceActive(dr))chips+='<span class="status disc-grace" title="Disconnection deferred">⏸ grace until '+shortET(dr.grace_until)+'</span>';else if(dr.signal_sent)chips+='<span class="status disc-signal" title="Active Disconnection signal sent'+(dr.signal_sent_at?' · '+shortET(dr.signal_sent_at):'')+'">🔴 SIGNAL SENT</span>';}}
+  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr){if(dr.restored)chips+='<span class="status disc-restored" title="Back on service'+(dr.restored_at?' · '+shortET(dr.restored_at):'')+'">🟢 restored</span>';else if(graceActive(dr))chips+='<span class="status disc-grace" title="Disconnection deferred">⏸ grace until '+shortET(dr.grace_until)+'</span>';else if(dr.signal_sent)chips+='<span class="status disc-signal" title="Active Disconnection signal sent'+(dr.signal_sent_at?' · '+shortET(dr.signal_sent_at):'')+'">🔴 disabled</span>';}}
   if(d.reviewed_at&&!isSent)chips+='<span class="status reviewed">✓ reviewed</span>';
   if(isSent)chips+='<span class="status sent">✅ sent'+(d.sent_at?' · '+shortET(d.sent_at):'')+'</span>';
   return '<div class="draft'+(d.kind==='disconnect'?' disc':d.kind==='recovery'?' recovery':'')+(isSent?' done':'')+'" id="d'+d.id+'"><div class="dhead"><span class="kind '+d.kind+'">'+d.kind+'</span><span class="dname">'+esc(d.customer_name)+'</span><span class="dmail">'+esc(d.email||'⚠ no email on file')+'</span> '+chips+'<span class="amt">'+fmt(d.amount)+'</span></div>'
@@ -599,7 +599,7 @@ async function setDisc(c,patch){
   if(r.error){alert('Could not save: '+r.error.message);return;}
   toast('Saved ✓');await load();
 }
-var GPSDEV={}; var GPS_DRYRUN=true; var GPSROWS=[];
+var GPSDEV={}; var GPS_DRYRUN=false; var GPSROWS=[];
 function gpsKeyFor(label){return label==='RENT 2 Go - JJTusa'?'jjt':'default';}
 async function gpsInvoke(b){var r=await sb.functions.invoke('linda-command',{body:b});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));return r.data;}
 async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSDEV[k];var d=await gpsInvoke({action:'devices',account_label:acc});GPSDEV[k]=d.devices||[];return GPSDEV[k];}
@@ -610,12 +610,12 @@ async function gpsUnlink(i){var c=GPSROWS[i];if(!confirm('Unlink this car?'))ret
 function gpsTrackHtml(d){var ign=d.ignition?('<span class="ignbadge '+(d.ignition==='ON'?'on':'off')+'">Ignition '+d.ignition+'</span>'):'';var mot=d.motion?(' <span class="gpsmot">'+d.motion+(d.motion_since?' since '+esc(d.motion_since):'')+(d.speed?' ('+esc(d.speed)+')':'')+'</span>'):'';var ev=(d.events||[]).slice(0,6).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('');return '<div class="gpstrack">'+ign+mot+'<div class="gpsloc">Location: '+esc(d.address||'-')+(d.maps?' - <a href="'+esc(d.maps)+'" target="_blank" rel="noopener">open in Google Maps</a>':'')+'</div>'+((d.lat&&d.lng)?'<iframe class="gpsmap" loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(d.lat+','+d.lng)+'&z=15&output=embed"></iframe>':'')+(ev?'<details class="gpsevwrap"><summary>recent events</summary>'+ev+'</details>':'')+'</div>';}
 async function gpsTrack(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">locating...</span>';try{var d=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});el.innerHTML=gpsTrackHtml(d);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Track failed: '+esc(e.message||e)+'</span>';}}
 async function gpsLocate(i){var c=GPSROWS[i];var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">pinging the car for a fresh location\u2026</span>';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});el.innerHTML='<span class="hint">ping sent \u2014 fetching the fresh position in ~15s\u2026</span>';setTimeout(function(){gpsTrack(i);},15000);}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Locate failed: '+esc(e.message||e)+'</span>';}}
-async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' this car ('+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});if(d.dry_run){el.innerHTML='<span class="gpsok">DRY-RUN - would send '+kind+' (msg '+d.message_type_id+'). Nothing sent.</span>';}else{el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind+' command sent');}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
+async function gpsSend(i,kind){var c=GPSROWS[i];var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm(verb+' '+(c.name||'this')+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nThis is LIVE. It takes effect the next time the ignition is OFF.':' This is LIVE.')))return;var el=document.getElementById('gpsr'+i);el.innerHTML='<span class="hint">sending...</span>';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:false});el.innerHTML='<span class="gpsok">Sent: '+kind+' - '+(d.status_description||d.notice||'queued')+(d.command_queue_id?' - #'+d.command_queue_id:'')+'</span>';toast(kind==='disable'?'Starter DISABLE sent':'Starter ENABLE sent');if(kind==='disable'){await setDisc(c,{signal_sent:true,signal_sent_at:new Date().toISOString(),restored:false,restored_at:null});}else{await setDisc(c,{restored:true,restored_at:new Date().toISOString()});}}catch(e){el.innerHTML='<span class="hint" style="color:var(--out)">Failed: '+esc(e.message||e)+'</span>';}}
 async function gpsCommand(c,kind){
   if(!c.sarekon_device_id)return null;
   var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';
-  if(!confirm((GPS_DRYRUN?'[DRY-RUN] ':'')+verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')?'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return {cancelled:true};
-  try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:GPS_DRYRUN});toast(d.dry_run?('DRY-RUN: would '+kind):(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:'')));return d;}
+  if(!confirm(verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')? This is LIVE.'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return {cancelled:true};
+  try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:false});toast(kind+' command sent'+(d.command_queue_id?' #'+d.command_queue_id:''));return d;}
   catch(e){alert('GPS '+kind+' failed: '+(e.message||e));return {error:String(e)};}
 }
 function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
@@ -637,7 +637,7 @@ function renderDisconnections(){
     var gA=graceActive(r);
     var badge=r.restored?'<span class="dbadge on">🟢 RESTORED'+(r.restored_at?' · '+shortET(r.restored_at):'')+'</span>'
       :gA?'<span class="dbadge grace">⏸ GRACE — deferred until '+fullET(r.grace_until)+'</span>'
-      :r.signal_sent?'<span class="dbadge red">🔴 ACTIVE DISCONNECTION · SIGNAL SENT'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
+      :r.signal_sent?'<span class="dbadge red">🔴 STARTER DISABLED'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
       :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
     var nsent=dnf&&dnf.status==='sent';
@@ -664,7 +664,7 @@ function renderDisconnections(){
   }).join('');
   el.innerHTML='<details class="discwrap"><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
     +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
-    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<label class="gpsdry"><input type="checkbox" class="gpsdrychk"'+(GPS_DRYRUN?' checked':'')+'> \uD83E\uDDEA GPS dry-run (safe) \u2014 UNCHECK to actually disable/enable a car</label>'
+    +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<div class="hint" style="color:var(--out);font-weight:700;margin:2px 0 10px">\u26a1 GPS commands are LIVE \u2014 Disable/Enable act on the real vehicle and update the status here.</div>'
     +cards+'</details>';
 }
 // ── PAYMENT PLAN MODULE ──────────────────────────────────────────────────────────────
