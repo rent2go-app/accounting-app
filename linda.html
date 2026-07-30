@@ -600,26 +600,24 @@ async function sendFee(invId,btn){
 }
 async function raiseFee(invId,btn){
   var f=FEES.find(x=>x.invoice_id===invId);if(!f)return;
-  if(!confirm('Create a $10 DRAFT late-fee invoice in Stripe for this customer?\n\nDraft only — NOT sent. You finalize/send it yourself in Stripe.'))return;
-  var o=btn.textContent;btn.disabled=true;btn.textContent='Raising…';
+  if(!confirm('Create a $10 late-fee invoice in Stripe and EMAIL it to the customer to pay?\n\nPayable invoice — the customer is emailed to pay it; no card is auto-charged.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Creating…';
   try{
-    var r=await sb.functions.invoke('linda-raise-fee',{body:{invoice_id:f.invoice_id,account_label:f.account_label,customer_id:f.customer_id,memo:f.memo}});
-    if(r.error)throw r.error;
-    var res=(r.data&&r.data.results&&r.data.results[0])||{};
-    if(res.error)throw new Error(res.error);
-    toast(res.already?'Already raised — no duplicate created ✓':'Draft $10 invoice created in Stripe ✓');await load();
-  }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+    var r=await sb.functions.invoke('linda-raise-fee',{body:{create:true,invoice_id:f.invoice_id,account_label:f.account_label,customer_id:f.customer_id,memo:f.memo}});
+    if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);
+    toast('Invoice created & emailed to customer ✓');await load();
+  }catch(e){alert('Create failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 async function raiseAllFees(btn,acc){
-  var list=acc?FEES.filter(function(f){return f.account_label===acc;}):FEES;
-  if(!list.length){alert('No fees to raise.');return;}
-  if(!confirm('Create '+list.length+' DRAFT $10 late-fee invoice(s)'+(acc?' for '+acc:'')+' in Stripe?\n\nDrafts only — NOT sent. You finalize/send each yourself in Stripe.'))return;
-  var o=btn.textContent;btn.disabled=true;btn.textContent='Raising '+list.length+'…';
+  var list=(acc?FEES.filter(function(f){return f.account_label===acc;}):FEES).filter(function(f){return f.status==='proposed';});
+  if(!list.length){alert('No fees to create.');return;}
+  if(!confirm('Create & EMAIL '+list.length+' $10 late-fee invoice(s)'+(acc?' for '+acc:'')+' to customers to pay?\n\nEach is a payable Stripe invoice emailed to the customer — never auto-charged. This cannot be undone.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Creating '+list.length+'…';
   try{
-    var r=await sb.functions.invoke('linda-raise-fee',{body:acc?{all:true,account_label:acc}:{all:true}});
+    var r=await sb.functions.invoke('linda-raise-fee',{body:acc?{create_all:true,account_label:acc}:{create_all:true}});
     if(r.error)throw r.error;
-    toast('Raised '+((r.data&&r.data.raised)||0)+' draft invoice(s) ✓'+((r.data&&r.data.failed)?' · '+r.data.failed+' failed':''));await load();
-  }catch(e){alert('Raise failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
+    toast('Created & emailed '+((r.data&&r.data.created)||0)+' invoice(s) ✓'+((r.data&&r.data.failed)?' · '+r.data.failed+' failed':''));await load();
+  }catch(e){alert('Create failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 async function sendAllFees(btn,acc){
   var list=(acc?FEES.filter(function(f){return f.account_label===acc;}):FEES).filter(function(f){return f.status==='raised';});
@@ -727,16 +725,30 @@ function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
 }
 function renderDisconnections(){
   var el=document.getElementById('ldisc');if(!el)return;
-  DISCROWS=CUSTS.filter(function(c){return c.state==='disconnect';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  // Include anyone whose car is still physically disabled (signal sent, not yet restored) EVEN IF they've now
+  // paid and dropped out of 'disconnect' state — otherwise a paid customer's car stays cut off with nothing
+  // prompting a reconnect. Float those "paid but still disabled" to the top; they're the most time-sensitive.
+  DISCROWS=CUSTS.filter(function(c){var r=discRec(c);return c.state==='disconnect'||(r.signal_sent&&!r.restored);}).sort(function(a,b){
+    var ra=discRec(a),rb=discRec(b);
+    var an=(a.state!=='disconnect'&&ra.signal_sent&&!ra.restored)?0:1;
+    var bn=(b.state!=='disconnect'&&rb.signal_sent&&!rb.restored)?0:1;
+    if(an!==bn)return an-bn;
+    return (+b.outstanding||0)-(+a.outstanding||0);
+  });
   if(!DISCROWS.length){el.innerHTML='';return;}
   var actd=DISCROWS.filter(function(c){var r=discRec(c);return r.signal_sent&&!r.restored;}).length;
   var restd=DISCROWS.filter(function(c){return discRec(c).restored;}).length;
   var pend=DISCROWS.length-DISCROWS.filter(function(c){return discRec(c).signal_sent;}).length;
+  var reconn=DISCROWS.filter(function(c){var r=discRec(c);return c.state!=='disconnect'&&r.signal_sent&&!r.restored;}).length;
   var cards=DISCROWS.map(function(c,i){
     var r=discRec(c);
     var gA=graceActive(r);
+    // paid / no longer past-due, but the car is still physically disabled → hold here until reconnected
+    var reconnectNeeded=(c.state!=='disconnect'&&r.signal_sent&&!r.restored);
+    var reconnectBanner=reconnectNeeded?'<div class="dnotice" style="background:#e7f6ec;border:1px solid #0f8a4d;color:#0a6b3a;font-weight:700">✅ PAID / off the past-due list — but the starter is still DISABLED. Re-enable the car below, then tick “Restored”. They stay in this ledger until reconnected.</div>':'';
     var badge=r.restored?'<span class="dbadge on">🟢 RESTORED'+(r.restored_at?' · '+shortET(r.restored_at):'')+'</span>'
       :gA?'<span class="dbadge grace">⏸ GRACE — deferred until '+fullET(r.grace_until)+'</span>'
+      :reconnectNeeded?'<span class="dbadge red">🔌 RECONNECT NEEDED'+(r.signal_sent_at?' · disabled '+shortET(r.signal_sent_at):'')+'</span>'
       :r.signal_sent?'<span class="dbadge red">🔴 STARTER DISABLED'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
       :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
@@ -750,7 +762,7 @@ function renderDisconnections(){
       +'</div>'):'';
     return '<div class="disccard'+(r.restored?' restored':gA?' grace':r.signal_sent?' active':'')+'">'
       +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span> <span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past due</span> '+badge+'</div>'
-      +noticeLine+noticeActions
+      +reconnectBanner+noticeLine+noticeActions
       +tl
       +'<div class="dchecks">'
         +'<label class="dchk"><input type="checkbox" data-discsig="'+i+'"'+(r.signal_sent?' checked':'')+'> <b>🔴 Active Disconnection — SIGNAL SENT</b> <span class="hint">(fires starter-disable if a car is linked)</span>'+(r.signal_sent_at?' <span class="dts">'+shortET(r.signal_sent_at)+' ET</span>':'')+'</label>'
@@ -764,7 +776,7 @@ function renderDisconnections(){
       +'</div></div>';
   }).join('');
   el.innerHTML='<details class="discwrap" data-sec="disc"'+(OPENSEC.disc?' open':'')+'><summary>🔴 Disconnections — <b>'+DISCROWS.length+'</b> flagged'
-    +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored</span></summary>'
+    +' <span class="hint">· '+actd+' signal active · '+pend+' pending signal · '+restd+' restored'+(reconn?' · <b style="color:#0a6b3a">'+reconn+' paid — reconnect</b>':'')+'</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">Track each disconnection: send the signal, log when the customer reaches out, record the action taken, and mark restored when they\'re back on service.</p>'+'<div class="hint" style="color:var(--out);font-weight:700;margin:2px 0 10px">\u26a1 GPS commands are LIVE \u2014 Disable/Enable act on the real vehicle and update the status here.</div>'
     +cards+'</details>';
 }
@@ -841,24 +853,24 @@ function renderFeeLedger(){
       var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;
       var att='<b>'+esc(f.invoice_number||f.invoice_id||'—')+'</b>'+(f.rental_desc?'<div class="hint">'+esc(f.rental_desc)+(f.for_date?' · due '+esc(f.for_date):'')+'</div>':'');
       var act;
-      if(f.status==='proposed')act='<button class="btn small pri" data-raisefee="'+esc(f.invoice_id)+'" title="Create this $10 as a DRAFT invoice in Stripe">📝 Raise draft</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done — I raised it myself">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Spare this customer today">✕ Dismiss</button>';
-      else if(f.status==='raised')act='<span class="status raised">📝 draft in Stripe</span> <button class="btn small pri" data-sendfee="'+esc(f.invoice_id)+'" title="Finalize &amp; email the invoice to the customer to pay (no auto-charge)">📧 Send</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done">✓ Done</button>';
+      if(f.status==='proposed')act='<button class="btn small pri" data-raisefee="'+esc(f.invoice_id)+'" title="Create a $10 invoice in Stripe and email the customer to pay it now">🧾 Create invoice</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done — I handled it myself">✓ Done</button> <button class="btn small" data-dismissfee="'+esc(f.invoice_id)+'" title="Spare this customer today">✕ Dismiss</button>';
+      else if(f.status==='raised')act='<span class="status raised">📝 leftover draft</span> <button class="btn small pri" data-sendfee="'+esc(f.invoice_id)+'" title="Finalize &amp; email this existing draft to the customer to pay (no auto-charge)">📧 Send</button> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Mark done">✓ Done</button>';
       else act='<span class="status sent">✅ sent</span> <button class="btn small ok" data-donefee="'+esc(f.invoice_id)+'" title="Clear from list">✓ Done</button>';
       return '<tr><td>'+esc(nm)+'</td><td>'+att+'</td><td class="n">'+fmt(f.fee)+'</td><td>'+act+'</td></tr>'
         +(f.status==='proposed'&&f.memo?'<tr class="memorow"><td colspan="4">'+IC_DOC+'<b>The $10 invoice will read:</b> '+esc(f.memo)+'</td></tr>':'');
     }).join('');
     return '<div class="feegrp"><div class="feegrphd">🏦 '+esc(acc)+' <span class="feegrpt">'+fs.length+' fee'+(fs.length===1?'':'s')+'</span>'
-      +(np?'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create all '+np+' proposed as DRAFT invoices for this fleet">📝 Raise all '+np+' in this fleet</button>':'')
+      +(np?'<button class="btn small pri" data-raiseallacct="'+esc(acc)+'" title="Create &amp; email all '+np+' invoices for this fleet">🧾 Create all '+np+' invoices in this fleet</button>':'')
       +(nr?' <button class="btn small ok" data-sendallacct="'+esc(acc)+'" title="Finalize &amp; email all '+nr+' raised draft(s) to customers to pay (never auto-charged)">📧 Send all '+nr+' raised in this fleet</button>':'')+'</div>'
       +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Attached to rental invoice</td><td>Fee</td><td>Action</td></tr>'+frows+'</table></div>';
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
   var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-pull the invoice/fee ledger from the database now">🔄 Refresh ledger</button></div>';
-  var main='<details class="feewrap" data-sec="fees"'+(OPENSEC.fees?' open':'')+'><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to raise'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — raise → send → done)</span></summary>'
+  var main='<details class="feewrap" data-sec="fees"'+(OPENSEC.fees?' open':'')+'><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to invoice'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — create invoice → paid)</span></summary>'
     +refreshBar
     +groups
-    +'<p class="hint"><b>📝 Raise draft</b> → $10 draft in Stripe (not sent). <b>📧 Send</b> → finalizes &amp; <b>emails the invoice</b> to the customer to pay (never auto-charged). <b>✓ Done</b> → clears it from this list. <b>✕ Dismiss</b> spares the customer today. Fees <b>stay through raise → send → done</b>.</p></details>';
+    +'<p class="hint"><b>🧾 Create invoice</b> → creates the $10 invoice in Stripe and <b>emails it to the customer to pay</b> (never auto-charged) in one step. <b>✓ Done</b> → clears it without invoicing. <b>✕ Dismiss</b> spares the customer today. (Any older <b>📝 leftover draft</b> still shows a 📧 Send to finish it.)</p></details>';
   el.innerHTML=main+dismBlock;
 }
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
@@ -957,7 +969,7 @@ function renderSuggestions(){
   if(rec)s.push({c:'red',t:rec+' customer(s) at RECOVERY — notify the administrator to schedule collection.'});
   if(disc)s.push({c:'red',t:disc+' customer(s) on FINAL disconnection notice — recovery follows in 12h if uncured.'});
   near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
-  if(proposedN)s.push({c:'',t:IC_FEE+proposedN+' × $10 late fee(s) ready to raise ('+fmt(proposedAmt)+') — open the $10 ledger and tap 📝 Raise draft.'});
+  if(proposedN)s.push({c:'',t:IC_FEE+proposedN+' × $10 late fee(s) ready to invoice ('+fmt(proposedAmt)+') — open the $10 ledger and tap 🧾 Create invoice.'});
   if(draftN)s.push({c:'',t:draftN+' notice(s) awaiting review — 📧 Send email or 📋 Copy for WhatsApp/SMS, then ✅ Mark sent.'});
   if(!draftN&&!disc&&!rec&&!proposedN)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
   var el=document.getElementById('heroBubble');

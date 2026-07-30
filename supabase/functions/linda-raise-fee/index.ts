@@ -57,6 +57,16 @@ async function finalizeOne(invoice_id: string) {
   return { invoice_id, ok: true, hosted: fin.hosted_invoice_url };
 }
 
+// create + finalize + email in ONE step (no separate draft stage). Works from a proposed fee,
+// and also finishes any leftover raised draft (raiseOne short-circuits, then we finalize).
+async function createOne(feeIn: any) {
+  const r = await raiseOne(feeIn);
+  if (r.error) return r;
+  const f = await finalizeOne(feeIn.invoice_id);
+  if (f.error) return { invoice_id: feeIn.invoice_id, error: f.error, stripe_invoice_id: r.stripe_invoice_id };
+  return { invoice_id: feeIn.invoice_id, ok: true, created: true, emailed: true, hosted: f.hosted };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const auth = (req.headers.get("Authorization") || "").replace("Bearer ", "");
@@ -65,6 +75,19 @@ Deno.serve(async (req) => {
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
     const body = await req.json().catch(() => ({}));
+    // CREATE (+finalize +email) a single fee directly — no draft stage. {create:true,invoice_id,account_label,customer_id,memo}
+    if (body.create && body.invoice_id) {
+      const r = await createOne(body);
+      if (r.error) return new Response(JSON.stringify({ error: r.error }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true, created: true, emailed: true, done: true, hosted: r.hosted }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+    // CREATE ALL proposed fees in an account directly (create + finalize + email each).
+    if (body.create_all) {
+      const props = await sbGet(`linda_fees?status=eq.proposed${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id,account_label,customer_id,memo`);
+      const results = [];
+      for (const f of props) results.push(await createOne(f));  // sequential — gentle on Stripe
+      return new Response(JSON.stringify({ ok: true, created: results.filter((r) => r.ok).length, failed: results.filter((r) => r.error).length, results }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
     // BULK SEND — finalize + email EVERY raised draft in an account (mirror of {all:true} bulk-raise).
     if (body.send_all) {
       const raised = await sbGet(`linda_fees?status=eq.raised${body.account_label ? `&account_label=eq.${encodeURIComponent(body.account_label)}` : ""}&select=invoice_id`);
