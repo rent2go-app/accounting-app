@@ -426,7 +426,9 @@ function render(){CUSTOMCATS=[];var _cseen={};DK.forEach(function(dd){(MD[dd].e|
  var mtdD=DK.filter(function(d){return d.slice(0,7)===_mon&&d<=anchor;});var ytdD=DK.filter(function(d){return d.slice(0,4)===_yr&&d<=anchor;});
  var mtdI=r2(mtdD.reduce(function(s,d){return s+M[d].incReal;},0)),mtdE=r2(mtdD.reduce(function(s,d){return s+M[d].exp;},0)),mtdP=r2(mtdI-mtdE);
  var ytdI=r2(ytdD.reduce(function(s,d){return s+M[d].incReal;},0)),ytdE=r2(ytdD.reduce(function(s,d){return s+M[d].exp;},0)),ytdP=r2(ytdI-ytdE);
+ var _w5=addDays(TODAY,-151);var _d5=DK.filter(function(d){return d>=_w5&&d<=TODAY;});var _n5=_d5.length||1;var _staff5=0,_maint5=0;_d5.forEach(function(d){((MD[d]&&MD[d].e)||[]).forEach(function(l){var c=l[2]||'Other',a=+l[1]||0;if(c==='Staff & Payroll')_staff5+=a;else if(c==='Maintenance & Repairs')_maint5+=a;});});var _staffPD=_staff5/_n5,_maintPD=_maint5/_n5,_smPD=(_staff5+_maint5)/_n5;
  document.getElementById('kpis').innerHTML=[
+  ['Staff + Maintenance · avg/day',fmt(_smPD),'neg','last 5 mo ('+_n5+'d) · Staff '+fmt(_staffPD)+' + Maint '+fmt(_maintPD)],
   ['Month income to date · '+anchor,fmt(mtdI),'pos','daily income this month up to the '+ORD(new Date(anchor+'T00:00:00').getDate())],
   ['Month-end · '+_mn,fmt(_mb),_mb<0?'neg':'','carried fwd '+_me],
   ['Year income to date',fmt(ytdI),'pos',_yr+' running · to '+anchor],
