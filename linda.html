@@ -255,6 +255,20 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .logincard button{width:100%;margin-top:14px;padding:10px;background:var(--brand);color:#fff;border:none;border-radius:9px;font-weight:800;cursor:pointer}
 .err{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
 .hint{color:var(--muted);font-size:12.5px}
+
+/* recovery scheduler */
+.discwrap.rec>summary{background:#fff4ed;border-color:#f0b79a}
+.reccard{border:1px solid #e6e9ed;border-left:4px solid #f4a93c;border-radius:12px;padding:12px 14px;margin:10px 0;background:#fff}
+.reccard.over{border-left-color:#b3261e;background:#fff7f6}
+.reccard.active{border-left-color:#2d8cf0}
+.reccard.done{border-left-color:#0f8a4d;background:#f5fbf7;opacity:.85}
+.reccard.cancelled{opacity:.6}
+.recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:8px 0}
+.recgrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:#5c6a7a}
+.recgrid .dinput{width:100%}
+.recacts{flex-wrap:wrap;gap:6px}
+.rmeta{font-size:12.5px;color:#5c6a7a;margin:4px 0}
+.rmeta.warn{color:#8a5a00;background:#fff6e5;border:1px solid #f4d9a0;border-radius:8px;padding:6px 9px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
@@ -280,6 +294,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="lreport"></div>
 <div id="lmsgs"></div>
 <div id="ldisc"></div>
+  <div id="lrec"></div>
 <div id="lplans"></div>
 <div id="lfeeledger"></div>
 <div class="foldbar" style="margin-top:22px"><h2 style="margin:0;flex:1">📋 Notices by account</h2><button class="btn small" id="expandAll">⤢ Expand all</button><button class="btn small" id="collapseAll">⤡ Collapse all</button></div>
@@ -487,6 +502,7 @@ function render(){
   GPSROWS=[];
   renderMessages();
   renderDisconnections();
+  renderRecoveries();
   renderPlans();
   renderFeeLedger();
   renderReportShell();
@@ -509,6 +525,10 @@ function render(){
     +(tot?(sentN>=tot?'<span class="pill alldone">🎉 All today’s notices sent</span>':'<span class="pill warn">'+(tot-sentN)+' still to send</span>'):'<span class="pill alldone">🎉 Nothing to chase today</span>')
     +(pt.length?'<span class="pill done">💰 Paid today <b>'+pt.length+' · '+fmt(paidAmt)+'</b></span>':'')
     +(recPend?'<span class="pill red">⚠ '+recPend+' recovery to action</span>':'')
+      +(function(){var o=CUSTS.filter(function(c){return recOverdue(discRec(c));}).length,
+                       bk=CUSTS.filter(function(c){return recOpen(discRec(c));}).length;
+          return (o?'<span class="pill red">⏰ '+o+' recovery overdue</span>':'')
+               + (bk-o>0?'<span class="pill">🚨 '+(bk-o)+' recovery booked</span>':'');})()
     +(discPend?'<span class="pill red">⛔ '+discPend+' disconnection'+(discPend==1?'':'s')+' pending</span>':'')
     +'</div>';
   var accs=Array.from(new Set(CUSTS.map(c=>c.account_label).concat(DRAFTS.map(d=>d.account_label)).concat(ACCTMETA.map(a=>a.label)))).filter(Boolean).sort();
@@ -761,6 +781,102 @@ function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
   var opts=devs.map(function(d){return '<option value="'+esc(d.device_id)+'">'+esc(d.description)+'</option>';}).join('');
   return '<div class="gpsrow">Car: <select class="gpssel" data-gpspick="'+i+'"><option value="">- pick this car -</option>'+opts+'</select></div>';
 }
+// ---------- 🚨 Recovery scheduler ----------
+// Disconnection ends at "starter disabled". When the customer still doesn't pay
+// and stops answering, the car has to be physically collected — and until now
+// that was only ever typed into the free-text "Action taken" box, so nothing
+// showed when a recovery was booked, who was going, or whether it happened.
+var RECROWS=[];
+var RECREASONS=['Non-payment — no contact','Non-payment — broken promise','Refused to return',
+                'Out of service area','Contract violation','Unreported damage','Vehicle abandoned','Other'];
+function recOverdue(r){return r.recovery_scheduled_at&&(r.recovery_status==='scheduled'||r.recovery_status==='en_route')
+  &&new Date(r.recovery_scheduled_at).getTime()<Date.now();}
+function recOpen(r){return r.recovery_status==='scheduled'||r.recovery_status==='en_route';}
+// Anyone flagged for recovery, anyone with a recovery already on the books, and
+// anyone whose car has been disabled a while with no sign of payment.
+function recCandidate(c){
+  var r=discRec(c);
+  if(c.flag==='recovery'||c.state==='recovery')return true;
+  if(r.recovery_status)return true;
+  return !!(r.signal_sent&&!r.restored&&!graceActive(r)&&(+c.pastdue_count||0)>=3);
+}
+function renderRecoveries(){
+  var el=document.getElementById('lrec');if(!el)return;
+  RECROWS=CUSTS.filter(recCandidate).sort(function(a,b){
+    var ra=discRec(a),rb=discRec(b);
+    var oa=recOverdue(ra)?0:recOpen(ra)?1:ra.recovery_status==='recovered'?3:2;
+    var ob=recOverdue(rb)?0:recOpen(rb)?1:rb.recovery_status==='recovered'?3:2;
+    if(oa!==ob)return oa-ob;
+    if(ra.recovery_scheduled_at&&rb.recovery_scheduled_at)
+      return new Date(ra.recovery_scheduled_at)-new Date(rb.recovery_scheduled_at);
+    return (+b.outstanding||0)-(+a.outstanding||0);
+  });
+  if(!RECROWS.length){el.innerHTML='';return;}
+  var due=RECROWS.filter(function(c){return recOverdue(discRec(c));}).length;
+  var open=RECROWS.filter(function(c){return recOpen(discRec(c));}).length;
+  var got=RECROWS.filter(function(c){return discRec(c).recovery_status==='recovered';}).length;
+  var todo=RECROWS.filter(function(c){return !discRec(c).recovery_status;}).length;
+
+  var cards=RECROWS.map(function(c,i){
+    var r=discRec(c);
+    var st=r.recovery_status||'';
+    var over=recOverdue(r);
+    var badge=st==='recovered'?'<span class="dbadge on">✅ RECOVERED'+(r.recovered_at?' · '+shortET(r.recovered_at):'')+'</span>'
+      :st==='cancelled'?'<span class="dbadge">✖ CANCELLED</span>'
+      :st==='en_route'?'<span class="dbadge red">🚚 CREW EN ROUTE</span>'
+      :st==='scheduled'?(over?'<span class="dbadge red">⏰ OVERDUE — was due '+fullET(r.recovery_scheduled_at)+'</span>'
+                              :'<span class="dbadge warn">📅 SCHEDULED · '+fullET(r.recovery_scheduled_at)+'</span>')
+      :'<span class="dbadge warn">⚠ NOT SCHEDULED</span>';
+    // Prefill the form with what is already booked, otherwise tomorrow 9am ET.
+    var dv='',tv='09:00';
+    if(r.recovery_scheduled_at){
+      var d=new Date(r.recovery_scheduled_at);
+      dv=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+      tv=new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+    }else{
+      var t=new Date(Date.now()+86400000);
+      dv=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
+    }
+    var reasons=RECREASONS.map(function(x){return '<option'+(r.recovery_reason===x?' selected':'')+'>'+esc(x)+'</option>';}).join('');
+    var booked=r.recovery_created_at?'<div class="rmeta">📌 Booked '+shortET(r.recovery_created_at)+' ET'
+      +(r.recovery_assignee?' · assigned to <b>'+esc(r.recovery_assignee)+'</b>':'')
+      +(r.recovery_location?' · at <b>'+esc(r.recovery_location)+'</b>':'')
+      +(r.recovery_reason?' · '+esc(r.recovery_reason):'')+'</div>':'';
+    var discLine=r.signal_sent_at
+      ? '<div class="rmeta">🔴 Starter disabled '+fullET(r.signal_sent_at)+' · offline '+durText(r.signal_sent_at,new Date().toISOString())+'</div>'
+      : '<div class="rmeta warn">⚠ The car has not been disabled yet — do that first in the Disconnections module.</div>';
+
+    return '<div class="reccard'+(over?' over':st==='recovered'?' done':st==='cancelled'?' cancelled':st?' active':'')+'">'
+      +'<div class="dischd"><span class="discname">'+esc(c.name)+'</span> <span class="discacct">'+esc(c.account_label)+'</span>'
+      +'<span class="discamt">'+fmt(c.outstanding)+' · '+(c.pastdue_count||0)+' past-due</span> '+badge+'</div>'
+      +discLine+booked
+      +'<div class="dchecks">'
+        +'<div class="recgrid">'
+          +'<label>Date<input type="date" id="rcd'+i+'" class="dinput" value="'+esc(dv)+'"></label>'
+          +'<label>Time (ET)<input type="time" id="rct'+i+'" class="dinput" value="'+esc(tv)+'"></label>'
+          +'<label>Assigned to<input id="rca'+i+'" class="dinput" placeholder="who is collecting it" value="'+esc(r.recovery_assignee||'')+'"></label>'
+          +'<label>Where<input id="rcl'+i+'" class="dinput" placeholder="address or last known location" value="'+esc(r.recovery_location||'')+'"></label>'
+          +'<label>Reason<select id="rcr'+i+'" class="dinput">'+reasons+'</select></label>'
+        +'</div>'
+        +'<div class="dact"><span class="dlbl">Notes:</span><input id="rcn'+i+'" class="dinput" placeholder="gate code, second address, anything the crew needs" value="'+esc(r.recovery_notes||'')+'"></div>'
+        +'<div class="dact recacts">'
+          +'<button class="btn small pri" data-recsave="'+i+'">'+(st?'💾 Update recovery':'📅 Schedule recovery')+'</button>'
+          +(recOpen(r)?'<button class="btn small'+(st==='en_route'?' on':'')+'" data-recroute="'+i+'">🚚 Crew en route</button>':'')
+          +(recOpen(r)?'<button class="btn small ok" data-recdone="'+i+'">✅ Car recovered</button>':'')
+          +(st&&st!=='recovered'?'<button class="btn small" data-reccancel="'+i+'">✖ Cancel recovery</button>':'')
+          +(st?'<button class="btn small" data-reclear="'+i+'" title="Wipe the recovery and start again">↺ Clear</button>':'')
+        +'</div>'
+        +gpsRow(c)
+      +'</div></div>';
+  }).join('');
+
+  el.innerHTML='<details class="discwrap rec" data-sec="rec"'+(OPENSEC.rec?' open':'')+'>'
+    +'<summary>🚨 Recovery scheduler — <b>'+RECROWS.length+'</b> case'+(RECROWS.length==1?'':'s')
+    +' <span class="hint">· '+(due?'<b style="color:#b3261e">'+due+' overdue</b> · ':'')+open+' booked · '+todo+' not scheduled · '+got+' recovered</span></summary>'
+    +'<p class="hint" style="margin:6px 0 10px">When a disabled car is not going to be paid for, book its collection here — date, crew and location — so it is not left sitting in a note. Anyone disabled 3+ days with no payment shows up automatically.</p>'
+    +cards+'</details>';
+}
+
 function renderDisconnections(){
   var el=document.getElementById('ldisc');if(!el)return;
   // Include anyone whose car is still physically disabled (signal sent, not yet restored) EVEN IF they've now
@@ -809,7 +925,7 @@ function renderDisconnections(){
         +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
-        +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button></div>'
+        +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button><button class="btn small" data-discrecover="'+i+'" title="Book the physical collection of this car">🚨 Schedule recovery</button></div>'
         +gpsRow(c)
       +'</div></div>';
   }).join('');
@@ -1070,6 +1186,50 @@ function wire(){
   document.querySelectorAll('[data-discgrace]').forEach(b=>b.onclick=function(){var i=b.dataset.discgrace,t=document.getElementById('dgt'+i).value;if(!t){alert('Enter a grace time (ET) first.');return;}setDisc(DISCROWS[i],{grace_until:etTimeToISO(t),grace_note:document.getElementById('dgn'+i).value});});
   document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
   document.querySelectorAll('[data-discplan]').forEach(b=>b.onclick=()=>putOnPlan(b.dataset.discplan));
+  document.querySelectorAll('[data-discrecover]').forEach(b=>b.onclick=function(){
+    OPENSEC.rec=true; renderRecoveries();
+    var w=document.querySelector('.discwrap.rec'); if(w){w.open=true;w.scrollIntoView({behavior:'smooth',block:'start'});}
+  });
+  function recPatch(i,extra){
+    var d=document.getElementById('rcd'+i).value, t=document.getElementById('rct'+i).value;
+    if(!d||!t){alert('Pick a date and a time for the recovery.');return null;}
+    var p={recovery_scheduled_at:etTimeToISO(t,d),
+           recovery_assignee:document.getElementById('rca'+i).value.trim(),
+           recovery_location:document.getElementById('rcl'+i).value.trim(),
+           recovery_reason:document.getElementById('rcr'+i).value,
+           recovery_notes:document.getElementById('rcn'+i).value.trim()};
+    return Object.assign(p,extra||{});
+  }
+  document.querySelectorAll('[data-recsave]').forEach(b=>b.onclick=function(){
+    var i=b.dataset.recsave, r=discRec(RECROWS[i]);
+    var p=recPatch(i,{recovery_status:(r.recovery_status==='en_route'?'en_route':'scheduled')});
+    if(!p)return;
+    if(!r.recovery_created_at)p.recovery_created_at=new Date().toISOString();
+    setDisc(RECROWS[i],p);
+  });
+  document.querySelectorAll('[data-recroute]').forEach(b=>b.onclick=function(){
+    var p=recPatch(b.dataset.recroute,{recovery_status:'en_route'});
+    if(p)setDisc(RECROWS[b.dataset.recroute],p);
+  });
+  document.querySelectorAll('[data-recdone]').forEach(b=>b.onclick=function(){
+    var c=RECROWS[b.dataset.recdone];
+    if(!confirm('Mark '+c.name+"'s car as recovered?"))return;
+    setDisc(c,{recovery_status:'recovered',recovered_at:new Date().toISOString(),
+               recovery_notes:document.getElementById('rcn'+b.dataset.recdone).value.trim()});
+  });
+  document.querySelectorAll('[data-reccancel]').forEach(b=>b.onclick=function(){
+    var c=RECROWS[b.dataset.reccancel];
+    if(!confirm('Cancel the recovery for '+c.name+'?'))return;
+    setDisc(c,{recovery_status:'cancelled'});
+  });
+  document.querySelectorAll('[data-reclear]').forEach(b=>b.onclick=function(){
+    var c=RECROWS[b.dataset.reclear];
+    if(!confirm('Clear the recovery for '+c.name+' completely?'))return;
+    setDisc(c,{recovery_status:null,recovery_scheduled_at:null,recovery_created_at:null,
+               recovered_at:null,recovery_assignee:null,recovery_location:null,
+               recovery_reason:null,recovery_notes:null});
+  });
+
   document.querySelectorAll('[data-gpsload]').forEach(b=>b.onclick=()=>gpsLoad(b.dataset.gpsload));
   document.querySelectorAll('[data-gpspick]').forEach(b=>b.onchange=()=>gpsPick(b.dataset.gpspick,b));
   document.querySelectorAll('[data-gpsloadall]').forEach(b=>b.onclick=()=>gpsLoadAll(b));
