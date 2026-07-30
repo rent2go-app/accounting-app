@@ -72,6 +72,8 @@
     "@media(max-width:899px){#r2gnav{transform:translateX(-100%)}body.r2gnav-open #r2gnav{transform:translateX(0)}",
     "#r2gburger{position:fixed;top:10px;left:10px;z-index:9001;background:#0d2b1e;color:#fff;border:0;border-radius:9px;width:42px;height:42px;font-size:19px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.25)}",
     "#r2gback{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:8999;display:none}body.r2gnav-open #r2gback{display:block}}",
+    "body.r2gnav-hidden{padding-left:0!important}",
+    "body.r2gnav-hidden #r2gnav,body.r2gnav-hidden #r2gburger{display:none!important}",
   ].join("");
 
   function build() {
@@ -114,6 +116,7 @@
         document.getElementById("r2gout").onclick = function () { sb.auth.signOut().then(function () { location.href = "login.html"; }); };
         sb.auth.getSession().then(function (r) {
           var email = r && r.data && r.data.session && r.data.session.user ? (r.data.session.user.email || "") : "";
+          if(!email){document.body.classList.add("r2gnav-hidden");return;} document.body.classList.remove("r2gnav-hidden");
           var isAdmin = ADMINS.indexOf(email.toLowerCase()) >= 0;
           var who = document.getElementById("r2gwho"); if (who) who.textContent = email || "";
           if (!isAdmin) {

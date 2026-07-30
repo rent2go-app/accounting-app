@@ -607,7 +607,8 @@ function openDoc(oi,kind){
   var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(eln.join('\n'));
   var emailHTML='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+EMAIL_CSS+'</style></head><body><div class="ew">'
     +'<div class="dhdr"><img src="'+LOGO_URL+'" alt="Rent 2 Go" style="height:40px;width:auto;display:block;margin-bottom:6px"><div class="dsubb">'+title+' · '+docNo(kind,oi)+' · '+fmtYM(YM)+' · Issued '+esc(todayStr)+'</div></div>'
-    +fromP+billP+body+'</div></body></html>';
+    +fromP+billP+body+'</div><script defer src="assets/nav.js"></script>
+</body></html>';
   var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
     +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.png" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
     +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
