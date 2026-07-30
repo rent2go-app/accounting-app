@@ -1,0 +1,15 @@
+{
+  "name": "Rent 2 Go — Business",
+  "short_name": "Rent 2 Go",
+  "description": "Rent 2 Go accounting, billing, fleet & operations",
+  "start_url": "index.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0f8a4d",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -260,6 +260,14 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .rtnote{flex:1;min-width:180px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px}
 .rtlink{font-size:11.5px;color:var(--brand);word-break:break-all}
 </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rent 2 Go">
+<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
 </head><body>
 <div id="loginwrap" class="loginwrap" style="display:none"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">Renters &amp; ID Verification — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
 <div id="noadmin" class="loginwrap" style="display:none"><div class="logincard"><h1>Admins only</h1><p id="noadmin_who"></p><button class="btn" onclick="location.href='cars.html'">🚙 Fleet</button><button class="btn" onclick="location.href='index.html'">← Back to the ledger</button> <button class="btn" id="na_out">Sign out</button></div></div>
