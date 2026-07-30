@@ -268,6 +268,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="reauditbar"><button class="btn pri big" id="reaudit">🔄 RE-AUDIT — sweep all accounts for payments &amp; updates</button><button class="btn big" id="testNotice" title="Send a TEST notice email to yourself">🧪 Send test email</button><span class="hint" id="lastscan"></span></div>
 <div id="lbrief" class="briefbar"></div>
 <div class="cards" id="lsum"></div>
+<div id="lreport"></div>
 <div id="lmsgs"></div>
 <div id="ldisc"></div>
 <div id="lplans"></div>
@@ -351,6 +352,75 @@ async function refreshLedger(btn){
   try{await load();toast('Invoice ledger refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');}
   catch(e){alert('Refresh failed: '+(e.message||e));btn.disabled=false;btn.innerHTML=o;}
 }
+// ---------- Payment Trends report (is Linda working?) ----------
+function reportAccounts(){var s=new Set();CUSTS.forEach(function(c){if(c.account_label)s.add(c.account_label);});return Array.from(s).sort();}
+function renderReportShell(){
+  var el=document.getElementById('lreport');if(!el||document.getElementById('reports'))return; // build once
+  var opts='<option value="">All fleets</option>'+reportAccounts().map(function(a){return '<option value="'+esc(a)+'">'+esc(a)+'</option>';}).join('');
+  el.innerHTML='<style>'
+    +'.repctlbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}'
+    +'.repctlbar label{font-size:12px;font-weight:700;color:var(--muted,#567)}'
+    +'.repctlbar select,.repctlbar input{padding:5px 7px;border:1px solid #cbd5cf;border-radius:7px;font:inherit}'
+    +'.reptbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}'
+    +'.reptbl th,.reptbl td{padding:6px 8px;border-bottom:1px solid #eef2ef}'
+    +'.reptbl th{text-align:left;color:var(--muted,#567);font-size:11px;text-transform:uppercase;letter-spacing:.04em}'
+    +'.reptbl tbody tr:hover{background:#f6faf7}'
+    +'</style>'
+    +'<details class="discwrap" data-sec="reports" id="reports"'+(OPENSEC.reports?' open':'')+'>'
+    +'<summary>📊 Payment Trends — is Linda working?</summary>'
+    +'<div class="repctlbar">'
+      +'<label>Fleet <select id="repFleet">'+opts+'</select></label>'
+      +'<label>From <input type="date" id="repFrom" value="2026-06-01"></label>'
+      +'<label>By <select id="repGran"><option value="week">Week</option><option value="month">Month</option></select></label>'
+      +'<button class="btn pri" id="repBuild">📊 Build / refresh trend</button>'
+      +'<span class="hint" id="repStatus"></span>'
+    +'</div>'
+    +'<div id="repout"><p class="hint">Tap “Build / refresh trend” to pull the latest Stripe payment history across fleets (~20–30s). Shows the improvement score since Linda started, plus a week-by-week trend.</p></div>'
+    +'</details>';
+  document.getElementById('repBuild').onclick=buildReport;
+}
+async function repInvoke(body){var r=await sb.functions.invoke('linda-report',{body:body});if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);return r.data;}
+async function buildReport(){
+  var btn=document.getElementById('repBuild'),stt=document.getElementById('repStatus'),out=document.getElementById('repout');
+  var fleet=document.getElementById('repFleet').value,from=document.getElementById('repFrom').value,gran=document.getElementById('repGran').value;
+  btn.disabled=true;stt.textContent='Pulling Stripe history…';
+  try{
+    var series;
+    if(fleet){series=(await repInvoke({granularity:gran,from:from,account_label:fleet})).months;}
+    else{var accts=reportAccounts();var parts=await Promise.all(accts.map(function(a){return repInvoke({granularity:gran,from:from,account_label:a}).then(function(d){return d.months;}).catch(function(){return [];});}));series=mergeSeries(parts);}
+    renderReportOut(out,series,gran);
+    stt.textContent='Updated '+shortET(new Date().toISOString())+' ET';
+  }catch(e){out.innerHTML='<p class="hint" style="color:var(--out)">Could not build report: '+esc(e.message||e)+'</p>';stt.textContent='';}
+  btn.disabled=false;
+}
+function mergeSeries(parts){
+  var m={};
+  parts.forEach(function(months){(months||[]).forEach(function(x){var b=m[x.bucket]=m[x.bucket]||{bucket:x.bucket,invoices:0,paid:0,ontime:0,late:0,dlsum:0,collected:0,open_pastdue:0};b.invoices+=x.invoices;b.paid+=x.paid;b.ontime+=x.ontime;b.late+=x.late;b.dlsum+=x.avg_days_late*x.late;b.collected+=x.collected;b.open_pastdue+=x.open_pastdue;});});
+  return Object.keys(m).sort().map(function(k){var b=m[k];return {bucket:k,invoices:b.invoices,paid:b.paid,ontime:b.ontime,late:b.late,ontime_pct:b.paid?Math.round(b.ontime/b.paid*100):null,avg_days_late:b.late?Math.round(b.dlsum/b.late*10)/10:0,collected:Math.round(b.collected*100)/100,open_pastdue:b.open_pastdue};});
+}
+function scoreFrom(series){
+  var CUT='2026-07-27'; // Linda active: late-fee invoices 27th, first notices 29th
+  var bef={paid:0,ot:0,late:0,dl:0},aft={paid:0,ot:0,late:0,dl:0};
+  series.forEach(function(m){var t=(m.bucket<CUT)?bef:aft;t.paid+=m.paid;t.ot+=m.ontime;t.late+=m.late;t.dl+=m.avg_days_late*m.late;});
+  function st(t){return {onp:t.paid?t.ot/t.paid*100:0,latep:t.paid?t.late/t.paid*100:0,avgl:t.late?t.dl/t.late:0};}
+  var b=st(bef),a=st(aft);
+  var lateRed=b.latep>0?(b.latep-a.latep)/b.latep*100:0,dayRed=b.avgl>0?(b.avgl-a.avgl)/b.avgl*100:0;
+  return {b:b,a:a,lateRed:Math.round(lateRed),dayRed:Math.round(dayRed),score:Math.round((lateRed+dayRed)/2),afterPaid:aft.paid,befPaid:bef.paid};
+}
+function renderReportOut(out,series,gran){
+  if(!series.length){out.innerHTML='<p class="hint">No invoice history in this range.</p>';return;}
+  var s=scoreFrom(series);
+  var rows=series.map(function(m){var opc=m.ontime_pct==null?'—':m.ontime_pct+'%';return '<tr><td>'+esc(m.bucket)+'</td><td style="text-align:right">'+m.paid+'</td><td style="text-align:right"><b>'+opc+'</b></td><td style="text-align:right">'+m.avg_days_late+'d</td><td style="text-align:right">'+fmt(m.collected)+'</td><td style="text-align:right">'+m.open_pastdue+'</td></tr>';}).join('');
+  var conf=(s.afterPaid<150)?'<div class="hint" style="margin-top:8px">⚠ Early signal — the “after Linda” window is only <b>'+s.afterPaid+'</b> settled payments (baseline '+s.befPaid+'). Treat the score as provisional until 2–3 more weeks confirm it.</div>':'';
+  var scoreDetail=s.befPaid&&s.afterPaid?'late payments −'+s.lateRed+'% · lateness −'+s.dayRed+'%':'need before &amp; after data';
+  out.innerHTML='<div class="cards" style="margin:10px 0">'
+      +card('📈','Improvement score',(s.score>0?'+':'')+s.score+'%',scoreDetail,s.score>0?'pos':'')
+      +card('✅','On-time rate',Math.round(s.a.onp)+'%','was '+Math.round(s.b.onp)+'% before Linda','pos')
+      +card('⏱','Avg days late',(Math.round(s.a.avgl*10)/10)+'d','was '+(Math.round(s.b.avgl*10)/10)+'d','pos')
+      +card('🚦','Late-payment rate',Math.round(s.a.latep)+'%','was '+Math.round(s.b.latep)+'% before','pos')
+    +'</div>'+conf
+    +'<table class="reptbl"><thead><tr><th>'+(gran==='month'?'Month':'Week of')+'</th><th style="text-align:right">Paid</th><th style="text-align:right">On-time</th><th style="text-align:right">Avg late</th><th style="text-align:right">Collected</th><th style="text-align:right">Past-due open</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
 function render(){
   var rem=DRAFTS.filter(x=>x.kind==='reminder').length,disc=DRAFTS.filter(x=>x.kind==='disconnect').length,rec=DRAFTS.filter(x=>x.kind==='recovery').length;
   var out=CUSTS.reduce((s,c)=>s+(+c.outstanding||0),0);
@@ -381,6 +451,7 @@ function render(){
   renderDisconnections();
   renderPlans();
   renderFeeLedger();
+  renderReportShell();
   renderPaid();
   renderOutstanding();
   var openingLate=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;  // past-due owed at the morning snapshot
