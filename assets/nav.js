@@ -14,6 +14,7 @@
       { t: "Daily Sheet", h: "index.html", icon: "📒" },
       { t: "Ledger", h: "ledger.html", icon: "📗" },
       { t: "Budget & Projection", h: "budget.html", icon: "📈" },
+      { t: "Management Accounts", h: "index.html#reports", icon: "📊" },
     ]},
     { g: "Billing — Linda", icon: "🧾", items: [
       { t: "Collections", h: "linda.html", icon: "🤖" },

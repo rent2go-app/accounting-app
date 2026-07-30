@@ -166,6 +166,7 @@ function card(v){
      +(v.rate_source==='billing'?' <span class="flag ok">from billing</span>':'')+'</div>'
    +'<div class="flags">'+flags(v)+'</div></div>'
    +'<div class="cf"><button class="btn sm" data-edit="'+v.id+'" style="flex:1">Edit</button>'
+   +(v.status==='live'?'<button class="btn sm" data-godown="'+v.id+'" title="Take off the platform — down for repairs/maintenance" style="color:#c22a2a;border-color:#c22a2a">🔧 Down</button>':'<button class="btn sm" data-golive="'+v.id+'" title="Put live on the platform" style="color:#0a7d44;border-color:#0a7d44">✅ Live</button>')
    +'<button class="btn sm" data-photos="'+v.id+'">📷</button>'
    +'<button class="btn sm" data-docs="'+v.id+'">📄</button></div></div>';
 }
@@ -219,6 +220,14 @@ async function saveCar(id){
             :await sb.from('vehicles').insert(Object.assign({source:'admin',images:[],docs:{}},row));
   if(r.error){alert(r.error.message);return;}
   $('ovCar').classList.remove('open');toast('Saved');await load();render();
+}
+async function setCarStatus(id,st){
+  const v=CARS.find(x=>x.id===id);const nm=v?([v.year,v.make,v.model].filter(Boolean).join(' ')||v.name||'this car'):'this car';
+  const live=st==='live';
+  if(!confirm(live?('Put '+nm+' LIVE on the platform? It becomes bookable.'):('Take '+nm+' DOWN for repairs/maintenance?\n\nIt will be marked down and not bookable.')))return;
+  const r=await sb.from('vehicles').update({status:st,available:live,updated_at:new Date().toISOString()}).eq('id',id);
+  if(r.error){alert(r.error.message);return;}
+  toast(live?'Now LIVE ✓':'Down for maintenance 🔧');await load();render();
 }
 async function delCar(id,v){
   if(!confirm('Delete '+(v.name||'this car')+'? Bookings referencing it will keep their record but lose the link.'))return;
@@ -331,6 +340,8 @@ function wire(){
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openCar(b.dataset.edit));
   document.querySelectorAll('[data-photos]').forEach(b=>b.onclick=()=>openPhotos(b.dataset.photos));
   document.querySelectorAll('[data-docs]').forEach(b=>b.onclick=()=>openDocs(b.dataset.docs));
+  document.querySelectorAll('[data-golive]').forEach(b=>b.onclick=()=>setCarStatus(b.dataset.golive,'live'));
+  document.querySelectorAll('[data-godown]').forEach(b=>b.onclick=()=>setCarStatus(b.dataset.godown,'maintenance'));
 }
 document.getElementById('ovCar').onclick=e=>{if(e.target.id==='ovCar')e.target.classList.remove('open');};
 
