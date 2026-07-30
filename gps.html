@@ -3,6 +3,15 @@
 <meta charset="utf-8">
 <link rel="icon" type="image/png" href="assets/linda-sm.png">
 <title>GPS Tracker Control — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rent 2 Go">
+<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/style.css">
 <style>
@@ -272,14 +281,6 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .gpscard .gclinks span{margin:0 6px;color:var(--line-strong)}
 @media(max-width:820px){.gpslayout{flex-direction:column;height:auto}.gpsside{flex:none;max-height:260px}.gpsbigmap{min-height:320px}}
 </style>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f8a4d">
-<link rel="apple-touch-icon" href="assets/icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Rent 2 Go">
-<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
 </head><body>
 
 <div id="loginwrap" class="loginwrap" style="display:none"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">GPS Tracker Control — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>

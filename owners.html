@@ -1,6 +1,15 @@
 <meta charset="utf-8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23eafaf0%22/%3E%3Cpath%20d%3D%22M9%2041c0-1%201-2%202-3l3-1%204-8c1-2%202-3%205-3h18c3%200%204%201%205%203l4%208%203%201c1%201%202%202%202%203v5c0%201-1%202-2%202h-3a5%205%200%200%201-10%200H23a5%205%200%200%201-10%200h-2c-1%200-2-1-2-2z%22%20fill%3D%22%230f8a4d%22/%3E%3C/svg%3E">
 <title>Owners Programme — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rent 2 Go">
+<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--gold:#eab54e;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}
@@ -605,18 +614,9 @@ function openDoc(oi,kind){
   eln.push('');eln.push('Thank you,');eln.push(R2G_BIZ.name);
   var subj=(kind==='invoice'?'Invoice ':'Statement ')+docNo(kind,oi)+' — Rent 2 Go — '+fmtYM(YM);
   var mailHref='mailto:'+encodeURIComponent(o.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(eln.join('\n'));
-  var emailHTML='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+EMAIL_CSS+'</style><link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f8a4d">
-<link rel="apple-touch-icon" href="assets/icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Rent 2 Go">
-<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
-</head><body><div class="ew">'
+  var emailHTML='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+EMAIL_CSS+'</style></head><body><div class="ew">'
     +'<div class="dhdr"><img src="'+LOGO_URL+'" alt="Rent 2 Go" style="height:40px;width:auto;display:block;margin-bottom:6px"><div class="dsubb">'+title+' · '+docNo(kind,oi)+' · '+fmtYM(YM)+' · Issued '+esc(todayStr)+'</div></div>'
-    +fromP+billP+body+'</div><script defer src="assets/nav.js"></script>
-</body></html>';
+    +fromP+billP+body+'</div></body></html>';
   var html='<div class="modal"><div class="mcard docmc"><div class="printdoc">'
     +'<div class="dhdr"><div class="dbrand"><img src="assets/logo.png" alt="Rent 2 Go" class="dlogo"><div><div class="dtitle">'+title+'</div><div class="dmeta">'+docNo(kind,oi)+' · '+fmtYM(YM)+'</div></div></div><div class="ddate">Issued<b>'+esc(todayStr)+'</b></div></div>'
     +'<div class="dparties">'+fromP+billP+'</div>'+body+'</div>'
@@ -737,3 +737,4 @@ document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();loc
 document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
 gate();
 </script>
+<script defer src="assets/nav.js"></script>
