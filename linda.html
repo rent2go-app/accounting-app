@@ -721,7 +721,7 @@ async function sendTestNotice(btn){
 }
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
 // ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
-var DISCROWS=[];
+var DISCROWS=[];var DISCADD=[];
 function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'-04:00';}catch(e){return '-04:00';}}
 function tomorrowGraceISO(){var t=new Date(Date.now()+86400000);var ymd=t.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T17:00:00'+etOffsetStr()).toISOString();}
 async function graceFromMsg(id){var m=MSGS.find(function(x){return x.id===id;});if(!m)return;if(!m.customer_id){alert('This message is not matched to a customer (unknown number) — handle it manually.');return;}var until=tomorrowGraceISO();if(!confirm('Grant '+(m.customer_name||'this customer')+' grace until tomorrow 5:00 PM ET, from their message?'))return;var r=await sb.from('linda_disconnections').upsert({account_label:m.account_label,customer_id:m.customer_id,customer_name:m.customer_name,grace_until:until,grace_note:'Requested by text: "'+(m.body||'').slice(0,140)+'"',updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});if(r.error){alert(r.error.message);return;}await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace granted'}).eq('id',id);toast('Grace granted to tomorrow 5 PM ✓');await load();}
@@ -874,22 +874,31 @@ function renderRecoveries(){
     +'<summary>🚨 Recovery scheduler — <b>'+RECROWS.length+'</b> case'+(RECROWS.length==1?'':'s')
     +' <span class="hint">· '+(due?'<b style="color:#b3261e">'+due+' overdue</b> · ':'')+open+' booked · '+todo+' not scheduled · '+got+' recovered</span></summary>'
     +'<p class="hint" style="margin:6px 0 10px">When a disabled car is not going to be paid for, book its collection here — date, crew and location — so it is not left sitting in a note. Anyone disabled 3+ days with no payment shows up automatically.</p>'
-    +cards+'</details>';
+    +addCtl+cards+'</details>';
 }
 
+function discAddManual(){
+  var sel=document.getElementById('discAddSel');var v=sel?sel.value:'';
+  if(v===''||v==null){alert('Pick a customer first.');return;}
+  var c=DISCADD[+v];if(!c)return;
+  if(!confirm('Add '+(c.name||'this customer')+' ('+c.account_label+') to the disconnection list?\n\nThey will appear so you can disable the starter and track it \u2014 nothing is sent automatically.'))return;
+  setDisc(c,{manual:true});
+}
 function renderDisconnections(){
   var el=document.getElementById('ldisc');if(!el)return;
   // Include anyone whose car is still physically disabled (signal sent, not yet restored) EVEN IF they've now
   // paid and dropped out of 'disconnect' state — otherwise a paid customer's car stays cut off with nothing
   // prompting a reconnect. Float those "paid but still disabled" to the top; they're the most time-sensitive.
-  DISCROWS=CUSTS.filter(function(c){var r=discRec(c);return c.state==='disconnect'||(r.signal_sent&&!r.restored);}).sort(function(a,b){
+  DISCROWS=CUSTS.filter(function(c){var r=discRec(c);return c.state==='disconnect'||(r.signal_sent&&!r.restored)||r.manual;}).sort(function(a,b){
     var ra=discRec(a),rb=discRec(b);
     var an=(a.state!=='disconnect'&&ra.signal_sent&&!ra.restored)?0:1;
     var bn=(b.state!=='disconnect'&&rb.signal_sent&&!rb.restored)?0:1;
     if(an!==bn)return an-bn;
     return (+b.outstanding||0)-(+a.outstanding||0);
   });
-  if(!DISCROWS.length){el.innerHTML='';return;}
+  DISCADD=CUSTS.filter(function(c){return !DISCROWS.some(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;});}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var addCtl='<div class="dact" style="margin:8px 0;padding:9px 10px;background:var(--surface-2,#f2f5f9);border-radius:9px;flex-wrap:wrap"><span class="dlbl">\u2795 Manually add someone to disconnect:</span> <select id="discAddSel" class="dinput"><option value="">\u2014 pick a customer \u2014</option>'+DISCADD.map(function(c,i){return '<option value="'+i+'">'+esc(c.name||c.customer_id)+' \u00b7 '+esc(c.account_label)+(c.outstanding>0?' \u00b7 '+fmt(c.outstanding):'')+'</option>';}).join('')+'</select> <button class="btn small danger" data-discadd="1">Add to list</button></div>';
+  if(!DISCROWS.length){el.innerHTML='<details class="discwrap" data-sec="disc"'+(OPENSEC.disc?' open':'')+'><summary>\ud83d\udd34 Disconnections \u2014 <b>0</b> flagged</summary><p class="hint" style="margin:6px 0 8px">No auto-flagged disconnections right now \u2014 you can still add someone manually below to disable &amp; track them.</p>'+addCtl+'</details>';return;}
   var actd=DISCROWS.filter(function(c){var r=discRec(c);return r.signal_sent&&!r.restored;}).length;
   var restd=DISCROWS.filter(function(c){return discRec(c).restored;}).length;
   var pend=DISCROWS.length-DISCROWS.filter(function(c){return discRec(c).signal_sent;}).length;
@@ -904,6 +913,7 @@ function renderDisconnections(){
       :gA?'<span class="dbadge grace">⏸ GRACE — deferred until '+fullET(r.grace_until)+'</span>'
       :reconnectNeeded?'<span class="dbadge red">🔌 RECONNECT NEEDED'+(r.signal_sent_at?' · disabled '+shortET(r.signal_sent_at):'')+'</span>'
       :r.signal_sent?'<span class="dbadge red">🔴 STARTER DISABLED'+(r.signal_sent_at?' · '+shortET(r.signal_sent_at):'')+'</span>'
+      :r.manual?'<span class="dbadge warn">➕ MANUALLY ADDED — ready to disconnect</span>'
       :'<span class="dbadge warn">⚠ PENDING — signal not sent</span>';
     var dnf=DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});
     var nsent=dnf&&dnf.status==='sent';
@@ -925,7 +935,7 @@ function renderDisconnections(){
         +'<div class="dact"><span class="dlbl">Action taken:</span> <input id="dai'+i+'" class="dinput" placeholder="e.g. paid in full / promised by 3pm / payment plan / recovery scheduled" value="'+esc(r.action_taken||'')+'"> <button class="btn small" data-discact="'+i+'">Save</button>'+(r.action_at?' <span class="dts">'+shortET(r.action_at)+' ET</span>':'')+'</div>'
         +'<label class="dchk"><input type="checkbox" data-discrestore="'+i+'"'+(r.restored?' checked':'')+'> <b>🟢 Restored back to service</b>'+(r.restored_at?' <span class="dts">'+shortET(r.restored_at)+' ET</span>':'')+'</label>'
         +'<div class="dact"><span class="dlbl">Notes:</span> <input id="dni'+i+'" class="dinput" placeholder="any notes on this disconnection" value="'+esc(r.notes||'')+'"> <button class="btn small" data-discnote="'+i+'">Save note</button></div>'
-        +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button><button class="btn small" data-discrecover="'+i+'" title="Book the physical collection of this car">🚨 Schedule recovery</button></div>'
+        +'<div class="dact"><button class="btn small" data-discplan="'+i+'" title="Move this customer off disconnection and onto a payment plan">📋 Put on payment plan instead</button><button class="btn small" data-discrecover="'+i+'" title="Book the physical collection of this car">🚨 Schedule recovery</button>'+(r.manual?'<button class="btn small" data-discunmanual="'+i+'" title="Remove this manually-added customer from the list">✕ Remove from list</button>':'')+'</div>'
         +gpsRow(c)
       +'</div></div>';
   }).join('');
@@ -1186,6 +1196,8 @@ function wire(){
   document.querySelectorAll('[data-discgrace]').forEach(b=>b.onclick=function(){var i=b.dataset.discgrace,t=document.getElementById('dgt'+i).value;if(!t){alert('Enter a grace time (ET) first.');return;}setDisc(DISCROWS[i],{grace_until:etTimeToISO(t),grace_note:document.getElementById('dgn'+i).value});});
   document.querySelectorAll('[data-discgraceclear]').forEach(b=>b.onclick=()=>setDisc(DISCROWS[b.dataset.discgraceclear],{grace_until:null,grace_note:null}));
   document.querySelectorAll('[data-discplan]').forEach(b=>b.onclick=()=>putOnPlan(b.dataset.discplan));
+  document.querySelectorAll('[data-discadd]').forEach(b=>b.onclick=discAddManual);
+  document.querySelectorAll('[data-discunmanual]').forEach(b=>b.onclick=()=>{var c=DISCROWS[b.dataset.discunmanual];if(confirm('Remove '+(c.name||'this customer')+' from the disconnection list?'))setDisc(c,{manual:false});});
   document.querySelectorAll('[data-discrecover]').forEach(b=>b.onclick=function(){
     OPENSEC.rec=true; renderRecoveries();
     var w=document.querySelector('.discwrap.rec'); if(w){w.open=true;w.scrollIntoView({behavior:'smooth',block:'start'});}
