@@ -602,7 +602,7 @@ function draftCard(d){
     +'<div class="dact"><button class="btn small" data-toggle="'+d.id+'">Preview</button>'
     +'<button class="btn small pri" data-copy="'+d.id+'" title="Copy with live links — paste into WhatsApp/SMS/email">📋 Copy</button>'
     +'<button class="btn small" data-test="'+d.id+'" title="Email a TEST copy of this exact notice to yourself">🧪 Test</button>'
-    +(!isSent?(d.email?'<button class="btn small ok" data-send="'+d.id+'" title="Email this notice to the customer now (from billing@rentaride2go.com)">📧 Send email</button>':'<span class="hint" style="align-self:center">⚠ no email — use Copy for SMS/WhatsApp</span>')
+    +(!isSent?(d.email?'<button class="btn small ok" data-send="'+d.id+'" title="Email this notice to the customer now (from billing@rentaride2go.com)">📧 Send email</button>':'<span class="hint" style="align-self:center">⚠ no email — use Copy for SMS/WhatsApp</span>')+(((cust&&cust.phone)||d.phone)?'<button class="btn small ok" data-sms="'+d.id+'" title="Text this notice from your Rent 2 Go number">💬 Text</button>':'')
         +'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>'
         +'<button class="btn small'+(d.reviewed_at?' on':'')+'" data-review="'+d.id+'">'+(d.reviewed_at?'✓ Reviewed':'👁 Mark reviewed')+'</button>'
         +'<button class="btn small ok" data-sent="'+d.id+'" title="I have sent this to the customer (email / WhatsApp / SMS)">✅ Mark sent</button>'
@@ -1160,6 +1160,7 @@ function wire(){
   document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>upd(b.dataset.skip,{status:'skipped',skipped_at:new Date().toISOString()}));
   document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>upd(b.dataset.restore,{status:'draft',skipped_at:null}));
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send(b.dataset.send,b));
+  document.querySelectorAll('[data-sms]').forEach(b=>b.onclick=()=>sendSms(b.dataset.sms,b));
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editDraft(b.dataset.edit));
   document.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>sendTest(b.dataset.test,b));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyDraft(b.dataset.copy,b));
@@ -1285,6 +1286,21 @@ async function upd(id,patch){
   if(!r.data||!r.data.length){toast('⚠ Could not save — refreshing…');await load();return;}
   if(d)Object.assign(d,patch,r.data[0]);
   render();
+}
+async function sendSms(id,btn){
+  var d=DRAFTS.find(x=>x.id==id);if(!d)return;
+  var cust=CUSTS.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);
+  var phone=(cust&&cust.phone)||d.phone||'';
+  if(!phone){alert('No phone number on file for this customer — add one first.');return;}
+  if(!confirm('Text this notice to '+(d.customer_name||'customer')+' at '+phone+'?\n\nSent from your Rent 2 Go number (704) 727-4605.'))return;
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Texting…';
+  try{
+    var b=dynBody(d);
+    var r=await sb.functions.invoke('send-sms',{body:{to:phone,body:bodyToPlain(b)}});
+    if(r.error)throw r.error; if(r.data&&r.data.error)throw new Error(typeof r.data.error==='string'?r.data.error:JSON.stringify(r.data.error));
+    await upd(id,{status:'sent',sent_at:new Date().toISOString(),sent_via:'sms',body:b});
+    toast('Texted '+(d.customer_name||'')+' ✓');
+  }catch(e){alert('Text failed: '+(e.message||e));btn.disabled=false;btn.textContent=o;}
 }
 async function send(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d||!d.email){alert('No email on file for this customer — use 📋 Copy to send by WhatsApp/SMS instead.');return;}
