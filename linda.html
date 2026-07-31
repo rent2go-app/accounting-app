@@ -724,7 +724,52 @@ function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('l
 var DISCROWS=[];var DISCADD=[];var MAPCUSTS=[];
 function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'-04:00';}catch(e){return '-04:00';}}
 function tomorrowGraceISO(){var t=new Date(Date.now()+86400000);var ymd=t.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T17:00:00'+etOffsetStr()).toISOString();}
-async function graceFromMsg(id){var m=MSGS.find(function(x){return x.id===id;});if(!m)return;if(!m.customer_id){alert('This message is not matched to a customer (unknown number) — handle it manually.');return;}var until=tomorrowGraceISO();if(!confirm('Grant '+(m.customer_name||'this customer')+' grace until tomorrow 5:00 PM ET, from their message?'))return;var r=await sb.from('linda_disconnections').upsert({account_label:m.account_label,customer_id:m.customer_id,customer_name:m.customer_name,grace_until:until,grace_note:'Requested by text: "'+(m.body||'').slice(0,140)+'"',updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});if(r.error){alert(r.error.message);return;}await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace granted'}).eq('id',id);toast('Grace granted to tomorrow 5 PM ✓');await load();}
+function nowETDow(){try{return new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})).getDay();}catch(e){return new Date().getDay();}}
+function graceLabel(iso){return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',weekday:'short',hour:'numeric',minute:'2-digit'})+' ET';}
+// Read a deadline out of the customer's own words; fall back to next day 5 PM ET.
+function parseGraceTime(body){
+  var t=(body||'').toLowerCase();
+  var addDays=0,dayFound=false;
+  if(/\btomorrow\b/.test(t)){addDays=1;dayFound=true;}
+  else if(/\b(tonight|today|this (morning|afternoon|evening))\b/.test(t)){addDays=0;dayFound=true;}
+  else{var dn=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];for(var i=0;i<7;i++){if(new RegExp('\\b'+dn[i]+'\\b').test(t)){var delta=(i-nowETDow()+7)%7;if(delta===0)delta=7;addDays=delta;dayFound=true;break;}}}
+  var hh=null,mm=0,mt=t.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)/);
+  if(mt){hh=parseInt(mt[1],10);mm=mt[2]?parseInt(mt[2],10):0;var ap=mt[3].replace(/\./g,'');if(ap==='pm'&&hh<12)hh+=12;if(ap==='am'&&hh===12)hh=0;}
+  else if(/\bnoon\b/.test(t)){hh=12;}
+  else if(/\bmidnight\b/.test(t)){hh=23;mm=59;}
+  else if(/\b(cob|eod|end of (the )?day|close of business)\b/.test(t)){hh=17;}
+  else if(/\bmorning\b/.test(t)){hh=10;}
+  else if(/\bafternoon\b/.test(t)){hh=15;}
+  else if(/\b(evening|tonight)\b/.test(t)){hh=20;}
+  else{var bt=t.match(/\b(?:by|at|around|after|before)\s+(1[0-2]|0?[1-9])(?::([0-5]\d))?\b/);if(bt){hh=parseInt(bt[1],10);mm=bt[2]?parseInt(bt[2],10):0;if(hh<=7)hh+=12;}}
+  if(hh===null){if(dayFound){hh=17;}else{var f=tomorrowGraceISO();return {iso:f,label:graceLabel(f),guessed:true};}}
+  function build(ad){var d=new Date(Date.now()+ad*86400000);var ymd=d.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T'+('0'+hh).slice(-2)+':'+('0'+mm).slice(-2)+':00'+etOffsetStr()).toISOString();}
+  var iso=build(addDays);
+  if(!dayFound&&new Date(iso).getTime()<Date.now())iso=build(1); // time-only that already passed → tomorrow
+  return {iso:iso,label:graceLabel(iso),guessed:false};
+}
+async function graceFromMsg(id){
+  var m=MSGS.find(function(x){return x.id===id;});if(!m)return;
+  if(!m.customer_id){alert('Link this message to a customer first (Map to → 🔗 Link).');return;}
+  var g=parseGraceTime(m.body);
+  if(!confirm('Grant '+(m.customer_name||'this customer')+' grace until '+g.label+'?'+(g.guessed?'\n\n(No time found in their text — using the default; you can change it on the disconnection card.)':'\n\n(Picked up from their message.)')))return;
+  var r=await sb.from('linda_disconnections').upsert({account_label:m.account_label,customer_id:m.customer_id,customer_name:m.customer_name,grace_until:g.iso,grace_note:'By text: "'+(m.body||'').slice(0,140)+'"',updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});
+  if(r.error){alert(r.error.message);return;}
+  await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace until '+g.label}).eq('id',id);
+  var cust=CUSTS.find(function(x){return x.account_label===m.account_label&&x.customer_id===m.customer_id;});
+  var first=((m.customer_name||'').split(' ')[0]||'');
+  var draft='Rent 2 Go: Thanks '+first+' — we’ve noted your message and extended your payment deadline to '+g.label+'. Please settle by then to keep your vehicle active. Reply STOP to opt out.';
+  var text=prompt('✅ Grace set until '+g.label+'.\n\nEdit the confirmation to send to '+(m.customer_name||'the customer')+', or Cancel to skip sending:',draft);
+  if(text){
+    var phone=(cust&&cust.phone)||m.from_number||'',email=cust&&cust.email;
+    try{
+      if(phone){var rs=await sb.functions.invoke('send-sms',{body:{to:phone,body:text}});if(rs.error)throw rs.error;if(rs.data&&rs.data.error)throw new Error(rs.data.error);toast('Confirmation texted ✓');}
+      else if(email){var re=await sb.functions.invoke('send-doc',{body:{to:email,subject:'Rent 2 Go — payment deadline extended',html:esc(text),text:text}});if(re.error)throw re.error;toast('Confirmation emailed ✓');}
+      else{try{await navigator.clipboard.writeText(text);}catch(_){}toast('No phone/email on file — copied so you can send it manually');}
+    }catch(e){try{await navigator.clipboard.writeText(text);}catch(_){}alert('Could not send ('+(e.message||e)+') — copied to clipboard so you can send it manually'+(phone?' (SMS needs A2P approval).':'.'));}
+  }
+  await load();
+}
 async function markMsgHandled(id){await sb.from('messages').update({handled:true,handled_at:new Date().toISOString()}).eq('id',id);await load();}
 async function delMsg(id){if(!confirm('Remove this message?'))return;await sb.from('messages').delete().eq('id',id);await load();}
 function renderMessages(){
@@ -741,7 +786,8 @@ function renderMessages(){
     if(m.customer_id){ who='<b>'+esc(m.customer_name||m.from_name||'')+'</b> <span class="status plan">✓ matched</span>'; }
     else{ who='<b>'+esc(m.from_name||m.from_number||'Unknown')+'</b> <span class="hint">unmatched · '+esc(m.from_number||'?')+'</span>';
       link='<div class="dact" style="margin:4px 0"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+m.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+m.id+'">🔗 Link</button></div>'; }
-    var acts='<button class="btn small pri" data-msggrace="'+m.id+'"'+(m.customer_id?'':' disabled title="link a customer first"')+'>⏸ Grace to tomorrow</button> <button class="btn small ok" data-msgdone="'+m.id+'">✓ Handled</button> <button class="btn small" data-msgdel="'+m.id+'">✕</button>';
+    var gl=m.customer_id?parseGraceTime(m.body):null;
+    var acts='<button class="btn small pri" data-msggrace="'+m.id+'"'+(m.customer_id?'':' disabled title="link a customer first"')+'>⏸ Grace'+(gl?' \u2192 '+gl.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-msgdone="'+m.id+'">✓ Handled</button> <button class="btn small" data-msgdel="'+m.id+'">✕</button>';
     return '<div class="msgrow"><div class="msgtop">'+who+' '+grace+'<span class="msgtime">'+shortET(m.received_at)+' ET · '+esc(m.source||'')+'</span></div><div class="msgbody">'+esc(m.body||'')+'</div>'+link+'<div class="dact">'+acts+'</div></div>';
   }
   var list=open.slice(0,60).map(row).join('')||'<p class="hint" style="padding:8px">No open messages — all handled ✓</p>';
