@@ -721,7 +721,7 @@ async function sendTestNotice(btn){
 }
 function undismissFee(invId){var f=DISM.find(x=>x.invoice_id===invId);sb.from('linda_fees').update({status:'proposed',dismissed_at:null}).eq('invoice_id',invId).then(function(r){if(r.error){alert(r.error.message);return;}DISM=DISM.filter(x=>x.invoice_id!==invId);if(f){f.status='proposed';f.dismissed_at=null;FEES.push(f);}render();});}
 // ── DISCONNECTION MODULE ─────────────────────────────────────────────────────────────
-var DISCROWS=[];var DISCADD=[];
+var DISCROWS=[];var DISCADD=[];var MAPCUSTS=[];
 function etOffsetStr(){try{var s=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date()).find(function(p){return p.type==='timeZoneName';}).value;return s.replace('GMT','')||'-04:00';}catch(e){return '-04:00';}}
 function tomorrowGraceISO(){var t=new Date(Date.now()+86400000);var ymd=t.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T17:00:00'+etOffsetStr()).toISOString();}
 async function graceFromMsg(id){var m=MSGS.find(function(x){return x.id===id;});if(!m)return;if(!m.customer_id){alert('This message is not matched to a customer (unknown number) — handle it manually.');return;}var until=tomorrowGraceISO();if(!confirm('Grant '+(m.customer_name||'this customer')+' grace until tomorrow 5:00 PM ET, from their message?'))return;var r=await sb.from('linda_disconnections').upsert({account_label:m.account_label,customer_id:m.customer_id,customer_name:m.customer_name,grace_until:until,grace_note:'Requested by text: "'+(m.body||'').slice(0,140)+'"',updated_at:new Date().toISOString()},{onConflict:'account_label,customer_id'});if(r.error){alert(r.error.message);return;}await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace granted'}).eq('id',id);toast('Grace granted to tomorrow 5 PM ✓');await load();}
@@ -729,16 +729,37 @@ async function markMsgHandled(id){await sb.from('messages').update({handled:true
 async function delMsg(id){if(!confirm('Remove this message?'))return;await sb.from('messages').delete().eq('id',id);await load();}
 function renderMessages(){
   var el=document.getElementById('lmsgs');if(!el)return;
-  if(!MSGS.length){el.innerHTML='<details class="discwrap" data-sec="msgs"'+(OPENSEC.msgs?' open':'')+'><summary>💬 Incoming messages — <b>0</b> open</summary><p class="hint" style="margin:6px 0 10px">Texts from Google Voice / Quo / your Rent 2 Go number (704) 727-4605 land here, matched to a customer by phone. Nothing yet — a customer text appears within ~5 minutes of arriving.</p></details>';return;}
-  var open=MSGS.filter(function(m){return !m.handled;});var graceN=open.filter(function(m){return m.is_grace_request;}).length;
-  var rows=MSGS.slice(0,80).map(function(m){
-    var who=esc(m.customer_name||m.from_name||m.from_number||'Unknown');
-    var matched=m.customer_id?'<span class="status plan">✓ '+esc(m.customer_name||'')+'</span>':'<span class="hint">unmatched · '+esc(m.from_number||'?')+'</span>';
-    var grace=m.is_grace_request?'<span class="dbadge grace">⏸ grace request</span>':'';
-    var acts=(!m.handled?('<button class="btn small pri" data-msggrace="'+m.id+'"'+(m.customer_id?'':' disabled title="unmatched number"')+'>⏸ Grace to tomorrow</button> <button class="btn small ok" data-msgdone="'+m.id+'">✓ Handled</button>'):'<span class="hint">✓ handled</span>')+' <button class="btn small" data-msgdel="'+m.id+'">✕</button>';
-    return '<div class="msgrow'+(m.handled?' mdone':'')+'"><div class="msgtop"><b>'+who+'</b> '+matched+' '+grace+'<span class="msgtime">'+shortET(m.received_at)+' ET · '+esc(m.source||'')+'</span></div><div class="msgbody">'+esc(m.body||'')+'</div><div class="dact">'+acts+'</div></div>';
-  }).join('');
-  el.innerHTML='<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+open.length+'</b> open'+(graceN?' · <span style="color:var(--out)">'+graceN+' grace request'+(graceN==1?'':'s')+'</span>':'')+'</summary><p class="hint" style="margin:6px 0 10px">Texts ported from Google Voice / Quo, matched to a customer by phone. For a grace request, tap ⏸ to extend the disconnection into tomorrow.</p>'+rows+'</details>';
+  var open=MSGS.filter(function(m){return !m.handled;});
+  var graceN=open.filter(function(m){return m.is_grace_request;}).length;
+  var handledN=MSGS.length-open.length;
+  if(!MSGS.length){el.innerHTML='<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>0</b> open</summary><p class="hint" style="margin:6px 0 10px">Texts from Google Voice / Quo / your Rent 2 Go number (704) 727-4605 land here, matched to a customer by phone.</p></details>';return;}
+  MAPCUSTS=CUSTS.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var opts=MAPCUSTS.map(function(c,i){return '<option value="'+i+'">'+esc(c.name||c.customer_id)+' · '+esc(c.account_label)+'</option>';}).join('');
+  function row(m){
+    var grace=m.is_grace_request?'<span class="dbadge grace">⏸ grace</span>':'';
+    var who,link='';
+    if(m.customer_id){ who='<b>'+esc(m.customer_name||m.from_name||'')+'</b> <span class="status plan">✓ matched</span>'; }
+    else{ who='<b>'+esc(m.from_name||m.from_number||'Unknown')+'</b> <span class="hint">unmatched · '+esc(m.from_number||'?')+'</span>';
+      link='<div class="dact" style="margin:4px 0"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+m.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+m.id+'">🔗 Link</button></div>'; }
+    var acts='<button class="btn small pri" data-msggrace="'+m.id+'"'+(m.customer_id?'':' disabled title="link a customer first"')+'>⏸ Grace to tomorrow</button> <button class="btn small ok" data-msgdone="'+m.id+'">✓ Handled</button> <button class="btn small" data-msgdel="'+m.id+'">✕</button>';
+    return '<div class="msgrow"><div class="msgtop">'+who+' '+grace+'<span class="msgtime">'+shortET(m.received_at)+' ET · '+esc(m.source||'')+'</span></div><div class="msgbody">'+esc(m.body||'')+'</div>'+link+'<div class="dact">'+acts+'</div></div>';
+  }
+  var list=open.slice(0,60).map(row).join('')||'<p class="hint" style="padding:8px">No open messages — all handled ✓</p>';
+  el.innerHTML='<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+open.length+'</b> open'+(graceN?' · <span style="color:var(--out)">'+graceN+' grace</span>':'')+(handledN?' <span class="hint">· '+handledN+' handled</span>':'')+'</summary>'
+    +'<p class="hint" style="margin:6px 0 8px">Open customer texts. Unmatched? Pick a customer and tap 🔗 Link — it maps this text and remembers their number for next time.</p>'
+    +'<div style="max-height:440px;overflow-y:auto;border:1px solid var(--line,#d5dbe2);border-radius:10px;padding:6px">'+list+'</div></details>';
+}
+async function mapMsg(id){
+  var sel=document.querySelector('[data-mapsel="'+id+'"]');var v=sel?sel.value:'';
+  if(v===''||v==null){alert('Pick a customer first.');return;}
+  var c=MAPCUSTS[+v];if(!c)return;
+  var m=MSGS.find(function(x){return x.id===id;});
+  var patch={customer_id:c.customer_id,account_label:c.account_label,customer_name:c.name};
+  if(m&&m.from_number){
+    await sb.from('messages').update(patch).eq('from_number',m.from_number).is('customer_id',null);
+    var cp=(c.phone||'').replace(/[^0-9]/g,''); if(!cp){ await sb.from('linda_customers').update({phone:m.from_number}).eq('account_label',c.account_label).eq('customer_id',c.customer_id); }
+  } else { await sb.from('messages').update(patch).eq('id',id); }
+  toast('Linked to '+(c.name||'customer')+' ✓');await load();
 }
 function discRec(c){return DISCONN.find(function(d){return d.account_label===c.account_label&&d.customer_id===c.customer_id;})||{};}
 function discDraftFor(i){var c=DISCROWS[i];return DRAFTS.find(function(x){return x.account_label===c.account_label&&x.customer_id===c.customer_id;});}
@@ -1189,6 +1210,7 @@ function wire(){
   document.querySelectorAll('[data-msggrace]').forEach(b=>b.onclick=()=>graceFromMsg(b.dataset.msggrace));
   document.querySelectorAll('[data-msgdone]').forEach(b=>b.onclick=()=>markMsgHandled(b.dataset.msgdone));
   document.querySelectorAll('[data-msgdel]').forEach(b=>b.onclick=()=>delMsg(b.dataset.msgdel));
+  document.querySelectorAll('[data-msgmap]').forEach(b=>b.onclick=()=>mapMsg(b.dataset.msgmap));
   document.querySelectorAll('[data-sec]').forEach(function(dd){dd.ontoggle=function(){OPENSEC[dd.dataset.sec]=dd.open;};});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});

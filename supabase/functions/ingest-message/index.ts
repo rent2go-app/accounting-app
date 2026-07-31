@@ -23,11 +23,16 @@ Deno.serve(async (req) => {
     if (!text && !from) return json({ error: "empty message" }, 400);
     const fromD = digits(from).slice(-10);
 
-    // match sender to a customer by phone (last 10 digits)
+    // match sender to a customer — by phone (last 10 digits), then fall back to the contact name
+    const rows = await sbGet(`linda_customers?select=customer_id,account_label,name,phone`) as any[];
+    const norm = (x: string) => String(x || "").toLowerCase().replace(/\s+/g, " ").trim();
     let cust: any = null;
-    if (fromD.length >= 7) {
-      const rows = await sbGet(`linda_customers?select=customer_id,account_label,name,phone`);
-      cust = (rows as any[]).find((c) => digits(c.phone).slice(-10) === fromD) || null;
+    if (fromD.length >= 7) cust = rows.find((c) => digits(c.phone).slice(-10) === fromD) || null;
+    const nm = norm(body.name || body.from_name || "");
+    if (!cust && nm) cust = rows.find((c) => norm(c.name) === nm) || null;
+    // back-fill the customer's phone from this text so future texts match by number
+    if (cust && from && digits(cust.phone).length < 10) {
+      await fetch(`${SB}/rest/v1/linda_customers?customer_id=eq.${encodeURIComponent(cust.customer_id)}&account_label=eq.${encodeURIComponent(cust.account_label)}`, { method: "PATCH", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json" }, body: JSON.stringify({ phone: from }) });
     }
 
     const row = {
