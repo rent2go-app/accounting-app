@@ -784,12 +784,27 @@ async function threadDone(key){
   if(r.error){alert(r.error.message);return;}
   toast('Conversation cleared ✓');await load();
 }
+async function replyThread(mid){
+  var m=MSGS.find(function(x){return x.id===mid;});if(!m)return;
+  var inp=document.querySelector('[data-replyinput="'+mid+'"]');
+  var text=inp?inp.value.trim():'';
+  if(!text){alert('Type a reply first.');return;}
+  var to=m.from_number||'';
+  if(!to){alert('No phone number on file to reply to.');return;}
+  if(!confirm('Send this text to '+(m.customer_name||m.from_name||to)+' at '+to+'?'))return;
+  try{
+    var r=await sb.functions.invoke('send-sms',{body:{to:to,body:text}});
+    if(r.error)throw r.error; if(r.data&&r.data.error)throw new Error(r.data.error);
+    await sb.from('messages').insert([{source:'twilio',direction:'out',from_number:to,body:text,received_at:new Date().toISOString(),customer_id:m.customer_id,account_label:m.account_label,customer_name:m.customer_name,is_grace_request:false,handled:true}]);
+    toast('Text sent ✓');await load();
+  }catch(e){var msg=String(e.message||e);var a2p=(msg.indexOf('30034')>=0||msg.toLowerCase().indexOf('unregistered')>=0);alert('Could not send: '+msg+(a2p?'\n\nSMS goes live once your A2P campaign is approved — the reply box is ready and will work automatically then.':''));}
+}
 function renderMessages(){
   var el=document.getElementById('lmsgs');if(!el)return;
   var open=MSGS.filter(function(m){return !m.handled;});
   var graceN=open.filter(function(m){return m.is_grace_request;}).length;
-  var handledN=MSGS.length-open.length;
-  var css='<style>.msgthread{border:1px solid var(--line,#e2e6ec);border-radius:10px;margin:6px 0;background:var(--surface,#fff)}.msgthread>summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.msgthread>summary::-webkit-details-marker{display:none}.msgthread>summary:hover{background:var(--surface-2,#f5f7fa)}.msgcount{background:var(--brand,#0f8a4d);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px}.msgsnip{flex-basis:100%;color:var(--muted,#667);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.msgbubble{background:var(--surface-2,#f2f5f9);border-radius:9px;padding:7px 10px;margin:6px 12px}.msgbubble .msgtime{font-size:11px;color:var(--muted,#667)}</style>';
+  var handledN=MSGS.filter(function(m){return m.handled;}).length;
+  var css='<style>.msgthread{border:1px solid var(--line,#e2e6ec);border-radius:10px;margin:6px 0;background:var(--surface,#fff)}.msgthread>summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.msgthread>summary::-webkit-details-marker{display:none}.msgthread>summary:hover{background:var(--surface-2,#f5f7fa)}.msgcount{background:var(--brand,#0f8a4d);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px}.msgsnip{flex-basis:100%;color:var(--muted,#667);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.msgbubble{background:var(--surface-2,#f2f5f9);border-radius:9px;padding:7px 10px;margin:6px 12px 6px 12px;max-width:80%}.msgbubble.out{background:color-mix(in srgb,var(--brand,#0f8a4d) 16%,var(--surface,#fff));margin-left:auto;margin-right:12px}.msgbubble .msgtime{font-size:11px;color:var(--muted,#667)}.replybar{display:flex;gap:6px;margin:8px 12px 12px;flex-wrap:wrap}.replybar input{flex:1;min-width:180px}</style>';
   if(!MSGS.length){el.innerHTML=css+'<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>0</b> open</summary><p class="hint" style="margin:6px 0 10px">Texts from Google Voice / Quo / your Rent 2 Go number (704) 727-4605 land here, grouped by customer.</p></details>';return;}
   MAPCUSTS=CUSTS.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   var opts=MAPCUSTS.map(function(c,i){return '<option value="'+i+'">'+esc(c.name||c.customer_id)+' · '+esc(c.account_label)+'</option>';}).join('');
@@ -798,16 +813,17 @@ function renderMessages(){
   var arr=Object.keys(threads).map(function(k){var t=threads[k];t.msgs.sort(function(a,b){return new Date(a.received_at)-new Date(b.received_at);});t.last=t.msgs[t.msgs.length-1];t.name=t.last.customer_name||t.last.from_name||t.last.from_number||'Unknown';t.grace=t.msgs.some(function(m){return m.is_grace_request;});return t;});
   arr.sort(function(a,b){return new Date(b.last.received_at)-new Date(a.last.received_at);});
   var rows=arr.map(function(t){
-    var bubbles=t.msgs.map(function(m){return '<div class="msgbubble"><span class="msgtime">'+shortET(m.received_at)+' ET</span>'+(m.is_grace_request?' <span class="dbadge grace">⏸ grace</span>':'')+'<div>'+esc(m.body||'')+'</div></div>';}).join('');
+    var bubbles=t.msgs.map(function(m){var out=m.direction==='out';return '<div class="msgbubble'+(out?' out':'')+'"><span class="msgtime">'+shortET(m.received_at)+' ET'+(out?' · you':'')+'</span>'+(m.is_grace_request?' <span class="dbadge grace">⏸ grace</span>':'')+'<div>'+esc(m.body||'')+'</div></div>';}).join('');
     var link=t.matched?'':'<div class="dact" style="margin:6px 12px"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+t.last.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+t.last.id+'">🔗 Link</button></div>';
     var gmsg=t.msgs.filter(function(m){return m.is_grace_request;}).pop()||t.last;
     var gl=t.matched?parseGraceTime(gmsg.body):null;
-    var acts='<div class="dact" style="margin:6px 12px 10px"><button class="btn small pri" data-msggrace="'+gmsg.id+'"'+(t.matched?'':' disabled title="link a customer first"')+'>⏸ Grace'+(gl?' → '+gl.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-threaddone="'+esc(t.key)+'">✓ Handled ('+t.msgs.length+')</button></div>';
+    var reply=t.phone?('<div class="replybar"><input class="dinput" data-replyinput="'+t.last.id+'" placeholder="Reply to '+esc(t.name)+'…"><button class="btn small pri" data-reply="'+t.last.id+'" title="Sends from your Rent 2 Go number (704). Live once A2P is approved.">Send text</button></div>'):'';
+    var acts='<div class="dact" style="margin:6px 12px 4px"><button class="btn small pri" data-msggrace="'+gmsg.id+'"'+(t.matched?'':' disabled title="link a customer first"')+'>⏸ Grace'+(gl?' → '+gl.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-threaddone="'+esc(t.key)+'">✓ Handled ('+t.msgs.length+')</button></div>';
     var badge=t.matched?'<span class="status plan">✓ matched</span>':'<span class="hint">unmatched · '+esc(t.phone||'?')+'</span>';
-    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(t.grace?' <span class="dbadge grace">⏸ grace</span>':'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+bubbles+link+acts+'</details>';
+    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(t.grace?' <span class="dbadge grace">⏸ grace</span>':'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+bubbles+link+acts+reply+'</details>';
   }).join('');
   el.innerHTML=css+'<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+arr.length+'</b> conversation'+(arr.length==1?'':'s')+(graceN?' · <span style="color:var(--out)">'+graceN+' grace</span>':'')+(handledN?' <span class="hint">· '+handledN+' handled</span>':'')+'</summary>'
-    +'<p class="hint" style="margin:6px 0 8px">Grouped by customer — tap a name to see the full conversation. Grace requests auto-open. ✓ Handled clears the whole thread.</p>'
+    +'<p class="hint" style="margin:6px 0 8px">Grouped by customer — tap a name for the full conversation. Type in the reply box to text them back (from your 704 number).</p>'
     +'<div style="max-height:460px;overflow-y:auto">'+rows+'</div></details>';
 }
 async function mapMsg(id){
@@ -1273,6 +1289,7 @@ function wire(){
   document.querySelectorAll('[data-msgdel]').forEach(b=>b.onclick=()=>delMsg(b.dataset.msgdel));
   document.querySelectorAll('[data-msgmap]').forEach(b=>b.onclick=()=>mapMsg(b.dataset.msgmap));
   document.querySelectorAll('[data-threaddone]').forEach(b=>b.onclick=()=>threadDone(b.dataset.threaddone));
+  document.querySelectorAll('[data-reply]').forEach(b=>b.onclick=()=>replyThread(b.dataset.reply));
   document.querySelectorAll('[data-sec]').forEach(function(dd){dd.ontoggle=function(){OPENSEC[dd.dataset.sec]=dd.open;};});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
