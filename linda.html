@@ -729,7 +729,7 @@ async function markMsgHandled(id){await sb.from('messages').update({handled:true
 async function delMsg(id){if(!confirm('Remove this message?'))return;await sb.from('messages').delete().eq('id',id);await load();}
 function renderMessages(){
   var el=document.getElementById('lmsgs');if(!el)return;
-  if(!MSGS.length){el.innerHTML='';return;}
+  if(!MSGS.length){el.innerHTML='<details class="discwrap" data-sec="msgs"'+(OPENSEC.msgs?' open':'')+'><summary>💬 Incoming messages — <b>0</b> open</summary><p class="hint" style="margin:6px 0 10px">Texts from Google Voice / Quo / your Rent 2 Go number (704) 727-4605 land here, matched to a customer by phone. Nothing yet — a customer text appears within ~5 minutes of arriving.</p></details>';return;}
   var open=MSGS.filter(function(m){return !m.handled;});var graceN=open.filter(function(m){return m.is_grace_request;}).length;
   var rows=MSGS.slice(0,80).map(function(m){
     var who=esc(m.customer_name||m.from_name||m.from_number||'Unknown');
