@@ -109,7 +109,7 @@ ${desc}
 When you get to the Car - Please Complete the PICKUP by documenting the condition of the car Inside & outside as well as recording Gas and Mileage by using this pick up Form - Click This Link To Begin
 
 🚦Use This Link TO BEGIN Your Rental
-${SITE}#pickup
+${SITE}#pickupForm
 
 🎗MAKE SURE TO READ ALL THE RULES to make sure you know what you need to do`;
 }
