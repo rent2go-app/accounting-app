@@ -490,9 +490,11 @@ function render(){
   var topAcct=Object.keys(byAcctOut).sort((a,b)=>byAcctOut[b]-byAcctOut[a])[0];
   var feeCusts=new Set(FEES.map(f=>f.customer_id)).size;
   var payAccts=new Set(pt.map(p=>p.account_label)).size;
+  var msgOpen=MSGS.filter(function(m){return !m.handled;}).length;
+  var msgGrace=MSGS.filter(function(m){return !m.handled&&m.is_grace_request;}).length;
   document.getElementById('lsum').innerHTML=
     card(CIC.car,'Active rentals',CUSTS.length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
-    card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+
+    card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+'<div class="card" style="cursor:pointer" onclick="gotoMsgs()" title="Open the incoming messages inbox"><div class="ctop"><span style="font-size:32px;line-height:1">💬</span><div class="v '+(msgGrace?'red':'')+'">'+msgOpen+'</div></div><div class="l">Messages</div><div class="cd">'+(msgGrace?('<b>'+msgGrace+'</b> grace request'+(msgGrace==1?'':'s')):(msgOpen?'incoming texts':'inbox clear 🎉'))+'</div></div>'+
     card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase 🎉','')+
     card(CIC.power,'Disconnections',disc,disc?nm3(CUSTS.filter(c=>c.flag==='disconnect').map(c=>c.name)):'none','red')+
     card(CIC.warn,'Recovery',rec,rec?nm3(CUSTS.filter(c=>c.flag==='recovery').map(c=>c.name)):'none','red')+
@@ -772,6 +774,7 @@ async function graceFromMsg(id){
 }
 async function markMsgHandled(id){await sb.from('messages').update({handled:true,handled_at:new Date().toISOString()}).eq('id',id);await load();}
 async function delMsg(id){if(!confirm('Remove this message?'))return;await sb.from('messages').delete().eq('id',id);await load();}
+function gotoMsgs(){var e=document.getElementById('lmsgs');if(!e)return;var d=e.querySelector('details');if(d)d.open=true;e.scrollIntoView({behavior:'smooth'});}
 function renderMessages(){
   var el=document.getElementById('lmsgs');if(!el)return;
   var open=MSGS.filter(function(m){return !m.handled;});
