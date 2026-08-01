@@ -251,6 +251,20 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .loginerr{color:var(--out);font-size:12.5px;margin-top:10px;min-height:16px}
 .savestate{font-size:11.5px;font-weight:700;color:var(--muted)}.savestate.saving{color:#d97706}.savestate.saved{color:var(--in)}.savestate.error{color:var(--out)}
 .brandlogo{height:30px;display:block}.loginlogo{text-align:center;margin-bottom:8px}.loginlogo img{height:58px;max-width:100%}
+.ledgersearch{display:flex;gap:10px;align-items:center;margin:10px 0;flex-wrap:wrap}
+.ledgersearch input[type=search]{flex:1;min-width:240px;padding:9px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:var(--surface)}
+.srinfo{font-size:12.5px;font-weight:700;color:var(--muted)}
+#searchResults{margin:6px 0 16px;overflow-x:auto}
+.srhead{font-weight:800;font-size:15px;margin:2px 0 8px}
+.srtab{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.srtab td{padding:8px 11px;border-bottom:1px solid var(--line)}
+.srtab tr.hd td{background:var(--surface-2,#f2f5f9);font-weight:700;color:var(--muted);position:sticky;top:0}
+.srtab tbody tr,.srtab tr[data-jump]{cursor:pointer}
+.srtab tr[data-jump]:hover td{background:color-mix(in srgb,var(--brand) 8%,var(--surface))}
+.srtab td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.txntype{font-weight:700;font-size:12px;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.txntype.income{color:var(--in,#0a7d33);background:color-mix(in srgb,var(--in,#0a7d33) 14%,transparent)}
+.txntype.expense{color:var(--out,#b3261e);background:color-mix(in srgb,var(--out,#b3261e) 14%,transparent)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
@@ -276,7 +290,7 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 <div id="catlist" class="userlist"></div>
 </div>
 <div class="setdiv"></div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" id="setDone" style="background:var(--brand);color:#fff;border-color:var(--brand)">Save &amp; close</button><span class="setmsg" id="set_saved" style="margin:0">Changes save automatically as you type.</span></div></div>
-<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2035-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button><button class="qchip" id="addMonth" style="border-color:var(--brand);color:var(--brand);font-weight:800">+ Add month</button></div></div><div id="dashfloat" class="dashfloat"><div class="dashbar"><span class="dashttl">📊 <span id="dashRT">—</span></span><button class="dashmin" id="dashMin" title="Minimise / expand">▾</button></div><div class="dashbody"><div id="cashwarn" class="cashwarn" hidden></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div></div></div><div class="stack" id="stack"></div>
+<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2035-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button><button class="qchip" id="addMonth" style="border-color:var(--brand);color:var(--brand);font-weight:800">+ Add month</button></div></div><div class="ledgersearch"><input type="search" id="txnSearch" placeholder="🔍 Search all transactions — name · category · date · amount (space-separate terms)"><span class="srinfo" id="txnSearchInfo"></span><button class="btn" id="txnSearchClear" hidden>✕ Clear</button></div><div id="searchResults" hidden></div><div id="dashfloat" class="dashfloat"><div class="dashbar"><span class="dashttl">📊 <span id="dashRT">—</span></span><button class="dashmin" id="dashMin" title="Minimise / expand">▾</button></div><div class="dashbody"><div id="cashwarn" class="cashwarn" hidden></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div></div></div><div class="stack" id="stack"></div>
 <div class="botnav" id="botnav"><button class="btn" id="bprev">‹ Previous</button><span class="muted" id="botnavlbl"></span><button class="btn" id="bnext">Next ›</button></div>
 <datalist id="expnames"></datalist>
 <div id="movepop" class="movepop" hidden><div class="mpcard"><div class="mptitle" id="mvtitle">Move line to…</div><label class="mplbl">Target date</label><input type="date" id="mvdate"><div class="mprow"><button class="btn" id="mvCancel">Cancel</button><button class="btn" id="mvGo" style="background:var(--brand);color:#fff;border-color:var(--brand)">Move line</button></div></div></div>
@@ -488,6 +502,44 @@ function wire(){
  document.querySelectorAll('.droptarget').forEach(function(t){t.ondragover=function(e){e.preventDefault();t.classList.add('dropover');};t.ondragleave=function(){t.classList.remove('dropover');};t.ondrop=function(e){e.preventDefault();t.classList.remove('dropover');var s=(e.dataTransfer.getData('text/plain')||'').split('|');var d=s[0],i=+s[1];if(!MD[d]||!MD[d].e||!MD[d].e[i])return;var seg=t.getAttribute('data-seg');if(seg){var cc=MD[d].e[i][2]||'Other';CATSEG[cc]=seg;scheduleFlush();render();}else{var cat=t.getAttribute('data-cat');if(!cat)return;snapshot();MD[d].e[i][2]=cat;save();recompute();render();}};});}
 document.getElementById('anchor').value=anchor;
 document.querySelectorAll('#scopeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#scopeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');scope=b.dataset.s;customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});render();const t=document.getElementById('todayblk');if(t)t.scrollIntoView({block:'center'})});
+function runSearch(){
+  var box=document.getElementById('txnSearch');var q=(box.value||'').trim().toLowerCase();
+  var res=document.getElementById('searchResults'),stack=document.getElementById('stack');
+  var clr=document.getElementById('txnSearchClear'),info=document.getElementById('txnSearchInfo');
+  if(!q){res.hidden=true;res.innerHTML='';stack.style.display='';clr.hidden=true;info.textContent='';return;}
+  clr.hidden=false;
+  var terms=q.split(/\s+/).filter(Boolean);
+  var matches=[];
+  DK.forEach(function(d){
+    var o=MD[d];if(!o)return;
+    var hd=new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    var scan=function(arr,type){(arr||[]).forEach(function(l){
+      var desc=String(l[0]||''),cat=String(l[2]||''),amt=+l[1]||0;
+      var hay=(d+' '+hd+' '+desc+' '+cat+' '+amt.toFixed(2)).toLowerCase();
+      if(terms.every(function(t){return hay.indexOf(t)>=0;}))matches.push({d:d,hd:hd,type:type,desc:desc,cat:cat,amt:amt});
+    });};
+    scan(o.j,'income');scan(o.e,'expense');
+  });
+  matches.sort(function(a,b){return a.d<b.d?1:(a.d>b.d?-1:0);});
+  var inTot=0,exTot=0;matches.forEach(function(m){if(m.type==='income')inTot+=m.amt;else exTot+=m.amt;});
+  info.textContent=matches.length+' match'+(matches.length===1?'':'es')+' · income '+fmt(r2(inTot))+' · expense '+fmt(r2(exTot));
+  var cap=matches.slice(0,500);
+  var rows=cap.map(function(m){
+    return '<tr data-jump="'+m.d+'"><td>'+m.hd+'</td><td><span class="txntype '+m.type+'">'+(m.type==='income'?'▲ income':'▼ expense')+'</span></td><td>'+esc(m.desc||'—')+'</td><td>'+esc(m.cat||'—')+'</td><td class="n">'+fmt(m.amt)+'</td></tr>';
+  }).join('');
+  res.innerHTML='<div class="srhead">🔍 '+matches.length+' result'+(matches.length===1?'':'s')+' for “'+esc(q)+'”'+(matches.length>500?' — showing first 500':'')+'</div>'
+    +'<table class="srtab"><tr class="hd"><td>Date</td><td>Type</td><td>Description</td><td>Category</td><td class="n">Amount</td></tr>'+(rows||'<tr><td colspan="5" class="muted" style="padding:18px">No transactions match.</td></tr>')+'</table>';
+  res.hidden=false;stack.style.display='none';
+  res.querySelectorAll('[data-jump]').forEach(function(tr){tr.onclick=function(){
+    var d=tr.dataset.jump;customRange=null;scope='day';anchor=d;
+    var ai=document.getElementById('anchor');if(ai)ai.value=d;
+    document.querySelectorAll('#scopeSeg button').forEach(function(x){x.classList.toggle('on',x.dataset.s==='day');});
+    document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on');});
+    box.value='';runSearch();render();window.scrollTo({top:0,behavior:'smooth'});
+  };});
+}
+document.getElementById('txnSearch').oninput=runSearch;
+document.getElementById('txnSearchClear').onclick=function(){document.getElementById('txnSearch').value='';runSearch();document.getElementById('txnSearch').focus();};
 document.getElementById('anchor').onchange=e=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});anchor=e.target.value;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=e.target.value?d:a,DK[0]);render()};
 const step=n=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});const i=DK.indexOf(anchor);let ni=Math.max(0,Math.min(DK.length-1,i+n*(scope==='day'?1:scope==='week'?7:scope==='month'?30:91)));anchor=DK[ni];document.getElementById('anchor').value=anchor;render()};
 document.getElementById('prev').onclick=()=>step(-1);document.getElementById('next').onclick=()=>step(1);
