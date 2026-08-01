@@ -1174,7 +1174,15 @@ function dynBody(d){
     else b=insertAfterGreeting(b,'📅 As requested, your payment deadline has been extended to '+fullET(dr.grace_until)+'. Please settle by then to keep your vehicle active.');
   } else {
     var req=MSGS.find(function(m){return !m.handled&&m.is_grace_request&&m.account_label===d.account_label&&m.customer_id===d.customer_id;});
-    if(req)b=insertAfterGreeting(b,'📩 We received your message about needing more time. Our rentals are now managed by an automated system, so please reply with an exact date and time and we will apply the extension to your account. If you need more time beyond that, you can reach out for management approval.');
+    if(req){
+      // Don't ask for a date/time if they've already acted: paid since asking (kept the promise), or
+      // they're no longer behind (nothing to grant an extension on). Avoids a stale grace ask that
+      // contradicts a "thank you for your payment" on the same notice.
+      var c=CUSTS.find(function(x){return x.account_label===d.account_label&&x.customer_id===d.customer_id;});
+      var paidSince=PAY.some(function(p){return p.account_label===d.account_label&&p.customer_id===d.customer_id&&new Date(p.paid_at)>new Date(req.received_at);});
+      var behind=c&&(c.state==='disconnect'||(+c.pastdue_count||0)>0);
+      if(!paidSince&&behind)b=insertAfterGreeting(b,'📩 We received your message about needing more time. Our rentals are now managed by an automated system, so please reply with an exact date and time and we will apply the extension to your account. If you need more time beyond that, you can reach out for management approval.');
+    }
   }
   return b;
 }
