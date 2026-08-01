@@ -912,7 +912,7 @@ function gpsRow(c){ var i=GPSROWS.length; GPSROWS.push(c);
 // showed when a recovery was booked, who was going, or whether it happened.
 var RECROWS=[];
 var RECREASONS=['Non-payment — no contact','Non-payment — broken promise','Refused to return',
-                'Out of service area','Contract violation','Unreported damage','Vehicle abandoned','Other'];
+                'Vehicle theft / stolen','Out of service area','Contract violation','Unreported damage','Vehicle abandoned','Other'];
 function recOverdue(r){return r.recovery_scheduled_at&&(r.recovery_status==='scheduled'||r.recovery_status==='en_route')
   &&new Date(r.recovery_scheduled_at).getTime()<Date.now();}
 function recOpen(r){return r.recovery_status==='scheduled'||r.recovery_status==='en_route';}
@@ -922,6 +922,7 @@ function recCandidate(c){
   var r=discRec(c);
   if(c.flag==='recovery'||c.state==='recovery')return true;
   if(r.recovery_status)return true;
+  if(c.state==='ended'&&r.signal_sent)return true;   // contract over + car was disabled → surface here to close the recovery loop
   return !!(r.signal_sent&&!r.restored&&!graceActive(r)&&(+c.pastdue_count||0)>=3);
 }
 function renderRecoveries(){
