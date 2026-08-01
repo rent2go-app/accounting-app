@@ -76,6 +76,9 @@ async function scanAccount(acc: any) {
 
   const subs = await stripeAll(`https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.customer`, SKEY);
   const active = subs.filter((s: any) => ["active", "past_due", "unpaid", "trialing"].includes(s.status));
+  const subCustId = (s: any) => (typeof s.customer === "string" ? s.customer : (s.customer && s.customer.id)) || null;
+  const activeCustIds = new Set(active.map(subCustId).filter(Boolean));
+  const canceledCustIds = new Set(subs.filter((s: any) => s.status === "canceled").map(subCustId).filter(Boolean));
   const custs: any[] = [], drafts: any[] = [], fees: any[] = [], payments: any[] = [];
 
   // WHO to scan = ONLY active-subscription customers. This keeps the workflow current — we do NOT
@@ -128,19 +131,21 @@ async function scanAccount(acc: any) {
         fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: veh.slice(0, 90), for_date: fdate, memo });
       }
     }
-    // DISCONNECTION trigger (admin rule, 2026-07-28):
+    // DISCONNECTION trigger (admin rule, updated 2026-08-01):
     //  (a) 3+ OPEN rentals with 2+ already past due — i.e. 2 past-due rentals + a current/new open rental; OR
-    //  (b) $70+ in open late fees AND 2+ past-due rentals.
-    // (Requiring 2+ past due avoids disconnecting a brand-new renter whose open rentals are all still current.)
+    //  (b) $70+ in open late fees AND 1+ past-due rental (the fee pile alone is the trigger past the $70 mark;
+    //      a single past-due rental confirms they've actually fallen behind, not a brand-new renter).
     const open_rentals = inv.filter((i: any) => !isLateFee(i));   // all unpaid rentals: past-due + current
 
     // ── PLAN ADHERENCE (computed for every plan customer) ──────────────────────────────
-    // What did they actually pay yesterday? (rentals + late fees). Judge on-track vs behind, and keep a
-    // consecutive-days-behind streak. On track never disconnects; 3 days behind in a row auto-returns
-    // them to the disconnection list (on_plan cleared). A single behind day is a MANUAL recommendation.
+    // Attribute each payment to the correct PLAN-DAY before judging adherence. A payment made in the first
+    // 4 HOURS AFTER MIDNIGHT belongs to the PREVIOUS day — people routinely pay a few hours after midnight
+    // for the day that just ended. So shift every payment back 4h, then bucket it by ET date. This never
+    // loses a payment; it just credits it to the day it was meant for (so the day it lands on is right too).
+    const PLAN_DAY_CUTOFF_HRS = 4;
     const yday = etYMD(now - 86400);
     let planPaidR = 0, planPaidLF = 0;
-    for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (pat && etYMD(pat) === yday) { if (isLateFee(iv)) planPaidLF++; else planPaidR++; } }
+    for (const iv of allinv) { const pat = iv.status === "paid" ? (iv.status_transitions?.paid_at || 0) : 0; if (!pat) continue; if (etYMD(pat - PLAN_DAY_CUTOFF_HRS * 3600) === yday) { if (isLateFee(iv)) planPaidLF++; else planPaidR++; } }
     let onPlan = !!planmap[cid];
     let planBehind = false;
     const prevPlan = planExisting[cid] || { plan_behind_days: 0, plan_last_behind_day: null };
@@ -151,13 +156,24 @@ async function scanAccount(acc: any) {
       planBehind = isDaily ? !(planPaidR >= 2 && planPaidLF >= 2) : (rental_pd.length >= 2);
       if (planBehind) { if (lastBehindDay !== todaystr) { behindDays = behindDays + 1; lastBehindDay = todaystr; } }
       else { behindDays = 0; lastBehindDay = null; }
-      if (behindDays >= 3) onPlan = false;   // 3 strikes → back on the disconnection list
+      // A plan you set is STICKY — on_plan persists day-to-day and is NEVER auto-cleared, even here.
     } else { behindDays = 0; lastBehindDay = null; }
 
-    // Plan customers on track/behind are NOT auto-disconnected (disconnection stays a manual call) —
-    // UNLESS the 3-day streak above cleared onPlan, in which case normal disc logic applies.
-    const disc = !onPlan && ((open_rentals.length >= 3 && rental_pd.length >= 2) || (unpaid_latefees >= 70 && rental_pd.length >= 2));
+    // DISCONNECTION triggers.
+    //  • A plan customer who misses their agreed payment escalates to the disconnection list IMMEDIATELY
+    //    (any missed day) — but the plan is KEPT (on_plan stays true), so if they resume it's still there.
+    //  • Non-plan customers, two ways:
+    //     (a) 2 past-due rentals + a current/new open rental (3 open); OR
+    //     (b) the late-fee rule — $70+ in open late fees AS THE 3RD OPEN INVOICE, i.e. alongside BOTH a
+    //         past-due rental AND a current rental (past-due rental + current rental + $70+ fees = 3 open).
+    //    $70+ in fees with NO past-due rental (only a current one) is NOT a disconnection — it's a reminder
+    //    that disconnection is imminent (handled in the notice section below).
     const current_open = inv.filter((i: any) => !isPastDue(i));
+    const current_rentals_ct = current_open.filter((i: any) => !isLateFee(i)).length;
+    const feeTrigger = unpaid_latefees >= 70 && rental_pd.length >= 1 && current_rentals_ct >= 1;
+    const rentalTrigger = open_rentals.length >= 3 && rental_pd.length >= 2;
+    const planEscalate = onPlan && planBehind;
+    const disc = planEscalate || (!onPlan && (rentalTrigger || feeTrigger));
     const current_amt = current_open.reduce((a: number, i: any) => a + i.amount_remaining, 0) / 100;
     const grandtot = Math.round((pd_total + current_amt) * 100) / 100;
     const pdRent = pdinv.filter((x: any) => !isLateFee(x)).sort((a: any, b: any) => (a.created || 0) - (b.created || 0));
@@ -172,24 +188,30 @@ async function scanAccount(acc: any) {
     parts.push("💰 Total balance: " + m(grandtot));
     const pd_lines = parts.join("\n\n");
     let subj = "", intro = "", closing = "", kind = "reminder", state = "reminder", flag = "none", dnote: string | null = null;
-    if (onPlan) {
+    if (onPlan && !planBehind) {
       const terms = planmap[cid];
       const isDaily = /per day/i.test(terms);
-      const paidLine = `Yesterday you paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}${isDaily ? " (your plan asks for 2 of each per day)" : ""}.`;
-      const STRIKES = "Continued failure to stay on plan 3 days in a row will place you back on the disconnection list. Please resume the plan as promised.";
-      if (!planBehind) {
-        subj = "Thank you — your Rent 2 Go payment plan is on track";
-        intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
-        closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
-      } else {
-        subj = "⚠ Your Rent 2 Go payment plan — you've fallen behind";
-        intro = `Good morning ${nm},\n\nYour payment plan is: ${terms}. ${paidLine} That is short of your agreed plan, so you have fallen behind${behindDays > 1 ? ` — this is day ${behindDays} in a row` : ""}. It's important that you catch up today to stay on your plan and in good standing.`;
-        closing = "Please tap Pay now on the invoices above to bring your plan back on track today. If you don't get back on track, your account may be recommended for disconnection. " + STRIKES + " If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
-      }
-      kind = "reminder"; state = planBehind ? "plan_behind" : "plan"; flag = "none"; dnote = null;
+      const paidLine = `Recently you've paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}${isDaily ? " (your plan asks for 2 of each per day)" : ""}.`;
+      subj = "Thank you — your Rent 2 Go payment plan is on track";
+      intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
+      closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
+      kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
     } else if (disc) {
+      // Explain WHY the account is scheduled for disconnection, tailored to the trigger.
+      let why: string;
+      if (planEscalate) {
+        const madeSome = planPaidR > 0 || planPaidLF > 0;
+        const shortfall = madeSome
+          ? `You've recently paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}, but your plan asks for 2 of each per day, leaving you short`
+          : `You did not make your agreed payment-plan payment${behindDays > 1 ? ` — this is day ${behindDays} in a row` : ""}`;
+        why = `${shortfall}, so your account has been escalated and your Rent 2 Go rental is scheduled for DISCONNECTION today. Your plan remains in place (${planmap[cid]}) — bring it current to stay on the road.`;
+      } else if (feeTrigger && !rentalTrigger) {
+        why = `Your unpaid late fees have now built up to ${m(unpaid_latefees)} — past the $70 limit — which, together with your past-due rental, has scheduled your Rent 2 Go rental for DISCONNECTION today.`;
+      } else {
+        why = `Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoice${rental_pd.length === 1 ? "" : "s"}${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}) and is scheduled for DISCONNECTION today.`;
+      }
       subj = "⛔ FINAL NOTICE — your Rent 2 Go rental is scheduled for disconnection today (" + m(pd_total) + " past due)";
-      intro = `${nm},\n\nThis is a FINAL NOTICE. Your Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} past-due rental invoices) and is scheduled for DISCONNECTION today. To keep your vehicle, your account must be brought fully current right away.`;
+      intro = `${nm},\n\nThis is a FINAL NOTICE. ${why} To keep your vehicle, your account must be brought fully current right away.`;
       closing = "Tap Pay now on every invoice above to settle immediately. If you intend to keep the vehicle, reach out right away to arrange payments or discuss a plan of action — otherwise recovery will proceed.";
       kind = "disconnect"; state = "disconnect"; flag = "disconnect"; dnote = nowISO;
     } else if (rental_pd.length > 0 && pd_total > 250) {
@@ -205,9 +227,11 @@ async function scanAccount(acc: any) {
       intro = `Good morning ${nm} 👋\n\nJust a quick reminder that ${m(pd_total)} is now past due on your rental. Settling it today keeps everything active and in good standing.`;
       closing = "Whenever you're ready, simply tap Pay now on any invoice above. If you have any questions, we're always happy to help.";
     } else if (unpaid_latefees >= 70) {
-      subj = "A quick note about your Rent 2 Go account — " + m(unpaid_latefees) + " in late fees";
-      intro = `Good morning ${nm} 👋\n\nWe wanted to gently flag that your late fees have now added up to ${m(unpaid_latefees)}. Clearing these when you're able will keep your account comfortably in good standing and help avoid any interruption down the line.`;
-      closing = "Whenever it's convenient, simply tap Pay now above. Please don't hesitate to reach out if there's anything we can do to help.";
+      // $70+ in fees but no past-due rental (only current) — NOT a disconnection yet, but warn it's imminent:
+      // the moment a rental falls past due alongside these fees, the account is scheduled for disconnection.
+      subj = "⚠ Important — your Rent 2 Go late fees have reached " + m(unpaid_latefees);
+      intro = `Good morning ${nm},\n\nYour unpaid late fees have now built up to ${m(unpaid_latefees)} — past the $70 mark. Right now your rentals are current, so your account is still active. But please be aware: the moment a rental falls past due while these fees remain unpaid, your Rent 2 Go rental will be scheduled for disconnection. Clearing these fees now protects your account.`;
+      closing = "Please tap Pay now above to clear your late fees and avoid an imminent service interruption. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
     } else {
       subj = "A gentle reminder about your Rent 2 Go account — " + m(pd_total) + " in late fees";
       intro = `Good morning ${nm} 👋\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Just a gentle reminder that there's ${m(pd_total)} in late fees on your account whenever you have a moment to take care of it.`;
@@ -221,6 +245,19 @@ async function scanAccount(acc: any) {
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
     custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: onPlan, plan_terms: onPlan ? (planExisting[cid] && planExisting[cid].plan_terms) : null, plan_paid_rentals: planPaidR, plan_paid_latefees: planPaidLF, plan_behind_days: behindDays, plan_last_behind_day: lastBehindDay, updated_at: nowISO });
   }));
+
+  // CONTRACT OVER (admin rule 2026-08-01). A previously-billed customer (already tracked on this account)
+  // whose subscription has been CANCELLED and who has NO remaining active subscription — their rental
+  // contract is over. Take them off the active workflow: mark 'ended', clear the disconnect flag, drop
+  // pending notices. We keep the row + any outstanding balance for reference; we just stop chasing.
+  // Without this they'd fall out of the scan and freeze on whatever list they were last on (e.g. Rodney
+  // stuck on the disconnection list). Named cases: Rodney, Michael.
+  const endedIds = Object.keys(planExisting).filter((cid) => canceledCustIds.has(cid) && !activeCustIds.has(cid) && !targets.has(cid));
+  if (endedIds.length) {
+    const endedRows = endedIds.map((cid) => ({ account_label: LABEL, customer_id: cid, sub_status: "canceled", state: "ended", flag: "none", on_plan: false, plan_terms: null, plan_behind_days: 0, plan_last_behind_day: null, disconnect_notice_at: null, updated_at: nowISO }));
+    await sbPost(`linda_customers?on_conflict=account_label,customer_id`, endedRows, "resolution=merge-duplicates,return=minimal");
+    await sbDel(`linda_drafts?${aL}&customer_id=in.(${endedIds.map(enc).join(",")})&status=neq.sent`);   // drop pending notices, keep sent history
+  }
 
   if (custs.length) await sbPost(`linda_customers?on_conflict=account_label,customer_id`, custs, "resolution=merge-duplicates,return=minimal");
   if (fees.length) await sbPost(`linda_fees?on_conflict=invoice_id`, fees, "resolution=ignore-duplicates,return=minimal");

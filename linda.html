@@ -304,6 +304,8 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="loutstanding"></div>
 <h2 style="margin-top:22px">✅ Paid register — collected today</h2>
 <div id="lpaid"></div>
+<h2 style="margin-top:22px">📁 Contract ended — cancelled subscriptions</h2>
+<div id="lended"></div>
 <h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
 <div id="llearn"></div>
 </main></div>
@@ -494,7 +496,7 @@ function render(){
   var msgGrace=MSGS.filter(function(m){return !m.handled&&m.is_grace_request;}).length;
   var _yst=etDate(new Date(Date.now()-86400000).toISOString());var py=PAY.filter(function(p){return etDate(p.paid_at)===_yst;});var pyAmt=py.reduce(function(s2,p){return s2+(+p.amount||0);},0);var pyAccts=new Set(py.map(function(p){return p.account_label;})).size;
   document.getElementById('lsum').innerHTML=
-    card(CIC.car,'Active rentals',CUSTS.length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
+    card(CIC.car,'Active rentals',CUSTS.filter(c=>c.state!=='ended').length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
     card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+card(CIC.cash,'Paid yesterday',fmt(pyAmt),py.length?(py.length+' payment'+(py.length==1?'':'s')+' · '+pyAccts+' account'+(pyAccts==1?'':'s')):'none','pos')+'<div class="card" style="cursor:pointer" onclick="gotoMsgs()" title="Open the incoming messages inbox"><div class="ctop"><span style="font-size:32px;line-height:1">💬</span><div class="v '+(msgGrace?'red':'')+'">'+msgOpen+'</div></div><div class="l">Messages</div><div class="cd">'+(msgGrace?('<b>'+msgGrace+'</b> grace request'+(msgGrace==1?'':'s')):(msgOpen?'incoming texts':'inbox clear 🎉'))+'</div></div>'+
     card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase 🎉','')+
     card(CIC.power,'Disconnections',disc,disc?nm3(CUSTS.filter(c=>c.flag==='disconnect').map(c=>c.name)):'none','red')+
@@ -511,6 +513,7 @@ function render(){
   renderReportShell();
   renderPaid();
   renderOutstanding();
+  renderEnded();
   var openingLate=DAYSNAP?(+DAYSNAP.opening_outstanding||0):out;  // past-due owed at the morning snapshot
   var stillLate=out;                                              // past-due still owed now
   var clearedLate=Math.max(0,Math.round((openingLate-stillLate)*100)/100);  // reduction = paid against the late balance
@@ -1010,7 +1013,7 @@ function renderDisconnections(){
   // Include anyone whose car is still physically disabled (signal sent, not yet restored) EVEN IF they've now
   // paid and dropped out of 'disconnect' state — otherwise a paid customer's car stays cut off with nothing
   // prompting a reconnect. Float those "paid but still disabled" to the top; they're the most time-sensitive.
-  DISCROWS=CUSTS.filter(function(c){var r=discRec(c);return c.state==='disconnect'||(r.signal_sent&&!r.restored)||r.manual;}).sort(function(a,b){
+  DISCROWS=CUSTS.filter(function(c){if(c.state==='ended')return false;var r=discRec(c);return c.state==='disconnect'||(r.signal_sent&&!r.restored)||r.manual;}).sort(function(a,b){
     var ra=discRec(a),rb=discRec(b);
     var an=(a.state!=='disconnect'&&ra.signal_sent&&!ra.restored)?0:1;
     var bn=(b.state!=='disconnect'&&rb.signal_sent&&!rb.restored)?0:1;
@@ -1203,6 +1206,21 @@ function renderOutstanding(){
   }).join('');
   el.innerHTML='<details class="feewrap" open><summary>🔴 <b>'+owing.length+'</b> customers still owe <b>'+fmt(tot)+'</b> <span class="hint">(this is what makes up the outstanding balance — they move to the Paid register as they pay)</span></summary>'
     +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Past-due</td><td>Status</td><td>Owes</td></tr>'+rows+'<tr class="tot"><td colspan="4">Total still outstanding</td><td class="n">'+fmt(tot)+'</td></tr></table></details>';
+}
+function renderEnded(){
+  var el=document.getElementById('lended');if(!el)return;
+  var ended=CUSTS.filter(function(c){return c.state==='ended';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  if(!ended.length){el.innerHTML='<p class="hint">No ended contracts — every tracked customer has an active subscription.</p>';return;}
+  var tot=ended.reduce(function(s,c){return s+(+c.outstanding||0);},0);
+  var owe=ended.filter(function(c){return (+c.outstanding||0)>0;}).length;
+  var rows=ended.map(function(c){
+    var r=discRec(c);
+    var recover=(r.signal_sent&&!r.restored)?' <span class="ostag disc">recover vehicle</span>':'';
+    var bal=(+c.outstanding||0);
+    return '<tr><td>'+esc(c.name)+recover+'</td><td>'+esc(c.account_label)+'</td><td>'+(c.pastdue_count||0)+' past-due</td><td class="n">'+(bal>0?fmt(bal):'—')+'</td></tr>';
+  }).join('');
+  el.innerHTML='<details class="feewrap"><summary>📁 <b>'+ended.length+'</b> ended contract'+(ended.length==1?'':'s')+(owe?' · <b>'+owe+'</b> still owe '+fmt(tot):' · all settled ✓')+' <span class="hint">(subscription cancelled — off the active workflow, kept for reference)</span></summary>'
+    +'<table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Past-due</td><td>Owes</td></tr>'+rows+(owe?'<tr class="tot"><td colspan="3">Total still owed on ended contracts</td><td class="n">'+fmt(tot)+'</td></tr>':'')+'</table></details>';
 }
 function renderPaid(){
   var el=document.getElementById('lpaid');if(!el)return;
