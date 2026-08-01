@@ -232,6 +232,7 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 .snapsub{color:var(--muted,#667);font-size:13px;margin:6px 0 12px}
 .snapblock{margin-top:14px}
 .snaptitle{font-weight:700;font-size:13.5px;margin:0 0 6px;color:var(--muted,#556)}
+.opush{white-space:nowrap;align-self:center;margin-left:6px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
@@ -507,6 +508,7 @@ function render(){
       +'<input class="oname" data-on="'+oi+'" value="'+esc(o.name||'')+'" placeholder="Owner name">'
       +(open?controls:'')
       +ledgerBadge(o,ot)
+      +'<button class="btn small pri opush" data-pushowner="'+oi+'" title="Preview &amp; push this owner’s platform fees to the ledger for '+esc(fmtYM(YM))+'">⇪ Push to ledger</button>'
       +summary
       +'</div>'
       +(open?body:'')
