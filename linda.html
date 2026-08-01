@@ -784,6 +784,7 @@ async function threadDone(key){
   if(r.error){alert(r.error.message);return;}
   toast('Conversation cleared ✓');await load();
 }
+function copyReply(mid){var inp=document.querySelector('[data-replyinput="'+mid+'"]');if(inp&&inp.value){navigator.clipboard.writeText(inp.value).then(function(){toast('Draft copied — paste to send ✓');});}}
 async function replyThread(mid){
   var m=MSGS.find(function(x){return x.id===mid;});if(!m)return;
   var inp=document.querySelector('[data-replyinput="'+mid+'"]');
@@ -817,7 +818,9 @@ function renderMessages(){
     var link=t.matched?'':'<div class="dact" style="margin:6px 12px"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+t.last.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+t.last.id+'">🔗 Link</button></div>';
     var gmsg=t.msgs.filter(function(m){return m.is_grace_request;}).pop()||t.last;
     var gl=t.matched?parseGraceTime(gmsg.body):null;
-    var reply=t.phone?('<div class="replybar"><input class="dinput" data-replyinput="'+t.last.id+'" placeholder="Reply to '+esc(t.name)+'…"><button class="btn small pri" data-reply="'+t.last.id+'" title="Sends from your Rent 2 Go number (704). Live once A2P is approved.">Send text</button></div>'):'';
+    var first=(t.name||'').split(' ')[0]||'';
+    var suggested=t.grace?((gset&&graceActive(gset))?('Rent 2 Go: Confirmed, '+first+' — your extension is applied until '+shortET(gset.grace_until)+'. If you need more time, reach out for management approval. Reply STOP to opt out.'):('Rent 2 Go: Hi '+first+' — our rentals are now managed by an automated system, so I need an exact date and time to apply an extension to your account. Please reply with the date and time you’ll have your payment in. If you need more time beyond that, you can reach out for continued management approval. Reply STOP to opt out.')):'';
+    var reply=t.phone?('<div class="replybar"><input class="dinput" data-replyinput="'+t.last.id+'" placeholder="Reply to '+esc(t.name)+'…" value="'+esc(suggested)+'"><button class="btn small pri" data-reply="'+t.last.id+'" title="Sends from your 704 number — live once A2P is approved">Send text</button><button class="btn small" data-replycopy="'+t.last.id+'" title="Copy this draft to send now (e.g. via Google Voice)">📋 Copy</button></div>'):'';
     var acts='<div class="dact" style="margin:6px 12px 4px"><button class="btn small pri" data-msggrace="'+gmsg.id+'"'+(t.matched?'':' disabled title="link a customer first"')+'>⏸ Grace'+(gl?' → '+gl.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-threaddone="'+esc(t.key)+'">✓ Handled ('+t.msgs.length+')</button></div>';
     var badge=t.matched?'<span class="status plan">✓ matched</span>':'<span class="hint">unmatched · '+esc(t.phone||'?')+'</span>';
     var gset=t.matched?DISCONN.find(function(d){return d.account_label===t.last.account_label&&d.customer_id===t.last.customer_id;}):null;
@@ -1296,6 +1299,7 @@ function wire(){
   document.querySelectorAll('[data-msgmap]').forEach(b=>b.onclick=()=>mapMsg(b.dataset.msgmap));
   document.querySelectorAll('[data-threaddone]').forEach(b=>b.onclick=()=>threadDone(b.dataset.threaddone));
   document.querySelectorAll('[data-reply]').forEach(b=>b.onclick=()=>replyThread(b.dataset.reply));
+  document.querySelectorAll('[data-replycopy]').forEach(b=>b.onclick=()=>copyReply(b.dataset.replycopy));
   document.querySelectorAll('[data-sec]').forEach(function(dd){dd.ontoggle=function(){OPENSEC[dd.dataset.sec]=dd.open;};});
   document.querySelectorAll('[data-discreach]').forEach(b=>b.onchange=()=>setDisc(DISCROWS[b.dataset.discreach],{reached_out:b.checked,reached_out_at:b.checked?new Date().toISOString():null}));
   document.querySelectorAll('[data-discrestore]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discrestore];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'enable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{restored:b.checked,restored_at:b.checked?new Date().toISOString():null});});
