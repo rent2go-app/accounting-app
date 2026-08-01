@@ -1161,10 +1161,17 @@ function renderFeeLedger(){
 const NAMES={'gorentaride@gmail.com':'Ntando','thurstonrdavis@gmail.com':'Thurston','thandobnkala@gmail.com':'Thando'};
 function greetWord(){var h=parseInt(new Date().toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',hour12:false}),10)%24;return h<12?'Good morning':h<18?'Good afternoon':'Good evening';}
 // Message greeting tracks the current ET time until the notice is sent, then it freezes.
+function insertAfterGreeting(b,note){var p=b.split('\n\n');if(p.length>=1){p.splice(1,0,note);return p.join('\n\n');}return note+'\n\n'+b;}
 function dynBody(d){
   var b=d.status==='sent'?d.body:d.body.replace(/^Good (morning|afternoon|evening)/,greetWord());
-  // If grace is active on a disconnection, the notice must reflect the extended deadline — not "1:00 PM today / recovery now".
-  if(d.kind==='disconnect'){var dr=DISCONN.find(x=>x.account_label===d.account_label&&x.customer_id===d.customer_id);if(dr&&graceActive(dr))b=graceRewrite(b,dr);}
+  var dr=DISCONN.find(function(x){return x.account_label===d.account_label&&x.customer_id===d.customer_id;});
+  if(dr&&graceActive(dr)){
+    if(d.kind==='disconnect')b=graceRewrite(b,dr);
+    else b=insertAfterGreeting(b,'📅 As requested, your payment deadline has been extended to '+fullET(dr.grace_until)+'. Please settle by then to keep your vehicle active.');
+  } else {
+    var req=MSGS.find(function(m){return !m.handled&&m.is_grace_request&&m.account_label===d.account_label&&m.customer_id===d.customer_id;});
+    if(req)b=insertAfterGreeting(b,'📩 We received your message about needing more time. Our rentals are now managed by an automated system, so please reply with an exact date and time and we will apply the extension to your account. If you need more time beyond that, you can reach out for management approval.');
+  }
   return b;
 }
 function graceRewrite(b,dr){
