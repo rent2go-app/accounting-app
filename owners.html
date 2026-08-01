@@ -611,6 +611,47 @@ async function sendDoc(to,subject,html,btn){
 function docNo(kind,oi){return (kind==='invoice'?'INV':'STMT')+'-'+YM+'-'+pad(oi+1);}
 function maintRowsYM(o){return (o.maint||[]).filter(function(x){return String(x.date||'').slice(0,7)===YM;});}
 function carName(o,id){var c=(o.cars||[]).find(function(cc){return cc.id===id;});return c?(c.name||c.plate||'Car'):'Unassigned';}
+// Day-strip for documents — inline styles so it renders in emailed HTML too (no external CSS).
+function fleetStripInline(days,ym){
+  var n=dim(ym),out='';
+  for(var d=1;d<=n;d++){var k=ym+'-'+pad(d);var c=days[k];
+    var bg=c?(c.p?'#0f8a4d':'#d94b4b'):'#e6ebf1';
+    var bd=(c&&c.lf>0)?'border:1.5px solid #d9a300;':'border:1px solid rgba(0,0,0,.05);';
+    var t=k+(c?(c.p?' · paid $'+(c.a||0):' · billed, unpaid'):' · no rental')+(c&&c.lf>0?' · +$'+c.lf+' late fee':'');
+    out+='<span title="'+t+'" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+bg+';'+bd+'margin:1px;vertical-align:middle"></span>';
+  }
+  return out;
+}
+// Fleet financials breakdown for the owner STATEMENT — per-car days, rent vs late fees, bottom line + strip.
+function fleetDocHTML(o){
+  var sl=o.stripeLabel||'';if(!sl)return '';
+  var rows=FLEET.filter(function(f){return f.account_label===sl&&f.month===YM;});
+  if(!rows.length)return '';
+  var cars=mergeByCar(rows).sort(function(a,b){return (b.income+b.lf_income)-(a.income+a.lf_income);});
+  var tR=0,tLf=0,tPaid=0,tBill=0;
+  var carRows=cars.map(function(v){
+    var dv=Object.keys(v.days).map(function(k){return v.days[k];});
+    var daysPaid=dv.filter(function(d){return d.p;}).length,daysBilled=dv.length,lfDays=dv.filter(function(d){return (d.lf||0)>0;}).length;
+    var bottom=r2(v.income+v.lf_income);
+    tR+=v.income;tLf+=v.lf_income;tPaid+=daysPaid;tBill+=daysBilled;
+    var rns=v.renters.slice().sort(function(a,b){return a.first-b.first;}).map(function(r){return esc(r.name);}).join(' → ');
+    return '<tr><td><b>'+esc(v.vehicle)+'</b>'+(rns?'<div style="font-size:11px;color:#5c6a7a">'+rns+'</div>':'')
+      +'<div style="margin-top:4px;line-height:1">'+fleetStripInline(v.days,YM)+'</div></td>'
+      +'<td class="n">'+daysPaid+'/'+daysBilled+'</td>'
+      +'<td class="n">'+fmt(v.income)+'</td>'
+      +'<td class="n">'+(v.lf_income>0?fmt(v.lf_income)+' <span style="color:#5c6a7a;font-size:10px">('+lfDays+'d)</span>':'—')+'</td>'
+      +'<td class="n"><b>'+fmt(bottom)+'</b></td></tr>';
+  }).join('');
+  return '<div class="dsub">Fleet financials — '+fmtYM(YM)+' <span style="font-weight:400;text-transform:none">('+cars.length+' car'+(cars.length===1?'':'s')+' · days rented, rent vs late fees)</span></div>'
+    +'<table class="dtbl small"><thead><tr><th>Vehicle &amp; days rented</th><th class="n">Days paid</th><th class="n">Rent</th><th class="n">Late fees</th><th class="n">Bottom line</th></tr></thead><tbody>'+carRows
+    +'<tr class="tot"><td>Total · '+cars.length+' car'+(cars.length===1?'':'s')+'</td><td class="n">'+tPaid+'/'+tBill+'</td><td class="n">'+fmt(r2(tR))+'</td><td class="n">'+fmt(r2(tLf))+'</td><td class="n">'+fmt(r2(tR+tLf))+'</td></tr>'
+    +'</tbody></table>'
+    +'<div style="font-size:10px;color:#5c6a7a;margin-top:5px">'
+      +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#0f8a4d;vertical-align:middle"></span> paid &nbsp; '
+      +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#d94b4b;vertical-align:middle"></span> billed, unpaid &nbsp; '
+      +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#e6ebf1;vertical-align:middle"></span> not rented &nbsp; '
+      +'<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#0f8a4d;border:1.5px solid #d9a300;vertical-align:middle"></span> + late fee</div>';
+}
 function openDoc(oi,kind){
   var o=STATE[oi];var s=stripeFor(o.stripeLabel||'');var weekly=o.cadence==='weekly';
   var plat=r2(ownerMonthTotal(o,YM));
@@ -655,6 +696,7 @@ function openDoc(oi,kind){
       +'<tr><td>Fleet maintenance ('+mrows.length+' item'+(mrows.length===1?'':'s')+')</td><td class="n neg">-'+fmt(mtot)+'</td></tr>'
       +'<tr class="tot"><td>Net position (net earnings less R2G charges)</td><td class="n">'+fmt(netPos)+'</td></tr>'
       +'</tbody><tfoot><tr><td class="tl">Payable to Rent 2 Go</td><td class="n tl">'+fmt(totVal)+'</td></tr></tfoot></table>'
+      +fleetDocHTML(o)
       +(mrows.length?'<div class="dsub">Maintenance detail</div><table class="dtbl small"><thead><tr><th>Date</th><th>Car</th><th>Type</th><th>Detail</th><th class="n">Cost</th></tr></thead><tbody>'+mrows.map(function(x){return '<tr><td>'+esc(x.date)+'</td><td>'+esc(carName(o,x.carId))+'</td><td>'+esc(x.cat||'')+'</td><td>'+esc(x.desc||'')+'</td><td class="n">'+fmt(r2(+x.cost||0))+'</td></tr>';}).join('')+'</tbody></table>':'')
       +'<div class="dnote">'+(pfDisc>0?'\u2714 You are on our <b>Preferred Owner rate</b> — a '+fmt(pfDisc)+' discount off the standard $500/car platform fee applied this period. ':'')+'Owner earnings are collected in and paid out from the owner\'s own Stripe account. This statement summarises the period; Rent 2 Go charges (platform fee + maintenance) are billed on the matching invoice '+docNo('invoice',oi)+'.</div>';
   }
