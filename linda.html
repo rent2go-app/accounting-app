@@ -822,7 +822,11 @@ function renderMessages(){
     var badge=t.matched?'<span class="status plan">✓ matched</span>':'<span class="hint">unmatched · '+esc(t.phone||'?')+'</span>';
     var gset=t.matched?DISCONN.find(function(d){return d.account_label===t.last.account_label&&d.customer_id===t.last.customer_id;}):null;
     var graceStatus=t.grace?((gset&&graceActive(gset))?'<span class="dbadge on">✅ grace to '+shortET(gset.grace_until)+'</span>':'<span class="dbadge grace">⏳ awaiting date/time</span>'):'';
-    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(graceStatus?' '+graceStatus:'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+bubbles+link+acts+reply+'</details>';
+    var cust=t.matched?CUSTS.find(function(c){return c.account_label===t.last.account_label&&c.customer_id===t.last.customer_id;}):null;
+    var elig='';
+    if(t.grace&&cust){var pd=+cust.pastdue_count||0,opn=+cust.open_count||0;var disced=gset&&gset.signal_sent&&!gset.restored;
+      elig=disced?'<span class="dbadge red">🔴 disconnected — handle separately</span>':(opn>=3?'<span class="dbadge red">⚠ '+opn+' open — mgmt approval</span>':(pd<=1?'<span class="dbadge on">✅ grace OK · '+pd+' past due</span>':'<span class="dbadge red">⚠ '+pd+' past due — mgmt approval</span>'));}
+    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(graceStatus?' '+graceStatus:'')+(elig?' '+elig:'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+bubbles+link+acts+reply+'</details>';
   }).join('');
   el.innerHTML=css+'<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+arr.length+'</b> conversation'+(arr.length==1?'':'s')+(graceN?' · <span style="color:var(--out)">'+graceN+' grace</span>':'')+(handledN?' <span class="hint">· '+handledN+' handled</span>':'')+'</summary>'
     +'<p class="hint" style="margin:6px 0 8px">Grouped by customer — tap a name for the full conversation. Type in the reply box to text them back (from your 704 number).</p>'
