@@ -492,9 +492,10 @@ function render(){
   var payAccts=new Set(pt.map(p=>p.account_label)).size;
   var msgOpen=MSGS.filter(function(m){return !m.handled;}).length;
   var msgGrace=MSGS.filter(function(m){return !m.handled&&m.is_grace_request;}).length;
+  var _yst=etDate(new Date(Date.now()-86400000).toISOString());var py=PAY.filter(function(p){return etDate(p.paid_at)===_yst;});var pyAmt=py.reduce(function(s2,p){return s2+(+p.amount||0);},0);var pyAccts=new Set(py.map(function(p){return p.account_label;})).size;
   document.getElementById('lsum').innerHTML=
     card(CIC.car,'Active rentals',CUSTS.length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
-    card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+'<div class="card" style="cursor:pointer" onclick="gotoMsgs()" title="Open the incoming messages inbox"><div class="ctop"><span style="font-size:32px;line-height:1">💬</span><div class="v '+(msgGrace?'red':'')+'">'+msgOpen+'</div></div><div class="l">Messages</div><div class="cd">'+(msgGrace?('<b>'+msgGrace+'</b> grace request'+(msgGrace==1?'':'s')):(msgOpen?'incoming texts':'inbox clear 🎉'))+'</div></div>'+
+    card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+card(CIC.cash,'Paid yesterday',fmt(pyAmt),py.length?(py.length+' payment'+(py.length==1?'':'s')+' · '+pyAccts+' account'+(pyAccts==1?'':'s')):'none','pos')+'<div class="card" style="cursor:pointer" onclick="gotoMsgs()" title="Open the incoming messages inbox"><div class="ctop"><span style="font-size:32px;line-height:1">💬</span><div class="v '+(msgGrace?'red':'')+'">'+msgOpen+'</div></div><div class="l">Messages</div><div class="cd">'+(msgGrace?('<b>'+msgGrace+'</b> grace request'+(msgGrace==1?'':'s')):(msgOpen?'incoming texts':'inbox clear 🎉'))+'</div></div>'+
     card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase 🎉','')+
     card(CIC.power,'Disconnections',disc,disc?nm3(CUSTS.filter(c=>c.flag==='disconnect').map(c=>c.name)):'none','red')+
     card(CIC.warn,'Recovery',rec,rec?nm3(CUSTS.filter(c=>c.flag==='recovery').map(c=>c.name)):'none','red')+
