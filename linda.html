@@ -737,16 +737,16 @@ function parseGraceTime(body){
   else if(/\b(tonight|today|this (morning|afternoon|evening))\b/.test(t)){addDays=0;dayFound=true;}
   else{var dn=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];for(var i=0;i<7;i++){if(new RegExp('\\b'+dn[i]+'\\b').test(t)){var delta=(i-nowETDow()+7)%7;if(delta===0)delta=7;addDays=delta;dayFound=true;break;}}}
   var hh=null,mm=0,mt=t.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)/);
-  if(mt){hh=parseInt(mt[1],10);mm=mt[2]?parseInt(mt[2],10):0;var ap=mt[3].replace(/\./g,'');if(ap==='pm'&&hh<12)hh+=12;if(ap==='am'&&hh===12)hh=0;}
-  else if(/\bnoon\b/.test(t)){hh=12;}
-  else if(/\bmidnight\b/.test(t)){hh=23;mm=59;}
-  else if(/\b(cob|eod|end of (the )?day|close of business)\b/.test(t)){hh=17;}
-  else if(/\bmorning\b/.test(t)){hh=10;}
-  else if(/\bafternoon\b/.test(t)){hh=15;}
-  else if(/\b(evening|tonight)\b/.test(t)){hh=20;}
+  if(/\bafter\s*(midnight|12(\s*a\.?m\.?)?)\b/.test(t)&&!/12\s*(noon|p\.?m\.?)/.test(t)){hh=1;mm=0;if(!dayFound){addDays=1;dayFound=true;}}
+  else if(mt){hh=parseInt(mt[1],10);mm=mt[2]?parseInt(mt[2],10):0;var ap=mt[3].replace(/\./g,'');if(ap==='pm'&&hh<12)hh+=12;if(ap==='am'&&hh===12)hh=0;}
+  else if(/\b(noon|midday|mid-day)\b/.test(t)){hh=12;mm=0;}
+  else if(/\b(tonight|end of (the )?day|eod|before midnight|by midnight|midnight)\b/.test(t)){hh=23;mm=59;}
+  else if(/\bearly\s*morning\b/.test(t)){hh=6;mm=0;}
+  else if(/\bmorning\b/.test(t)){hh=9;mm=0;}
+  else if(/\bafternoon\b/.test(t)){hh=15;mm=0;}
+  else if(/\b(evening|cob|close of business|end of business)\b/.test(t)){hh=18;mm=0;}
   else{var bt=t.match(/\b(?:by|at|around|after|before)\s+(1[0-2]|0?[1-9])(?::([0-5]\d))?\b/);if(bt){hh=parseInt(bt[1],10);mm=bt[2]?parseInt(bt[2],10):0;if(hh<=7)hh+=12;}}
-  if(/\bafter\s*(midnight|12(\s*a\.?m\.?)?)\b/i.test(t)&&!/12\s*(noon|p\.?m\.?)/i.test(t)){hh=1;mm=30;if(!dayFound){addDays=1;dayFound=true;}}
-  if(hh===null){if(dayFound){hh=17;}else{var f=tomorrowGraceISO();return {iso:f,label:graceLabel(f),guessed:true};}}
+  if(hh===null){if(dayFound){hh=18;mm=0;}else{var f=tomorrowGraceISO();return {iso:f,label:graceLabel(f),guessed:true};}}
   function build(ad){var d=new Date(Date.now()+ad*86400000);var ymd=d.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T'+('0'+hh).slice(-2)+':'+('0'+mm).slice(-2)+':00'+etOffsetStr()).toISOString();}
   var iso=build(addDays);
   if(!dayFound&&new Date(iso).getTime()<Date.now())iso=build(1); // time-only that already passed → tomorrow
