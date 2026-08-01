@@ -265,44 +265,57 @@ async function scanAccount(acc: any) {
   if (drafts.length) await sbPost(`linda_drafts`, drafts, "return=minimal");
   await sbPost(`linda_accounts?on_conflict=label`, [{ label: LABEL, active: custs.length, notices: drafts.length, scanned_at: nowISO }], "resolution=merge-duplicates,return=minimal");
 
-  // FLEET FINANCIALS — per-vehicle daily payment map for the current ET calendar month (bill-driven)
-  const finv = await stripeAll(`https://api.stripe.com/v1/invoices?created%5Bgte%5D=${monthStart}&limit=100&expand[]=data.customer`, SKEY);
-  const rentals: Record<string, any> = {};
-  const lateByCust: Record<string, any[]> = {};   // cid -> [{day,amount}] of PAID late fees this month
+  // FLEET FINANCIALS — per-vehicle daily payment map, bill-driven. Always rebuild the CURRENT month.
+  // During the first days of a new month ALSO rebuild the PREVIOUS month, so the just-ended month
+  // FINALIZES (captures the last day + any late-settling payments) instead of freezing at that month's
+  // final in-month scan. Without this, every month-end lost its tail (e.g. July froze at Jul 31 9pm).
+  const [_fy, _fm] = monthKey.split("-").map(Number);
+  const pmY = _fm === 1 ? _fy - 1 : _fy, pmM = _fm === 1 ? 12 : _fm - 1;
+  const prevMonthKey = `${pmY}-${String(pmM).padStart(2, "0")}`;
+  const prevMonthStart = Math.floor(new Date(`${prevMonthKey}-01T00:00:00${etOffset(new Date())}`).getTime() / 1000);
+  const GRACE_DAYS = 5;
+  const doPrev = parseInt(todaystr.slice(8, 10), 10) <= GRACE_DAYS;   // finalize last month for its first 5 days
+  const wantMonths = doPrev ? [monthKey, prevMonthKey] : [monthKey];
+  const finv = await stripeAll(`https://api.stripe.com/v1/invoices?created%5Bgte%5D=${doPrev ? prevMonthStart : monthStart}&limit=100&expand[]=data.customer`, SKEY);
+  const rentals: Record<string, any> = {};        // key: mon|cid|vehicle
+  const lateByCust: Record<string, any[]> = {};   // key: mon|cid -> [{day,amount}] of PAID late fees that month
   for (const i of finv) {
     const c = i.customer || {};
     const cid = (typeof c === "object" ? c.id : c) || "?";
     const paid = i.status === "paid";
     if (isLateFee(i)) {                        // paid late fees add to the car's bottom line (attributed below)
-      if (paid) { const pat = i.status_transitions?.paid_at || i.created; (lateByCust[cid] = lateByCust[cid] || []).push({ day: etYMD(pat), amount: (i.amount_paid || 0) / 100 }); }
+      if (paid) { const pat = i.status_transitions?.paid_at || i.created; const d = etYMD(pat); const mon = d.slice(0, 7); if (wantMonths.includes(mon)) (lateByCust[mon + "|" + cid] = lateByCust[mon + "|" + cid] || []).push({ day: d, amount: (i.amount_paid || 0) / 100 }); }
       continue;
     }
     if ((i.amount_due || 0) <= 0) continue;
+    const day = etYMD(i.created);
+    const mon = day.slice(0, 7);
+    if (!wantMonths.includes(mon)) continue;
     const nm = (typeof c === "object" ? (c.name || "") : "") || "(no name)";
     const ln = (i.lines?.data || [{}])[0] || {};
     const vehicle = cleanlbl(ln.description || i.description || "Rental");
     if (/deposit|toll|late\s*fee|past\s*due|balance|\bcharge/i.test(vehicle)) continue;  // skip non-vehicle line items
-    const day = etYMD(i.created);
     const amt = (paid ? (i.amount_paid || 0) : (i.amount_due || 0)) / 100;
-    const key = cid + "|" + vehicle;
-    if (!rentals[key]) rentals[key] = { cid, nm, vehicle, days: {} as Record<string, any> };
+    const key = mon + "|" + cid + "|" + vehicle;
+    if (!rentals[key]) rentals[key] = { mon, cid, nm, vehicle, days: {} as Record<string, any> };
     const prev = rentals[key].days[day];
     rentals[key].days[day] = { p: ((prev && prev.p) || paid) ? 1 : 0, a: Math.max(prev ? prev.a : 0, amt), lf: prev ? (prev.lf || 0) : 0 };
   }
-  // attribute each customer's paid late fees to their primary (most-billed) vehicle for the month
-  for (const cid in lateByCust) {
-    const keys = Object.keys(rentals).filter((k) => rentals[k].cid === cid);
+  // attribute each customer's paid late fees to their primary (most-billed) vehicle for THAT month
+  for (const lk in lateByCust) {
+    const mon = lk.slice(0, 7), cid = lk.slice(8);
+    const keys = Object.keys(rentals).filter((k) => rentals[k].cid === cid && rentals[k].mon === mon);
     if (!keys.length) continue;
     keys.sort((a, b) => Object.keys(rentals[b].days).length - Object.keys(rentals[a].days).length);
     const r = rentals[keys[0]];
-    for (const lf of lateByCust[cid]) { const d = r.days[lf.day] = r.days[lf.day] || { p: 0, a: 0 }; d.lf = (d.lf || 0) + lf.amount; }
+    for (const lf of lateByCust[lk]) { const d = r.days[lf.day] = r.days[lf.day] || { p: 0, a: 0 }; d.lf = (d.lf || 0) + lf.amount; }
   }
   const r2f = (x: number) => Math.round(x * 100) / 100;
   const fleetRows = Object.values(rentals).map((r: any) => {
     const dv = Object.values(r.days) as any[];
     const income = dv.filter((d) => d.p).reduce((s, d) => s + d.a, 0);
     const lf_income = dv.reduce((s, d) => s + (d.lf || 0), 0);
-    return { account_label: LABEL, vehicle: r.vehicle, customer_id: r.cid, customer_name: r.nm, month: monthKey, days: r.days, days_paid: dv.filter((d) => d.p).length, days_billed: dv.length, income: r2f(income), lf_income: r2f(lf_income), lf_days: dv.filter((d) => (d.lf || 0) > 0).length, updated_at: nowISO };
+    return { account_label: LABEL, vehicle: r.vehicle, customer_id: r.cid, customer_name: r.nm, month: r.mon, days: r.days, days_paid: dv.filter((d) => d.p).length, days_billed: dv.length, income: r2f(income), lf_income: r2f(lf_income), lf_days: dv.filter((d) => (d.lf || 0) > 0).length, updated_at: nowISO };
   });
   if (fleetRows.length) await sbPost(`fleet_performance?on_conflict=account_label,vehicle,customer_id,month`, fleetRows, "resolution=merge-duplicates,return=minimal");
 
