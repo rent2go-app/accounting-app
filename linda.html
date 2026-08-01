@@ -800,6 +800,7 @@ async function replyThread(mid){
     toast('Text sent ✓');await load();
   }catch(e){var msg=String(e.message||e);var a2p=(msg.indexOf('30034')>=0||msg.toLowerCase().indexOf('unregistered')>=0);alert('Could not send: '+msg+(a2p?'\n\nSMS goes live once your A2P campaign is approved — the reply box is ready and will work automatically then.':''));}
 }
+function lastPayFor(al,cid){var ps=PAY.filter(function(p){return p.account_label===al&&p.customer_id===cid;});ps.sort(function(a,b){return new Date(b.paid_at)-new Date(a.paid_at);});return ps[0]||null;}
 function renderMessages(){
   var el=document.getElementById('lmsgs');if(!el)return;
   var open=MSGS.filter(function(m){return !m.handled;});
@@ -814,10 +815,15 @@ function renderMessages(){
   var arr=Object.keys(threads).map(function(k){var t=threads[k];t.msgs.sort(function(a,b){return new Date(a.received_at)-new Date(b.received_at);});t.last=t.msgs[t.msgs.length-1];t.name=t.last.customer_name||t.last.from_name||t.last.from_number||'Unknown';t.grace=t.msgs.some(function(m){return m.is_grace_request;});return t;});
   arr.sort(function(a,b){return new Date(b.last.received_at)-new Date(a.last.received_at);});
   var rows=arr.map(function(t){
-    var bubbles=t.msgs.map(function(m){var out=m.direction==='out';return '<div class="msgbubble'+(out?' out':'')+'"><span class="msgtime">'+shortET(m.received_at)+' ET'+(out?' · you':'')+'</span>'+(m.is_grace_request?' <span class="dbadge grace">⏸ grace</span>':'')+'<div>'+esc(m.body||'')+'</div></div>';}).join('');
+    var mkBubble=function(m){var out=m.direction==='out';return '<div class="msgbubble'+(out?' out':'')+'"><span class="msgtime">'+shortET(m.received_at)+' ET'+(out?' · you':'')+'</span>'+(m.is_grace_request?' <span class="dbadge grace">⏸ grace</span>':'')+'<div>'+esc(m.body||'')+'</div></div>';};
+    var older=t.msgs.slice(0,-3),recent=t.msgs.slice(-3);
+    var bubbles=(older.length?'<details class="oldermsgs"><summary style="cursor:pointer;color:var(--brand,#0f8a4d);font-size:12px;margin:6px 12px;list-style:none">▾ See earlier '+older.length+' message'+(older.length==1?'':'s')+'</summary>'+older.map(mkBubble).join('')+'</details>':'')+recent.map(mkBubble).join('');
     var link=t.matched?'':'<div class="dact" style="margin:6px 12px"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+t.last.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+t.last.id+'">🔗 Link</button></div>';
     var gmsg=t.msgs.filter(function(m){return m.is_grace_request;}).pop()||t.last;
     var gl=t.matched?parseGraceTime(gmsg.body):null;
+    var lp=cust?lastPayFor(t.last.account_label,t.last.customer_id):null;
+    var payline='';
+    if(t.grace&&t.matched){var lpTxt=lp?('💵 Last paid '+fmt(lp.amount)+' · '+shortET(lp.paid_at)):'💵 No payments on file';var promise='';if(gset&&gset.grace_until&&new Date(gset.grace_until)<new Date()){var paidSince=lp&&gset.updated_at&&(new Date(lp.paid_at)>new Date(gset.updated_at));promise=paidSince?' · <b style="color:#0a7d44">✅ kept last promise</b>':' · <b style="color:var(--out)">⚠ broke last promise (grace was '+shortET(gset.grace_until)+')</b>';}payline='<div class="hint" style="margin:4px 12px">'+lpTxt+promise+'</div>';}
     var first=(t.name||'').split(' ')[0]||'';
     var suggested=t.grace?((gset&&graceActive(gset))?('Rent 2 Go: Confirmed, '+first+' — your extension is applied until '+shortET(gset.grace_until)+'. If you need more time, reach out for management approval. Reply STOP to opt out.'):('Rent 2 Go: Hi '+first+' — our rentals are now managed by an automated system, so I need an exact date and time to apply an extension to your account. Please reply with the date and time you’ll have your payment in. If you need more time beyond that, you can reach out for continued management approval. Reply STOP to opt out.')):'';
     var reply=t.phone?('<div class="replybar"><input class="dinput" data-replyinput="'+t.last.id+'" placeholder="Reply to '+esc(t.name)+'…" value="'+esc(suggested)+'"><button class="btn small pri" data-reply="'+t.last.id+'" title="Sends from your 704 number — live once A2P is approved">Send text</button><button class="btn small" data-replycopy="'+t.last.id+'" title="Copy this draft to send now (e.g. via Google Voice)">📋 Copy</button></div>'):'';
@@ -829,7 +835,7 @@ function renderMessages(){
     var elig='';
     if(t.grace&&cust){var pd=+cust.pastdue_count||0,opn=+cust.open_count||0;var disced=gset&&gset.signal_sent&&!gset.restored;
       elig=disced?'<span class="dbadge red">🔴 disconnected — handle separately</span>':(opn>=3?'<span class="dbadge red">⚠ '+opn+' open — mgmt approval</span>':(pd<=1?'<span class="dbadge on">✅ grace OK · '+pd+' past due</span>':'<span class="dbadge red">⚠ '+pd+' past due — mgmt approval</span>'));}
-    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(graceStatus?' '+graceStatus:'')+(elig?' '+elig:'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+bubbles+link+acts+reply+'</details>';
+    return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(graceStatus?' '+graceStatus:'')+(elig?' '+elig:'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+payline+bubbles+link+acts+reply+'</details>';
   }).join('');
   el.innerHTML=css+'<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+arr.length+'</b> conversation'+(arr.length==1?'':'s')+(graceN?' · <span style="color:var(--out)">'+graceN+' grace</span>':'')+(handledN?' <span class="hint">· '+handledN+' handled</span>':'')+'</summary>'
     +'<p class="hint" style="margin:6px 0 8px">Grouped by customer — tap a name for the full conversation. Type in the reply box to text them back (from your 704 number).</p>'
