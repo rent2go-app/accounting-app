@@ -268,6 +268,9 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .rtact{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:9px}
 .rtnote{flex:1;min-width:180px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px}
 .rtlink{font-size:11.5px;color:var(--brand);word-break:break-all}
+.rtedit{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0 2px;border-top:1px dashed var(--line);margin-top:8px}
+.rtel{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.rti{padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12.5px;min-width:150px;flex:1}
 </style>
 </head><body>
 <div id="loginwrap" class="loginwrap" style="display:none"><form class="logincard" id="li_form"><div style="text-align:center"><img src="assets/linda-sm.png" alt="" style="width:64px;height:64px;border-radius:50%"></div><p style="text-align:center">Renters &amp; ID Verification — admin sign in.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="err" id="li_err"></div></form></div>
@@ -387,6 +390,7 @@ function render(){
       linkbtns+=' <span class="btn small" style="cursor:default;color:#c22a2a" title="'+esc(c.review_reason)+'">⚠ review</span>';
     }
     return '<div class="rtcard '+sc+'"><div class="rthead"><span class="rtname">'+esc(c.name||'(no name)')+'</span><span class="rtsub">'+esc(c.email||'no email')+(c.phone?' · '+esc(c.phone):'')+'</span><span class="rtbadge '+sc+'">'+statusLabel(c.status)+'</span>'+dec+'</div>'+verif
+      +'<div class="rtedit"><span class="rtel">Details</span><input class="rti" data-ename="'+i+'" value="'+esc(c.name||'')+'" placeholder="Full name"><input class="rti" data-eemail="'+i+'" type="email" value="'+esc(c.email||'')+'" placeholder="Email"><input class="rti" data-ephone="'+i+'" value="'+esc(c.phone||'')+'" placeholder="Phone"><button class="btn small pri" data-esave="'+i+'">💾 Save details</button>'+(c.linda_customer_id?'<span class="hint" title="This renter is linked to a billing customer — saving also updates their billing email">↔ linked to billing</span>':'')+'</div>'
       +'<div class="rtact">'+linkbtns+' <button class="btn small ok" data-approve="'+i+'">✅ Approve</button> <button class="btn small danger" data-reject="'+i+'">✕ Reject</button> <input class="rtnote" data-noteinput="'+i+'" placeholder="notes" value="'+esc(c.notes||'')+'"><button class="btn small" data-savenote="'+i+'">Save</button> <button class="btn small" data-del="'+i+'" title="Remove">✕</button></div></div>';
   }).join('');
   bind();
@@ -401,6 +405,7 @@ function bind(){
   document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>decide(+b.dataset.approve,'approved'));
   document.querySelectorAll('[data-reject]').forEach(b=>b.onclick=()=>decide(+b.dataset.reject,'rejected'));
   document.querySelectorAll('[data-savenote]').forEach(b=>b.onclick=()=>saveNote(+b.dataset.savenote));
+  document.querySelectorAll('[data-esave]').forEach(b=>b.onclick=()=>saveRenterDetails(+b.dataset.esave));
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delRenter(+b.dataset.del));
 }
 async function addRenter(){var n=document.getElementById('rt_name').value.trim();var e=document.getElementById('rt_email').value.trim();var p=document.getElementById('rt_phone').value.trim();if(!n){alert('Enter a name.');return;}var r=await sb.from('renters').insert([{name:n,email:e,phone:p,status:'new'}]);if(r.error){alert(r.error.message);return;}document.getElementById('rt_name').value='';document.getElementById('rt_email').value='';document.getElementById('rt_phone').value='';toast('Renter added ✓');await load();}
@@ -449,6 +454,23 @@ async function decide(i,dec){
   await load(); render();
 }
 async function saveNote(i){var c=RENTERS[i];var v=document.querySelector('[data-noteinput="'+i+'"]').value;var r=await sb.from('renters').update({notes:v}).eq('id',c.id);if(r.error){alert(r.error.message);return;}toast('Note saved ✓');}
+async function saveRenterDetails(i){
+  var c=RENTERS[i];
+  var name=(document.querySelector('[data-ename="'+i+'"]').value||'').trim();
+  var email=(document.querySelector('[data-eemail="'+i+'"]').value||'').trim();
+  var phone=(document.querySelector('[data-ephone="'+i+'"]').value||'').trim();
+  if(!name){alert('Name cannot be empty.');return;}
+  var r=await sb.from('renters').update({name:name,email:email,phone:phone,updated_at:new Date().toISOString()}).eq('id',c.id);
+  if(r.error){alert('Save failed: '+r.error.message);return;}
+  var extra='';
+  // A renter is a renter first, then a billing customer — if linked, keep billing in sync.
+  if(c.linda_customer_id&&c.account_label){
+    var lr=await sb.from('linda_customers').update({email:email,email_override:email}).eq('customer_id',c.linda_customer_id).eq('account_label',c.account_label);
+    if(!lr.error){await sb.from('linda_drafts').update({email:email}).eq('customer_id',c.linda_customer_id).eq('account_label',c.account_label);extra=' · billing email updated';}
+  }
+  toast('Details saved ✓'+extra);
+  await load();
+}
 async function delRenter(i){var c=RENTERS[i];if(!confirm('Remove '+(c.name||'this renter')+'?'))return;await sb.from('renters').delete().eq('id',c.id);await load();}
 async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('rt_add').onclick=addRenter;await load();}
 document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});

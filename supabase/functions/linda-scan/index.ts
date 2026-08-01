@@ -67,10 +67,10 @@ async function scanAccount(acc: any) {
   // Read EVERY customer's plan flag for this account so the sweep carries it FORWARD verbatim.
   // on_plan/plan_terms are set by the admin (dashboard toggle) and must survive every upsert —
   // we re-write them with their existing values so the badge can never flip off on a scan.
-  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null; plan_behind_days: number; plan_last_behind_day: string | null }> = {};
+  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null; plan_behind_days: number; plan_last_behind_day: string | null; email_override: string | null }> = {};
   const planmap: Record<string, string> = {};
-  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms,plan_behind_days,plan_last_behind_day&${aL}`)).forEach((r: any) => {
-    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null, plan_behind_days: r.plan_behind_days || 0, plan_last_behind_day: r.plan_last_behind_day || null };
+  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms,plan_behind_days,plan_last_behind_day,email_override&${aL}`)).forEach((r: any) => {
+    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null, plan_behind_days: r.plan_behind_days || 0, plan_last_behind_day: r.plan_last_behind_day || null, email_override: r.email_override || null };
     if (r.on_plan) planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day";
   });
 
@@ -102,7 +102,9 @@ async function scanAccount(acc: any) {
   }
 
   await Promise.all(Array.from(targets.values()).map(async (t: any) => {
-    const c = t.customer || {}, cid = c.id, nm = c.name || "(no name)", em = c.email || "", ph = c.phone || "", substatus = t.sub_status;
+    const c = t.customer || {}, cid = c.id, nm = c.name || "(no name)", ph = c.phone || "", substatus = t.sub_status;
+    // A manual email_override (set in the app) wins over the Stripe email, so edits stick across scans.
+    const em = (planExisting[cid] && planExisting[cid].email_override) || c.email || "";
     const allinv = await stripeAll(`https://api.stripe.com/v1/invoices?customer=${cid}&limit=100`, SKEY);
     for (const i of allinv) { if (i.status === "paid") { const pat = i.status_transitions?.paid_at || 0; if (pat && etYMD(pat) === todaystr) payments.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, customer_name: nm, amount: Math.round((i.amount_paid || 0) / 100 * 100) / 100, paid_at: etISO(pat), invoice_number: i.number || i.id, kind: isLateFee(i) ? "latefee" : "rental", updated_at: nowISO }); } }
     const inv = allinv.filter((i: any) => i.status === "open" && (i.amount_remaining || 0) > 0);
