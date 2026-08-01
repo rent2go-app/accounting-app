@@ -745,6 +745,7 @@ function parseGraceTime(body){
   else if(/\bafternoon\b/.test(t)){hh=15;}
   else if(/\b(evening|tonight)\b/.test(t)){hh=20;}
   else{var bt=t.match(/\b(?:by|at|around|after|before)\s+(1[0-2]|0?[1-9])(?::([0-5]\d))?\b/);if(bt){hh=parseInt(bt[1],10);mm=bt[2]?parseInt(bt[2],10):0;if(hh<=7)hh+=12;}}
+  if(/\bafter\s*(midnight|12(\s*a\.?m\.?)?)\b/i.test(t)&&!/12\s*(noon|p\.?m\.?)/i.test(t)){hh=1;mm=30;if(!dayFound){addDays=1;dayFound=true;}}
   if(hh===null){if(dayFound){hh=17;}else{var f=tomorrowGraceISO();return {iso:f,label:graceLabel(f),guessed:true};}}
   function build(ad){var d=new Date(Date.now()+ad*86400000);var ymd=d.toLocaleDateString('en-CA',{timeZone:'America/New_York'});return new Date(ymd+'T'+('0'+hh).slice(-2)+':'+('0'+mm).slice(-2)+':00'+etOffsetStr()).toISOString();}
   var iso=build(addDays);
@@ -816,26 +817,32 @@ function renderMessages(){
   var arr=Object.keys(threads).map(function(k){var t=threads[k];t.msgs.sort(function(a,b){return new Date(a.received_at)-new Date(b.received_at);});t.last=t.msgs[t.msgs.length-1];t.name=t.last.customer_name||t.last.from_name||t.last.from_number||'Unknown';t.grace=t.msgs.some(function(m){return m.is_grace_request;});return t;});
   arr.sort(function(a,b){return new Date(b.last.received_at)-new Date(a.last.received_at);});
   var rows=arr.map(function(t){
+    var cust=t.matched?CUSTS.find(function(c){return c.account_label===t.last.account_label&&c.customer_id===t.last.customer_id;}):null;
+    var gset=t.matched?DISCONN.find(function(d){return d.account_label===t.last.account_label&&d.customer_id===t.last.customer_id;}):null;
+    var gmsg=t.msgs.filter(function(m){return m.is_grace_request;}).pop()||t.last;
+    var gt=t.grace?parseGraceTime(gmsg.body):null;
+    var first=(t.name||'').split(' ')[0]||'';
+    var graceSet=gset&&graceActive(gset);
+    var graceStatus=t.grace?(graceSet?'<span class="dbadge on">✅ grace to '+shortET(gset.grace_until)+'</span>':((gt&&!gt.guessed)?'<span class="dbadge grace">🕒 asked '+gt.label.replace(' ET','')+' — apply</span>':'<span class="dbadge grace">⏳ awaiting date/time</span>')):'';
+    var elig='';
+    if(t.grace&&cust){var pd=+cust.pastdue_count||0,opn=+cust.open_count||0;var disced=gset&&gset.signal_sent&&!gset.restored;
+      elig=disced?'<span class="dbadge red">🔴 disconnected — handle separately</span>':(opn>=3?'<span class="dbadge red">⚠ '+opn+' open — mgmt approval</span>':(pd<=1?'<span class="dbadge on">✅ grace OK · '+pd+' past due</span>':'<span class="dbadge red">⚠ '+pd+' past due — mgmt approval</span>'));}
+    var badge=t.matched?'<span class="status plan">✓ matched</span>':'<span class="hint">unmatched · '+esc(t.phone||'?')+'</span>';
+    var lp=cust?lastPayFor(t.last.account_label,t.last.customer_id):null;
+    var payline='';
+    if(t.grace&&t.matched){var lpTxt=lp?('💵 Last paid '+fmt(lp.amount)+' · '+shortET(lp.paid_at)):'💵 No payments on file';var promise='';if(gset&&gset.grace_until&&new Date(gset.grace_until)<new Date()){var paidSince=lp&&gset.updated_at&&(new Date(lp.paid_at)>new Date(gset.updated_at));promise=paidSince?' · <b style="color:#0a7d44">✅ kept last promise</b>':' · <b style="color:var(--out)">⚠ broke last promise (grace was '+shortET(gset.grace_until)+')</b>';}payline='<div class="hint" style="margin:4px 12px">'+lpTxt+promise+'</div>';}
+    var suggested='';
+    if(t.grace){
+      if(graceSet) suggested='Rent 2 Go: Confirmed, '+first+' — your extension is applied until '+shortET(gset.grace_until)+'. If you need more time, reach out for management approval. Reply STOP to opt out.';
+      else if(gt&&!gt.guessed) suggested='Rent 2 Go: Hi '+first+' — done, your account is extended to '+gt.label+'. Please have your payment in by then. If you need more time, reach out for management approval. Reply STOP to opt out.';
+      else suggested='Rent 2 Go: Hi '+first+' — our rentals are now managed by an automated system, so I need an exact date and time to apply an extension to your account. Please reply with the date and time you’ll have your payment in. If you need more time beyond that, you can reach out for continued management approval. Reply STOP to opt out.';
+    }
     var mkBubble=function(m){var out=m.direction==='out';return '<div class="msgbubble'+(out?' out':'')+'"><span class="msgtime">'+shortET(m.received_at)+' ET'+(out?' · you':'')+'</span>'+(m.is_grace_request?' <span class="dbadge grace">⏸ grace</span>':'')+'<div>'+esc(m.body||'')+'</div></div>';};
     var older=t.msgs.slice(0,-3),recent=t.msgs.slice(-3);
     var bubbles=(older.length?'<details class="oldermsgs"><summary style="cursor:pointer;color:var(--brand,#0f8a4d);font-size:12px;margin:6px 12px;list-style:none">▾ See earlier '+older.length+' message'+(older.length==1?'':'s')+'</summary>'+older.map(mkBubble).join('')+'</details>':'')+recent.map(mkBubble).join('');
     var link=t.matched?'':'<div class="dact" style="margin:6px 12px"><span class="dlbl">Map to:</span> <select class="dinput" data-mapsel="'+t.last.id+'"><option value="">— pick customer —</option>'+opts+'</select> <button class="btn small pri" data-msgmap="'+t.last.id+'">🔗 Link</button></div>';
-    var gmsg=t.msgs.filter(function(m){return m.is_grace_request;}).pop()||t.last;
-    var gl=t.matched?parseGraceTime(gmsg.body):null;
-    var lp=cust?lastPayFor(t.last.account_label,t.last.customer_id):null;
-    var payline='';
-    if(t.grace&&t.matched){var lpTxt=lp?('💵 Last paid '+fmt(lp.amount)+' · '+shortET(lp.paid_at)):'💵 No payments on file';var promise='';if(gset&&gset.grace_until&&new Date(gset.grace_until)<new Date()){var paidSince=lp&&gset.updated_at&&(new Date(lp.paid_at)>new Date(gset.updated_at));promise=paidSince?' · <b style="color:#0a7d44">✅ kept last promise</b>':' · <b style="color:var(--out)">⚠ broke last promise (grace was '+shortET(gset.grace_until)+')</b>';}payline='<div class="hint" style="margin:4px 12px">'+lpTxt+promise+'</div>';}
-    var first=(t.name||'').split(' ')[0]||'';
-    var suggested=t.grace?((gset&&graceActive(gset))?('Rent 2 Go: Confirmed, '+first+' — your extension is applied until '+shortET(gset.grace_until)+'. If you need more time, reach out for management approval. Reply STOP to opt out.'):('Rent 2 Go: Hi '+first+' — our rentals are now managed by an automated system, so I need an exact date and time to apply an extension to your account. Please reply with the date and time you’ll have your payment in. If you need more time beyond that, you can reach out for continued management approval. Reply STOP to opt out.')):'';
     var reply=t.phone?('<div class="replybar"><input class="dinput" data-replyinput="'+t.last.id+'" placeholder="Reply to '+esc(t.name)+'…" value="'+esc(suggested)+'"><button class="btn small pri" data-reply="'+t.last.id+'" title="Sends from your 704 number — live once A2P is approved">Send text</button><button class="btn small" data-replycopy="'+t.last.id+'" title="Copy this draft to send now (e.g. via Google Voice)">📋 Copy</button></div>'):'';
-    var acts='<div class="dact" style="margin:6px 12px 4px"><button class="btn small pri" data-msggrace="'+gmsg.id+'"'+(t.matched?'':' disabled title="link a customer first"')+'>⏸ Grace'+(gl?' → '+gl.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-threaddone="'+esc(t.key)+'">✓ Handled ('+t.msgs.length+')</button></div>';
-    var badge=t.matched?'<span class="status plan">✓ matched</span>':'<span class="hint">unmatched · '+esc(t.phone||'?')+'</span>';
-    var gset=t.matched?DISCONN.find(function(d){return d.account_label===t.last.account_label&&d.customer_id===t.last.customer_id;}):null;
-    var graceStatus=t.grace?((gset&&graceActive(gset))?'<span class="dbadge on">✅ grace to '+shortET(gset.grace_until)+'</span>':'<span class="dbadge grace">⏳ awaiting date/time</span>'):'';
-    var cust=t.matched?CUSTS.find(function(c){return c.account_label===t.last.account_label&&c.customer_id===t.last.customer_id;}):null;
-    var elig='';
-    if(t.grace&&cust){var pd=+cust.pastdue_count||0,opn=+cust.open_count||0;var disced=gset&&gset.signal_sent&&!gset.restored;
-      elig=disced?'<span class="dbadge red">🔴 disconnected — handle separately</span>':(opn>=3?'<span class="dbadge red">⚠ '+opn+' open — mgmt approval</span>':(pd<=1?'<span class="dbadge on">✅ grace OK · '+pd+' past due</span>':'<span class="dbadge red">⚠ '+pd+' past due — mgmt approval</span>'));}
+    var acts='<div class="dact" style="margin:6px 12px 4px"><button class="btn small pri" data-msggrace="'+gmsg.id+'"'+(t.matched?'':' disabled title="link a customer first"')+'>⏸ Grace'+((gt&&!gt.guessed)?' → '+gt.label.replace(' ET',''):'')+'</button> <button class="btn small ok" data-threaddone="'+esc(t.key)+'">✓ Handled ('+t.msgs.length+')</button></div>';
     return '<details class="msgthread"'+(t.grace?' open':'')+'><summary><b>'+esc(t.name)+'</b> '+badge+(graceStatus?' '+graceStatus:'')+(elig?' '+elig:'')+' <span class="msgcount">'+t.msgs.length+'</span> <span class="msgtime">'+shortET(t.last.received_at)+' ET</span><span class="msgsnip">'+esc((t.last.body||'').slice(0,70))+'</span></summary>'+payline+bubbles+link+acts+reply+'</details>';
   }).join('');
   el.innerHTML=css+'<details class="discwrap" data-sec="msgs"'+((OPENSEC.msgs!==false)?' open':'')+'><summary>💬 Incoming messages — <b>'+arr.length+'</b> conversation'+(arr.length==1?'':'s')+(graceN?' · <span style="color:var(--out)">'+graceN+' grace</span>':'')+(handledN?' <span class="hint">· '+handledN+' handled</span>':'')+'</summary>'
