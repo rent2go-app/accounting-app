@@ -226,6 +226,12 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;padding:11px 18px;border-radius:10px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:60}
 .savestate{font-size:12px;font-weight:700;color:var(--muted)}
 .brandlogo{height:30px;display:block}.loginlogo{text-align:center;margin-bottom:8px}.loginlogo img{height:58px;max-width:100%}
+.snapwrap{margin:16px 0;border:1px solid var(--line,#e3e8ef);border-radius:14px;background:var(--surface,#fff);padding:12px 14px}
+.snapwrap>summary{cursor:pointer;font-size:17px;font-weight:800;list-style:none}
+.snapwrap>summary::-webkit-details-marker{display:none}
+.snapsub{color:var(--muted,#667);font-size:13px;margin:6px 0 12px}
+.snapblock{margin-top:14px}
+.snaptitle{font-weight:700;font-size:13.5px;margin:0 0 6px;color:var(--muted,#556)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
@@ -252,6 +258,7 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
 </div>
 <div class="odash" id="odash"></div>
 <div class="mbreak" id="omaintbreak"></div>
+<div id="osnapshot"></div>
 <div id="owners"></div>
 <p class="hint" style="margin-top:18px"><b>Monthly</b> owners: total = sum of their cars' fees, prorated daily by <b>days available ÷ days in the month</b>, paid once on the 25th or 30th. <b>Weekly</b> owners: the monthly total is <b>split 4 ways</b> and paid on the chosen weekday (4 payments a month). Each owner has its own <b>⇪ Preview &amp; push</b> — it writes only that owner's lines for the selected month, tagged with a hidden source ref so re-pushing <b>updates</b> instead of duplicating. Other owners and the rest of your ledger are never touched.</p>
 </main>
@@ -340,6 +347,47 @@ function renderDash(){var yr=YM.slice(0,4);var ytdG=0,ytdN=0,ytdP=0,ytdFi=0,ytdF
   var mMaint=0,ytdMaint=0,catAgg={};STATE.forEach(function(o){(o.maint||[]).forEach(function(x){var d=String(x.date||'');var c=+x.cost||0;if(d.slice(0,4)===yr)ytdMaint+=c;if(d.slice(0,7)===YM){mMaint+=c;var k=x.cat||'Uncategorised';catAgg[k]=(catAgg[k]||0)+c;}});});
   var el=document.getElementById('odash');if(!el)return;function card(l,v,sub,cls){return '<div class="dcard"><div class="dl">'+l+'</div><div class="dv tnum '+(cls||'')+'">'+fmt(v)+'</div><div class="ds">'+sub+'</div></div>';}el.innerHTML=card('YTD gross earnings (GMV)',r2(ytdG),yr+' · all accounts','')+card('YTD net earnings',r2(ytdN),yr+' · after Stripe fees','pos')+card('YTD paid out to owners',ytdPn,yr+(ytdFi>0?' · excl. Capital loan':' · payouts'),'pos')+(ytdFi>0?card('Stripe Capital loan',r2(ytdFi),fmt(ytdFo)+' repaid · liability, not income','neg'):'')+card('GMV · '+fmtYM(YM),r2(mG),'gross this month','')+card('Net earnings · '+fmtYM(YM),r2(mN),'after Stripe','pos')+card('Owner payouts · '+fmtYM(YM),mPn,'distributions'+(mFi>0?' · excl. loan':' paid out'),'pos')+card('Platform fees · '+fmtYM(YM),r2(plat),'R2G revenue','brand')+card('Maintenance costs · '+fmtYM(YM),r2(mMaint),'YTD '+fmt(r2(ytdMaint))+' · fleet upkeep','neg');
   var mb=document.getElementById('omaintbreak');if(mb){var ks=Object.keys(catAgg);mb.innerHTML=ks.length?'<div class="mbh">🔧 Maintenance by type · '+fmtYM(YM)+' <span class="mbt">'+fmt(r2(mMaint))+' total</span></div><div class="mbchips">'+ks.sort(function(a,b){return catAgg[b]-catAgg[a];}).map(function(k){return '<span class="mchip">'+esc(k)+' <b>'+fmt(r2(catAgg[k]))+'</b></span>';}).join('')+'</div>':'';}}
+// ── MONTHLY OWNER SNAPSHOT ── per-owner Gross → profit (owner view) + R2G margin (private) ──
+function ownerName(o){return o.name||o.ownerName||o.bizName||'Owner';}
+function renderSnapshot(){
+  var el=document.getElementById('osnapshot');if(!el)return;
+  if(!STATE.length){el.innerHTML='';return;}
+  var rows=STATE.map(function(o){
+    var s=stripeFor(o.stripeLabel||'');
+    var pf=r2(ownerMonthTotal(o,YM));   // R2G platform fee
+    var mm=maintYM(o);                    // maintenance this month
+    var profit=r2(s.g-s.f-pf-mm);         // owner take-home = Gross − Stripe fees − platform fee − maintenance
+    var margin=s.g>0?Math.round(profit/s.g*100):0;
+    return {name:ownerName(o),cars:(o.cars||[]).length,gross:s.g,fees:s.f,pf:pf,mm:mm,profit:profit,margin:margin};
+  }).sort(function(a,b){return b.gross-a.gross;});
+  var T={cars:0,gross:0,fees:0,pf:0,mm:0,profit:0};
+  rows.forEach(function(r){T.cars+=r.cars;T.gross+=r.gross;T.fees+=r.fees;T.pf+=r.pf;T.mm+=r.mm;T.profit+=r.profit;});
+  var tMargin=T.gross>0?Math.round(T.profit/T.gross*100):0;
+  var ownerRows=rows.map(function(r){
+    return '<tr><td>'+esc(r.name)+'</td><td class="n">'+r.cars+'</td><td class="n">'+fmt(r.gross)+'</td>'
+      +'<td class="n neg">'+(r.fees?fmt(-r.fees):'—')+'</td><td class="n neg">'+(r.pf?fmt(-r.pf):'—')+'</td>'
+      +'<td class="n neg">'+(r.mm?fmt(-r.mm):'—')+'</td><td class="n '+(r.profit>=0?'pos':'neg')+'"><b>'+fmt(r.profit)+'</b></td>'
+      +'<td class="n">'+r.margin+'%</td></tr>';
+  }).join('');
+  var ownerTot='<tr class="tot"><td>Total</td><td class="n">'+T.cars+'</td><td class="n">'+fmt(r2(T.gross))+'</td>'
+    +'<td class="n neg">'+fmt(-r2(T.fees))+'</td><td class="n neg">'+fmt(-r2(T.pf))+'</td><td class="n neg">'+fmt(-r2(T.mm))+'</td>'
+    +'<td class="n"><b>'+fmt(r2(T.profit))+'</b></td><td class="n">'+tMargin+'%</td></tr>';
+  var r2gRows=rows.map(function(r){
+    return '<tr><td>'+esc(r.name)+'</td><td class="n">'+fmt(r.gross)+'</td><td class="n brand"><b>'+fmt(r.pf)+'</b></td></tr>';
+  }).join('');
+  el.innerHTML=
+   '<details class="snapwrap" open><summary>📊 Monthly owner snapshot — '+fmtYM(YM)+'</summary>'
+   +'<div class="snapsub">How each owner performed in '+fmtYM(YM)+'. Owner view = what they earned and kept; R2G view = what Rent 2 Go made — keep that one private.'
+   +(YM===curYM()?' <b>⏳ This month is still in progress</b> — gross is still coming in while the platform fee reflects the whole month, so profit reads low until month-end. Pick a completed month for a settled view.':'')
+   +'</div>'
+   +'<div class="snapblock"><div class="snaptitle">Owner statements — what each owner earned &amp; kept</div>'
+   +'<div class="rowscroll"><table class="dtbl"><thead><tr><th>Owner</th><th class="n">Cars</th><th class="n">Gross revenue</th><th class="n">Stripe fees</th><th class="n">Platform fee</th><th class="n">Maintenance</th><th class="n">Owner profit</th><th class="n">Margin</th></tr></thead><tbody>'+ownerRows+ownerTot+'</tbody></table></div></div>'
+   +'<div class="snapblock"><div class="snaptitle">🔒 R2G margin (private) — platform fees earned · '+fmtYM(YM)+'</div>'
+   +'<div class="rowscroll"><table class="dtbl"><thead><tr><th>Owner</th><th class="n">Their gross</th><th class="n">R2G revenue (platform fee)</th></tr></thead><tbody>'+r2gRows
+   +'<tr class="tot"><td>Total R2G revenue</td><td class="n">'+fmt(r2(T.gross))+'</td><td class="n brand"><b>'+fmt(r2(T.pf))+'</b></td></tr></tbody></table></div>'
+   +'<div class="hint" style="margin-top:6px">Maintenance is billed through to owners, so R2G revenue here is the platform fee earned per owner. If you want R2G-borne costs netted out to a true margin, tell me which costs to attribute.</div></div>'
+   +'</details>';
+}
 // ── FLEET FINANCIALS (per-car daily payment, bill-driven from Stripe via Linda) ──
 function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
 var BASE_REASONS=['Customer defaulted','Not rented','Off-fleet — accident repair / maintenance','Payment plan','Other'];
@@ -413,6 +461,7 @@ function render(){
   var host=document.getElementById('owners');
   document.getElementById('ymlbl').textContent=fmtYM(YM);
   renderDash();
+  renderSnapshot();
   if(!STATE.length){host.innerHTML='<div class="owner"><div class="empty">No owners yet.<br><br><button class="btn pri" onclick="document.getElementById(\'addOwner\').click()">+ Add your first owner</button></div></div>';document.getElementById('grand').textContent='$0.00';return;}
   var grand=0;
   host.innerHTML=STATE.map(function(o,oi){
