@@ -1260,7 +1260,7 @@ function renderSuggestions(){
   var proposedAmt=FEES.filter(function(f){return f.status==='proposed';}).reduce(function(a,f){return a+(+f.fee||0);},0);
   if(rec)s.push({c:'red',t:rec+' customer(s) at RECOVERY — notify the administrator to schedule collection.'});
   if(disc)s.push({c:'red',t:disc+' customer(s) on FINAL disconnection notice — recovery follows in 12h if uncured.'});
-  near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — one more triggers disconnection.'}));
+  near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — a current/new rental (3 open) triggers disconnection.'}));
   if(proposedN)s.push({c:'',t:IC_FEE+proposedN+' × $10 late fee(s) ready to invoice ('+fmt(proposedAmt)+') — open the $10 ledger and tap 🧾 Create invoice.'});
   if(draftN)s.push({c:'',t:draftN+' notice(s) awaiting review — 📧 Send email or 📋 Copy for WhatsApp/SMS, then ✅ Mark sent.'});
   if(!draftN&&!disc&&!rec&&!proposedN)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
