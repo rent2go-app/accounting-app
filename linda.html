@@ -760,7 +760,7 @@ async function graceFromMsg(id){
   await sb.from('messages').update({handled:true,handled_at:new Date().toISOString(),note:'grace until '+g.label}).eq('id',id);
   var cust=CUSTS.find(function(x){return x.account_label===m.account_label&&x.customer_id===m.customer_id;});
   var first=((m.customer_name||'').split(' ')[0]||'');
-  var draft='Rent 2 Go: Thanks '+first+' — we’ve noted your message and extended your payment deadline to '+g.label+'. Please settle by then to keep your vehicle active. Reply STOP to opt out.';
+  var draft=g.guessed?('Rent 2 Go: Hi '+first+' — to set your extension we need a specific date and time. Please reply with the exact date and time you can have the payment in and we\u2019ll process it. Reply STOP to opt out.'):('Rent 2 Go: Hi '+first+' — confirming your extension to '+g.label+'. Please settle by then to keep your vehicle active. Reply STOP to opt out.');
   var text=prompt('✅ Grace set until '+g.label+'.\n\nEdit the confirmation to send to '+(m.customer_name||'the customer')+', or Cancel to skip sending:',draft);
   if(text){
     var phone=(cust&&cust.phone)||m.from_number||'',email=cust&&cust.email;
