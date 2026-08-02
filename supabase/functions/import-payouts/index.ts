@@ -1,10 +1,8 @@
 // import-payouts — pull INSTANT Stripe payouts from the Rent 2 Go (1.0) and Rent 2 Go 2.0 accounts
 // into the ledger (day_blocks) as daily income. This is the basis of daily income.
 //
-// DAY CYCLE = NOON-to-NOON (ET): the ledger day flips at NOON. A payout BEFORE noon belongs to that
-// calendar day; a payout AT/AFTER noon belongs to the NEXT day. (e.g. Jul 31 9am → Jul 31; Jul 31 2pm →
-// Aug 1.) Ledger day D collects payouts in [ (D-1) 12:00, D 12:00 ). Implemented by shifting the payout
-// time FORWARD 12h, then taking the ET date.
+// DAY CYCLE = MIDNIGHT-to-MIDNIGHT (ET): a payout belongs to the ET calendar date it was created
+// (00:00–24:00). No shift.
 //
 // Idempotent: each payout is written once, keyed by ref "sp:<payout_id>" — re-runs (and the 8x/day
 // cron) never duplicate. Auto-imported lines get a distinct COLOUR (#a855f7 purple) so any manual
@@ -20,7 +18,7 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } }); }
 function etYMD(e: number) { return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(e * 1000)); }
 function etTime(e: number) { return new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(new Date(e * 1000)); }
-function ledgerDay(created: number) { return etYMD(created + 12 * 3600); } // noon flip: <noon → same day, ≥noon → next day
+function ledgerDay(created: number) { return etYMD(created); } // calendar day (midnight-to-midnight ET)
 async function sbGet(path: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } }); return r.ok ? await r.json() : []; }
 async function sbPost(path: string, body: unknown, prefer: string) { await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(body) }); }
 async function stripeAll(base: string, key: string) {
