@@ -160,6 +160,7 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .dep{background:var(--surface);border:1px solid var(--dep-line);border-radius:8px;padding:2px 4px;display:flex;align-items:center}
 .dep.auto{border-color:#a855f7;box-shadow:inset 3px 0 0 #a855f7;background:color-mix(in srgb,#a855f7 8%,var(--surface))}
 .dep.auto .autotag{font-size:11px;color:#a855f7;padding:0 2px 0 1px}
+.dep .depts{font-size:9px;color:var(--muted);white-space:nowrap;padding:0 3px;letter-spacing:.01em}
 .dep .cur{font-size:10px;color:var(--muted);padding:0 1px 0 3px}
 .drt{border-top:2px solid var(--dep-line);margin-top:9px;padding-top:9px;display:flex;justify-content:space-between;font-weight:800;font-size:16px}.drt .num{color:var(--in)}
 .expwrap{padding:8px 16px 4px;border-top:2px solid var(--line-strong)}
@@ -412,7 +413,7 @@ function noteRail(d){var notes=NOTES[d]||[];var wide=(typeof window!=='undefined
 function findNote(id){for(var d in NOTES){var a=NOTES[d];for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];}return null;}
 function removeNote(id){for(var d in NOTES){var a=NOTES[d];for(var i=0;i<a.length;i++)if(a[i].id===id){a.splice(i,1);return;}}}
 function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00');const isT=d===anchor;const first=idx===0;const poscls=(scope==='day'&&!customRange)?(d===anchor?' poscur':(d<anchor?' posprev':' posnext')):'';
- const deps='<div class="deps">'+(o.d||[]).map((v,i)=>'<span class="dep'+(dauto(v)?' auto':'')+'"'+(dauto(v)?' title="Auto-imported Stripe payout — '+esc(v.lbl||'')+' ('+esc(v.ref||'')+')"':'')+'>'+(dauto(v)?'<span class="autotag">⚡</span>':'')+'<span class="cur">$</span><input class="amt dep tnum" type="number" step="0.01" data-d="'+d+'" data-k="d" data-f="a" data-i="'+i+'" value="'+dval(v).toFixed(2)+'"><button class="del" data-dk="d" data-dd="'+d+'" data-di="'+i+'" title="Delete deposit">×</button></span>').join('')+'<button class="addbtn" data-add="d" data-d="'+d+'">+ deposit</button></div>';
+ const deps='<div class="deps">'+(o.d||[]).map((v,i)=>'<span class="dep'+(dauto(v)?' auto':'')+'"'+(dauto(v)?' title="Auto-imported Stripe payout — '+esc(v.lbl||'')+' · '+esc(v.ts||'')+' ('+esc(v.ref||'')+')"':'')+'>'+(dauto(v)?'<span class="autotag">⚡</span>':'')+'<span class="cur">$</span><input class="amt dep tnum" type="number" step="0.01" data-d="'+d+'" data-k="d" data-f="a" data-i="'+i+'" value="'+dval(v).toFixed(2)+'">'+(dauto(v)?'<span class="depts">'+esc(v.ts||'')+(v.lbl?' · '+esc(String(v.lbl).replace("Rent 2 Go ","R2G "))+'':'')+'</span>':'')+'<button class="del" data-dk="d" data-dd="'+d+'" data-di="'+i+'" title="Delete deposit">×</button></span>').join('')+'<button class="addbtn" data-add="d" data-d="'+d+'">+ deposit</button></div>';
  const injL=(o.j||[]).map((l,i)=>iline(l,i,d)).join('');
  const groups={};(o.e||[]).forEach((l,i)=>{const c=l[2]||'Other';(groups[c]=groups[c]||[]).push([l,i])});
  const grpHTML=c=>{const items=groups[c];const sub=items.reduce((s,p)=>s+(+p[0][1]||0),0);const col=CATCOL[c]||'#6b7280';

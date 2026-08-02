@@ -18,6 +18,7 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } }); }
 function etYMD(e: number) { return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(e * 1000)); }
 function etTime(e: number) { return new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).format(new Date(e * 1000)); }
+function etMD(e: number) { return new Intl.DateTimeFormat("en-US", { timeZone: TZ, month: "short", day: "numeric" }).format(new Date(e * 1000)); }
 function ledgerDay(created: number) { return etYMD(created); } // calendar day (midnight-to-midnight ET)
 async function sbGet(path: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } }); return r.ok ? await r.json() : []; }
 async function sbPost(path: string, body: unknown, prefer: string) { await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(body) }); }
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
     // Lookback covers the current + previous noon-to-noon day (default 60h). Backfill can pass {from:<unix>}.
     const from = body.from ? Number(body.from) : now - (Number(body.hours) || 60) * 3600;
 
-    const byDay: Record<string, { id: string; amount: number; lbl: string }[]> = {};
+    const byDay: Record<string, { id: string; amount: number; lbl: string; ts: string }[]> = {};
     const perAcct: Record<string, number> = {};
     for (const a of ACCTS) {
       const short = WANT[a.label];
@@ -56,7 +57,7 @@ Deno.serve(async (req) => {
         const amt = Math.round(p.amount || 0) / 100;
         if (amt <= 0) continue;
         const day = ledgerDay(p.created);
-        (byDay[day] = byDay[day] || []).push({ id: p.id, amount: amt, lbl: `${short} · ${etTime(p.created)}` });
+        (byDay[day] = byDay[day] || []).push({ id: p.id, amount: amt, lbl: short, ts: `${etMD(p.created)} · ${etTime(p.created)}` });
         perAcct[short] = (perAcct[short] || 0) + amt;
       }
     }
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
         const ref = "sp:" + pay.id;
         dTot += pay.amount;
         if (have.has(ref)) { skipped++; continue; }            // already imported — never duplicate
-        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, src: "stripe" });   // object = auto-imported, marked ⚡ in UI
+        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });   // object = auto-imported, marked ⚡ + stamp in UI
         have.add(ref); added++; dAdded++;
       }
       perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100 };
