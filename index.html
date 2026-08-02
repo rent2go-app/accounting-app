@@ -300,7 +300,7 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 <div id="reports" class="repwrap" hidden>
 <div class="rephead"><h2>Management Accounts</h2><button class="btn" id="repClose">✕ Close</button></div>
 <div class="repctl"><label>From</label><input type="date" id="repFrom"><label>To</label><input type="date" id="repTo"><button class="qchip" data-rp="2026">2026</button><button class="qchip" data-rp="2027">2027 Q1</button><button class="qchip" data-rp="all">All</button><div class="spacer"></div><button class="btn" id="repCSV">⬇ Download CSV</button><button class="btn" id="repPrint">🖨 Print / PDF</button></div>
-<div class="reptabs"><button class="rtab on" data-r="pl">Profit &amp; Loss</button><button class="rtab" data-r="proj">📈 Projections</button><button class="rtab" data-r="ownrev">👥 Owner Revenue</button><button class="rtab" data-r="exp">Expenses by Category</button><button class="rtab" data-r="draw">Owner&#39;s Drawings</button><button class="rtab" data-r="cash">Cash Flow</button><button class="rtab" data-r="trend">Monthly Trend</button><button class="rtab" data-r="bva">Budget vs Actual</button><button class="rtab" data-r="pay">Payroll</button><button class="rtab" data-r="ap">Payables</button></div>
+<div class="reptabs"><button class="rtab on" data-r="pl">Profit &amp; Loss</button><button class="rtab" data-r="proj">📈 Projections</button><button class="rtab" data-r="ownrev">👥 Owner Revenue</button><button class="rtab" data-r="exp">Expenses by Category</button><button class="rtab" data-r="draw">Owner&#39;s Drawings</button><button class="rtab" data-r="cash">Cash Flow</button><button class="rtab" data-r="avgdep">💵 Daily Deposits &amp; Avg</button><button class="rtab" data-r="trend">Monthly Trend</button><button class="rtab" data-r="bva">Budget vs Actual</button><button class="rtab" data-r="pay">Payroll</button><button class="rtab" data-r="ap">Payables</button></div>
 <div id="repBody"></div></div>
 <div id="mtag" class="repwrap" hidden><div class="rephead"><h2>🔧 Maintenance attribution</h2><button class="btn" id="mtagClose">✕ Close</button></div><div class="repctl"><span id="mtagInfo" class="hint"></span><div class="spacer"></div><label>Show</label><select id="mtagFilter"><option value="sug">Auto-suggested</option><option value="none">No suggestion</option><option value="all">All untagged</option></select><span class="pill">Bulk-set shown →</span><select id="mtagBulk"></select><button class="btn" id="mtagApplyBulk">Apply to shown</button><button class="btn pri" id="mtagSave">💾 Save</button></div><div id="mtagBody"></div></div>
 <a href="linda.html" title="Ask Linda — Billing Agent" style="position:fixed;left:16px;bottom:18px;z-index:40"><img src="assets/linda-sm.png" alt="Linda" style="width:52px;height:52px;border-radius:50%;box-shadow:0 6px 18px rgba(0,0,0,.28);border:2px solid #fff"></a>
@@ -660,7 +660,25 @@ function buildOwnerRev(){
   rows.push({cls:'',cells:['Partner platform fees are R2G revenue too and post to the P&L via Owners → Push to ledger. Own-fleet net above is R2G principal revenue. GMV is total platform volume, not revenue.','','','']});
   return {cap:'Owner Revenue (from Owners module)',cols:['Stripe account','Gross (GMV)','Net earnings','Paid out'],rows:rows};
 }
-function renderReport(){var days=repDays();var rep=repType==='ownrev'?buildOwnerRev():repType==='proj'?buildProj():repType==='pl'?buildPL(days):repType==='exp'?buildExp(days):repType==='draw'?buildDraw(days):repType==='cash'?buildCash(days):repType==='trend'?buildTrend(days):repType==='ap'?buildAP(days):repType==='pay'?buildPay(days):buildBVA(days);repCurrent=rep;var html='<div class="repcap">'+rep.cap+' · '+repFrom+' to '+repTo+'</div><table class="reptab">';if(rep.cols)html+='<tr class="hd">'+rep.cols.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';rep.rows.forEach(function(rr){html+='<tr'+(rr.cls?' class="'+rr.cls+'"':'')+'>'+rr.cells.map(function(c){return '<td>'+((typeof c==='number')?fmt(c):(c||''))+'</td>';}).join('')+'</tr>';});html+='</table>';document.getElementById('repBody').innerHTML=html;}
+function buildAvgDep(days){
+  var rows=[],tDep=0,tOth=0,tTot=0,n=0;
+  days.forEach(function(d){
+    if(!M[d])return;
+    var dep=r2(depSum(d)),tot=r2(M[d].incReal),oth=r2(tot-dep);
+    tDep+=dep;tOth+=oth;tTot+=tot;n++;
+    var dd=new Date(d+'T00:00:00');
+    rows.push({cls:'',cells:[d,D3[dd.getDay()].slice(0,3),dep,oth,tot]});
+  });
+  tDep=r2(tDep);tOth=r2(tOth);tTot=r2(tTot);
+  var nd=n||1;
+  rows.push({cls:'tot',cells:['Total · '+n+' day'+(n===1?'':'s'),'',tDep,tOth,tTot]});
+  rows.push({cls:'hd',cells:['Averages (deposits · other · total)','','','','']});
+  rows.push({cls:'',cells:['Average per day','',r2(tDep/nd),r2(tOth/nd),r2(tTot/nd)]});
+  rows.push({cls:'',cells:['Average per week','',r2(tDep/nd*7),r2(tOth/nd*7),r2(tTot/nd*7)]});
+  rows.push({cls:'big',cells:['Average per month','',r2(tDep/nd*30.44),r2(tOth/nd*30.44),r2(tTot/nd*30.44)]});
+  return {cap:'Daily Deposits & Average Income',cols:['Date','Day','Deposits','Other income','Total income'],rows:rows};
+}
+function renderReport(){var days=repDays();var rep=repType==='ownrev'?buildOwnerRev():repType==='proj'?buildProj():repType==='pl'?buildPL(days):repType==='exp'?buildExp(days):repType==='draw'?buildDraw(days):repType==='cash'?buildCash(days):repType==='trend'?buildTrend(days):repType==='avgdep'?buildAvgDep(days):repType==='ap'?buildAP(days):repType==='pay'?buildPay(days):buildBVA(days);repCurrent=rep;var html='<div class="repcap">'+rep.cap+' · '+repFrom+' to '+repTo+'</div><table class="reptab">';if(rep.cols)html+='<tr class="hd">'+rep.cols.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';rep.rows.forEach(function(rr){html+='<tr'+(rr.cls?' class="'+rr.cls+'"':'')+'>'+rr.cells.map(function(c){return '<td>'+((typeof c==='number')?fmt(c):(c||''))+'</td>';}).join('')+'</tr>';});html+='</table>';document.getElementById('repBody').innerHTML=html;}
 function repCSV(){if(!repCurrent)return;var L=[];if(repCurrent.cols)L.push(repCurrent.cols);repCurrent.rows.forEach(function(rr){L.push(rr.cells.map(function(c){return typeof c==='number'?c:(c||'');}));});var csv=L.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var b=new Blob([csv],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='r2g-'+repType+'-'+repFrom+'_'+repTo+'.csv';a.click();}
 document.getElementById('repBtn').onclick=function(){document.getElementById('repFrom').value=repFrom;document.getElementById('repTo').value=repTo;document.getElementById('reports').hidden=false;renderReport();};
 if(location.hash==='#reports'){var _rb=document.getElementById('repBtn');if(_rb)_rb.click();}
