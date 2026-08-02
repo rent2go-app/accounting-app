@@ -374,9 +374,15 @@ async function load(){
 }
 // Refresh just the invoice/fee ledger data (re-pull from DB) and re-stamp the "last refreshed" time.
 async function refreshLedger(btn){
-  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='🔄 Refreshing…';
-  try{await load();toast('Invoice ledger refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');}
-  catch(e){alert('Refresh failed: '+(e.message||e));btn.disabled=false;btn.innerHTML=o;}
+  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='🔄 Re-pulling from Stripe… (~30–60s)';
+  try{
+    var r=await sb.functions.invoke('linda-scan');   // re-audit all accounts so account changes are picked up
+    if(r.error)throw r.error;
+    await load();
+    toast('Ledger re-audited & refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');
+  }
+  catch(e){alert('Refresh failed: '+(e.message||e));}
+  finally{btn.disabled=false;btn.innerHTML=o;}
 }
 // ---------- Payment Trends report (is Linda working?) ----------
 function reportAccounts(){var s=new Set();CUSTS.forEach(function(c){if(c.account_label)s.add(c.account_label);});return Array.from(s).sort();}
@@ -1155,7 +1161,7 @@ function renderFeeLedger(){
   }).join('');
   var dismRows=dismToday.map(function(f){var nm=nameOf[f.account_label+'|'+f.customer_id]||f.customer_id;return '<tr><td>'+esc(nm)+'</td><td>'+esc(f.account_label)+'</td><td>'+esc(f.invoice_number||f.invoice_id||'—')+'</td><td><button class="btn small" data-undismissfee="'+esc(f.invoice_id)+'">↩ Restore fee</button></td></tr>';}).join('');
   var dismBlock=dismToday.length?'<details class="feewrap" style="margin-top:8px"><summary>🚫 Dismissed today — <b>'+dismToday.length+'</b> <span class="hint">(no $10 fee will be raised for these today)</span></summary><table class="feetbl"><tr class="hd"><td>Customer</td><td>Account</td><td>Invoice</td><td>Restore</td></tr>'+dismRows+'</table></details>':'';
-  var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-pull the invoice/fee ledger from the database now">🔄 Refresh ledger</button></div>';
+  var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-scan Stripe (all accounts) and refresh the invoice/fee ledger — picks up account changes">🔄 Refresh ledger</button></div>';
   var main='<details class="feewrap" data-sec="fees"'+(OPENSEC.fees?' open':'')+'><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to invoice'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — create invoice → paid)</span></summary>'
     +refreshBar
     +groups
