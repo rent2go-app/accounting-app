@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     // Lookback covers the current + previous noon-to-noon day (default 60h). Backfill can pass {from:<unix>}.
     const from = body.from ? Number(body.from) : now - (Number(body.hours) || 60) * 3600;
 
-    const byDay: Record<string, { id: string; amount: number; desc: string }[]> = {};
+    const byDay: Record<string, { id: string; amount: number; lbl: string }[]> = {};
     const perAcct: Record<string, number> = {};
     for (const a of ACCTS) {
       const short = WANT[a.label];
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         const amt = Math.round(p.amount || 0) / 100;
         if (amt <= 0) continue;
         const day = ledgerDay(p.created);
-        (byDay[day] = byDay[day] || []).push({ id: p.id, amount: amt, desc: `Stripe payout — ${short} · ${etTime(p.created)}` });
+        (byDay[day] = byDay[day] || []).push({ id: p.id, amount: amt, lbl: `${short} · ${etTime(p.created)}` });
         perAcct[short] = (perAcct[short] || 0) + amt;
       }
     }
@@ -69,18 +69,18 @@ Deno.serve(async (req) => {
     for (const day of days) {
       const rows = await sbGet(`day_blocks?day=eq.${day}&select=day,deposits,income,expenses`);
       const row = rows[0] || { day, deposits: [], income: [], expenses: [] };
-      const income = (row.income || []).slice();
-      const have = new Set(income.filter((l: any) => String(l[4] || "").startsWith("sp:")).map((l: any) => l[4]));
+      const deposits = (row.deposits || []).slice();          // green "Daily deposits" section (Stripe transfers)
+      const have = new Set(deposits.filter((x: any) => x && typeof x === "object" && x.ref).map((x: any) => x.ref));
       let dAdded = 0, dTot = 0;
       for (const pay of byDay[day]) {
         const ref = "sp:" + pay.id;
         dTot += pay.amount;
         if (have.has(ref)) { skipped++; continue; }            // already imported — never duplicate
-        income.push([pay.desc, pay.amount, "Stripe Income", AUTO_COLOR, ref]);
+        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, src: "stripe" });   // object = auto-imported, marked ⚡ in UI
         have.add(ref); added++; dAdded++;
       }
       perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100 };
-      await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits: row.deposits || [], income, expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
+      await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits, income: row.income || [], expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
     }
     return json({ ok: true, from, days, added, skipped, perDay, perAcct });
   } catch (e) { return json({ error: String(e) }, 500); }

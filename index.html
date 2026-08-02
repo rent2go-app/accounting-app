@@ -158,6 +158,8 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .secttl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);margin:0 0 4px;display:flex;justify-content:space-between;align-items:center}
 .deps{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
 .dep{background:var(--surface);border:1px solid var(--dep-line);border-radius:8px;padding:2px 4px;display:flex;align-items:center}
+.dep.auto{border-color:#a855f7;box-shadow:inset 3px 0 0 #a855f7;background:color-mix(in srgb,#a855f7 8%,var(--surface))}
+.dep.auto .autotag{font-size:11px;color:#a855f7;padding:0 2px 0 1px}
 .dep .cur{font-size:10px;color:var(--muted);padding:0 1px 0 3px}
 .drt{border-top:2px solid var(--dep-line);margin-top:9px;padding-top:9px;display:flex;justify-content:space-between;font-weight:800;font-size:16px}.drt .num{color:var(--in)}
 .expwrap{padding:8px 16px 4px;border-top:2px solid var(--line-strong)}
@@ -290,7 +292,7 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 <div id="catlist" class="userlist"></div>
 </div>
 <div class="setdiv"></div><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="btn" id="setDone" style="background:var(--brand);color:#fff;border-color:var(--brand)">Save &amp; close</button><span class="setmsg" id="set_saved" style="margin:0">Changes save automatically as you type.</span></div></div>
-<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2035-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button><button class="qchip" id="addMonth" style="border-color:var(--brand);color:var(--brand);font-weight:800">+ Add month</button></div></div><div class="ledgersearch"><input type="search" id="txnSearch" placeholder="🔍 Search all transactions — name · category · date · amount (space-separate terms)"><span class="srinfo" id="txnSearchInfo"></span><button class="btn" id="txnSearchClear" hidden>✕ Clear</button></div><div id="searchResults" hidden></div><div id="dashfloat" class="dashfloat"><div class="dashbar"><span class="dashttl">📊 <span id="dashRT">—</span></span><button class="dashmin" id="dashMin" title="Minimise / expand">▾</button></div><div class="dashbody"><div id="cashwarn" class="cashwarn" hidden></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div></div></div><div class="stack" id="stack"></div>
+<main class="wrap"><div class="filters"><div class="seg" id="scopeSeg"><button data-s="day" class="on">Day</button><button data-s="week">Week</button><button data-s="month">Month</button><button data-s="quarter">Quarter</button></div><div class="nav"><button id="prev">‹</button><button id="next">›</button></div><label class="muted" style="font-size:12px;font-weight:700">Date</label><input type="date" id="anchor" min="2026-01-02" max="2035-12-31"><div class="spacer"></div><div class="rangeLbl" id="rangeLbl"></div><div class="qfilters"><span class="qlbl">Jump ahead</span><button class="qchip" data-q="today">Today</button><button class="qchip" data-q="d7">Next 7 days</button><button class="qchip" data-q="w4">Next 4 weeks</button><button class="qchip" data-q="nm">Next month</button><button class="qchip" data-q="nq">Next quarter</button><button class="qchip" data-q="ya">Year ahead</button><button class="qchip" id="addMonth" style="border-color:var(--brand);color:var(--brand);font-weight:800">+ Add month</button></div></div><div class="ledgersearch"><input type="search" id="txnSearch" placeholder="🔍 Search all transactions — name · category · date · amount (space-separate terms)"><span class="srinfo" id="txnSearchInfo"></span><button class="btn" id="txnSearchClear" hidden>✕ Clear</button><span class="spacer"></span><button class="btn" id="pullPayouts" title="Import instant Stripe payouts (Rent 2 Go 1.0 &amp; 2.0) into deposits right now — outside the 8×/day schedule">⚡ Pull payouts now</button></div><div id="searchResults" hidden></div><div id="dashfloat" class="dashfloat"><div class="dashbar"><span class="dashttl">📊 <span id="dashRT">—</span></span><button class="dashmin" id="dashMin" title="Minimise / expand">▾</button></div><div class="dashbody"><div id="cashwarn" class="cashwarn" hidden></div><div class="glance" id="glance"></div><div class="kpis" id="kpis"></div></div></div><div class="stack" id="stack"></div>
 <div class="botnav" id="botnav"><button class="btn" id="bprev">‹ Previous</button><span class="muted" id="botnavlbl"></span><button class="btn" id="bnext">Next ›</button></div>
 <datalist id="expnames"></datalist>
 <div id="movepop" class="movepop" hidden><div class="mpcard"><div class="mptitle" id="mvtitle">Move line to…</div><label class="mplbl">Target date</label><input type="date" id="mvdate"><div class="mprow"><button class="btn" id="mvCancel">Cancel</button><button class="btn" id="mvGo" style="background:var(--brand);color:#fff;border-color:var(--brand)">Move line</button></div></div></div>
@@ -318,7 +320,7 @@ async function load(){
   try{var flr=await sb.from('owners_program').select('owners').eq('id',1).single();FLEETCARS=[];if(flr.data&&flr.data.owners){flr.data.owners.forEach(function(o){var on=(o.name||'').trim()||'Owner';(o.cars||[]).forEach(function(c){if(c.id)FLEETCARS.push({id:c.id,owner:on,name:(c.name||c.plate||'car'),label:on+' · '+(c.name||c.plate||'car'),tok:parseVeh((c.name||'')+' '+(c.plate||''))});});});}}catch(e){FLEETCARS=[];}
   try{var nres=await sb.from('day_notes').select('*').order('created_at',{ascending:true});NOTES={};(nres.data||[]).forEach(function(n){(NOTES[n.day]=NOTES[n.day]||[]).push(n);});}catch(e){NOTES={};}
   try{var _si=[],_sf=0;while(true){var _sq=await sb.from('stripe_income').select('day,label,gross,fee,net,payout,fin_in,fin_out').order('day',{ascending:true}).range(_sf,_sf+999);if(_sq.error)throw _sq.error;var _sd=_sq.data||[];_si=_si.concat(_sd);if(_sd.length<1000)break;_sf+=1000;}STRIPEROWS=_si;}catch(e){STRIPEROWS=[];}
-  var rows=res.data||[];MD={};rows.forEach(function(r){MD[r.day]={d:(r.deposits||[]).map(Number),j:(r.income||[]),e:(r.expenses||[])};});
+  var rows=res.data||[];MD={};rows.forEach(function(r){MD[r.day]={d:(r.deposits||[]).map(function(x){return (x&&typeof x==='object')?x:Number(x);}),j:(r.income||[]),e:(r.expenses||[])};});
   for(var d in MD){MD[d].j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});MD[d].e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(d<=TODAY);if(l.length<5)l.push('');});}
   DK=Object.keys(MD).sort();
   if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
@@ -372,7 +374,11 @@ function snapshot(){try{HIST.push(JSON.stringify({m:MD,o:OPEN}));if(HIST.length>
 function updateUndo(){const b=document.getElementById('undoBtn');if(b){b.disabled=!HIST.length;b.textContent=HIST.length?'↶ Undo ('+HIST.length+')':'↶ Undo';}}
 function undo(){if(!HIST.length)return;const s=JSON.parse(HIST.pop());MD=s.m;OPEN=s.o;save();recompute();render();updateUndo();}
 let DK=[];
-const depSum=d=>(MD[d].d||[]).reduce((s,x)=>s+(+x||0),0);
+// A deposit is normally a plain number (manual). Auto-imported Stripe payouts are objects
+// {a:amount, ref:'sp:<id>', lbl:'Rent 2 Go 2.0'} so they can be deduped and marked in the UI.
+function dval(x){return (x&&typeof x==='object')?(+x.a||0):(+x||0);}
+function dauto(x){return !!(x&&typeof x==='object'&&x.ref);}
+const depSum=d=>(MD[d].d||[]).reduce((s,x)=>s+dval(x),0);
 const injReal=d=>(MD[d].j||[]).reduce((s,l)=>s+(isAdj(l)?0:(+l[1]||0)),0);
 const adjSum=d=>(MD[d].j||[]).reduce((s,l)=>s+(isAdj(l)?(+l[1]||0):0),0);
 const incReal=d=>r2(depSum(d)+injReal(d));
@@ -406,7 +412,7 @@ function noteRail(d){var notes=NOTES[d]||[];var wide=(typeof window!=='undefined
 function findNote(id){for(var d in NOTES){var a=NOTES[d];for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];}return null;}
 function removeNote(id){for(var d in NOTES){var a=NOTES[d];for(var i=0;i<a.length;i++)if(a[i].id===id){a.splice(i,1);return;}}}
 function block(d,idx){const o=MD[d];const x=M[d];const dd=new Date(d+'T00:00:00');const isT=d===anchor;const first=idx===0;const poscls=(scope==='day'&&!customRange)?(d===anchor?' poscur':(d<anchor?' posprev':' posnext')):'';
- const deps='<div class="deps">'+(o.d||[]).map((v,i)=>'<span class="dep"><span class="cur">$</span><input class="amt dep tnum" type="number" step="0.01" data-d="'+d+'" data-k="d" data-f="a" data-i="'+i+'" value="'+(+v||0).toFixed(2)+'"><button class="del" data-dk="d" data-dd="'+d+'" data-di="'+i+'" title="Delete deposit">×</button></span>').join('')+'<button class="addbtn" data-add="d" data-d="'+d+'">+ deposit</button></div>';
+ const deps='<div class="deps">'+(o.d||[]).map((v,i)=>'<span class="dep'+(dauto(v)?' auto':'')+'"'+(dauto(v)?' title="Auto-imported Stripe payout — '+esc(v.lbl||'')+' ('+esc(v.ref||'')+')"':'')+'>'+(dauto(v)?'<span class="autotag">⚡</span>':'')+'<span class="cur">$</span><input class="amt dep tnum" type="number" step="0.01" data-d="'+d+'" data-k="d" data-f="a" data-i="'+i+'" value="'+dval(v).toFixed(2)+'"><button class="del" data-dk="d" data-dd="'+d+'" data-di="'+i+'" title="Delete deposit">×</button></span>').join('')+'<button class="addbtn" data-add="d" data-d="'+d+'">+ deposit</button></div>';
  const injL=(o.j||[]).map((l,i)=>iline(l,i,d)).join('');
  const groups={};(o.e||[]).forEach((l,i)=>{const c=l[2]||'Other';(groups[c]=groups[c]||[]).push([l,i])});
  const grpHTML=c=>{const items=groups[c];const sub=items.reduce((s,p)=>s+(+p[0][1]||0),0);const col=CATCOL[c]||'#6b7280';
@@ -474,7 +480,7 @@ function wire(){
    if(k==='open'){OPEN=r2(inp.value);}
    else if(k==='startedit'){const pi=DK.indexOf(d)-1;const pd=DK[pi];const want=r2(inp.value);setDayAdj(pd,want-M[pd].carried);}
    else if(k==='tot'){const want=r2(inp.value);setDayAdj(d,want-M[d].total);}
-   else if(k==='d'){MD[d].d[i]=r2(inp.value);}
+   else if(k==='d'){var cur=MD[d].d[i];if(cur&&typeof cur==='object')cur.a=r2(inp.value);else MD[d].d[i]=r2(inp.value);}
    else if(f==='a'){MD[d][k][i][1]=r2(inp.value);}
    else if(f==='c'){var _v=inp.value;if(_v==='__add__'){var _nm=prompt('New category name:','');_v=(_nm&&_nm.trim())?_nm.trim():MD[d][k][i][2];}MD[d][k][i][2]=_v;}
    else{MD[d][k][i][0]=inp.value;}
@@ -539,6 +545,7 @@ function runSearch(){
   };});
 }
 document.getElementById('txnSearch').oninput=runSearch;
+(function(){var pb=document.getElementById('pullPayouts');if(!pb)return;pb.onclick=async function(){var orig=pb.textContent;pb.disabled=true;pb.textContent='⚡ Pulling…';try{var r=await sb.functions.invoke('import-payouts',{body:{}});if(r.error)throw r.error;var d=r.data||{};await load();pb.textContent='✓ '+(d.added||0)+' new deposit'+((d.added||0)===1?'':'s');setTimeout(function(){pb.textContent=orig;pb.disabled=false;},2600);}catch(e){alert('Pull failed: '+(e.message||e));pb.textContent=orig;pb.disabled=false;}};})();
 document.getElementById('txnSearchClear').onclick=function(){document.getElementById('txnSearch').value='';runSearch();document.getElementById('txnSearch').focus();};
 document.getElementById('anchor').onchange=e=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});anchor=e.target.value;if(!M[anchor])anchor=DK.reduce((a,d)=>d<=e.target.value?d:a,DK[0]);render()};
 const step=n=>{customRange=null;document.querySelectorAll('.qchip').forEach(function(x){x.classList.remove('on')});const i=DK.indexOf(anchor);let ni=Math.max(0,Math.min(DK.length-1,i+n*(scope==='day'?1:scope==='week'?7:scope==='month'?30:91)));anchor=DK[ni];document.getElementById('anchor').value=anchor;render()};
@@ -587,7 +594,7 @@ document.addEventListener('focusout',function(){setTimeout(function(){editingDay
 function _norm(o){o.j=o.j||[];o.e=o.e||[];o.d=o.d||[];o.j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});o.e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(false);if(l.length<5)l.push('');});return o;}
 function _applyRemote(day,inc){MD[day]=_norm(inc);LASTSYNC[day]=JSON.stringify(MD[day]);if(DK.indexOf(day)<0){DK.push(day);DK.sort();}recompute();render();_toast('Updated by a teammate \u00b7 '+day);}
 function _toast(msg){var t=document.getElementById('rtToast');if(!t){t=document.createElement('div');t.id='rtToast';t.className='rttoast';document.body.appendChild(t);}t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},3000);}
-sb.channel('r2g-ledger').on('postgres_changes',{event:'*',schema:'public',table:'day_blocks'},function(payload){var nd=payload.new;if(!nd||!nd.day)return;var day=nd.day;var inc={d:(nd.deposits||[]).map(Number),j:nd.income||[],e:nd.expenses||[]};var incStr=JSON.stringify(_norm(JSON.parse(JSON.stringify(inc))));var mine=MD[day]?JSON.stringify(MD[day]):null;if(incStr===mine)return;if(LASTSYNC[day]===incStr)return;if(day===editingDay){pendingRemote[day]=inc;return;}_applyRemote(day,inc);}).subscribe();
+sb.channel('r2g-ledger').on('postgres_changes',{event:'*',schema:'public',table:'day_blocks'},function(payload){var nd=payload.new;if(!nd||!nd.day)return;var day=nd.day;var inc={d:(nd.deposits||[]).map(function(x){return (x&&typeof x==='object')?x:Number(x);}),j:nd.income||[],e:nd.expenses||[]};var incStr=JSON.stringify(_norm(JSON.parse(JSON.stringify(inc))));var mine=MD[day]?JSON.stringify(MD[day]):null;if(incStr===mine)return;if(LASTSYNC[day]===incStr)return;if(day===editingDay){pendingRemote[day]=inc;return;}_applyRemote(day,inc);}).subscribe();
 setInterval(function(){try{flush();}catch(e){}},30000);
 // ===== Management Accounts =====
 var repType='pl',repFrom='2026-01-01',repTo='2026-12-31',repCurrent=null;
