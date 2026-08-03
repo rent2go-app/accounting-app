@@ -226,6 +226,10 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .banktbl .desc{word-break:break-word}
 .banktbl .amt{width:118px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
 .banktbl tr.tot td{font-weight:800;border-top:2px solid var(--line-strong)}
+.banktbl tr.flag td{background:color-mix(in srgb,#f97316 15%,var(--surface))}
+.banktbl tr.flag td.d{box-shadow:inset 4px 0 0 #f97316}
+.banktbl tr.flagpink td{background:color-mix(in srgb,#ec4899 15%,var(--surface))}
+.banktbl tr.flagpink td.d{box-shadow:inset 4px 0 0 #ec4899}
 @media print{.topbar,.rephead,.repctl,.reptabs{display:none!important}.repwrap{position:static}#appwrap>.wrap{display:none}}
 .di{border:1px solid transparent;border-radius:6px;padding:3px 6px;font-size:13.5px;background:transparent;color:var(--text);font-family:inherit;flex:1;min-width:60px}
 .di:hover{border-color:var(--line)}.di:focus{outline:none;border-color:var(--brand);background:var(--surface)}
@@ -718,10 +722,10 @@ function renderBank(){
   var bankOnly=rc.bank.filter(function(b){return !b.matched;});
   var ledgerOnly=rc.ledger.filter(function(l,j){return !rc.used[j];});
   var matchedN=rc.bank.length-bankOnly.length;
-  var boRows=bankOnly.map(function(b){var a=+b.amt||0;return '<tr><td class="d">'+esc(b.d||'—')+'</td><td class="desc">'+esc(b.desc)+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td><td class="amt"><button class="btn small" data-bkadd="'+esc(b.id)+'">+ book</button></td></tr>';}).join('');
-  var loRows=ledgerOnly.map(function(l){var a=+l.amt||0;return '<tr><td class="d">'+esc(l.d)+'</td><td class="desc">'+esc(l.desc||'')+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td></tr>';}).join('');
+  var boRows=bankOnly.map(function(b){var a=+b.amt||0;return '<tr class="flag"><td class="d">'+esc(b.d||'—')+'</td><td class="desc">'+esc(b.desc)+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td><td class="amt"><button class="btn small" data-bkadd="'+esc(b.id)+'">+ book</button></td></tr>';}).join('');
+  var loRows=ledgerOnly.map(function(l){var a=+l.amt||0;return '<tr class="flagpink"><td class="d">'+esc(l.d)+'</td><td class="desc">'+esc(l.desc||'')+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td></tr>';}).join('');
   var recSec='<div class="bankcap" style="margin-top:20px">Transaction reconciliation <span class="qfilters" style="display:inline-flex;margin-left:8px">'+winBtns+'</span></div>'
-    +'<div class="hint" style="margin:0 0 8px">'+rc.from+' → '+rc.to+' · <b>'+matchedN+'</b> matched · <b>'+bankOnly.length+'</b> in bank only · <b>'+ledgerOnly.length+'</b> in ledger only</div>'
+    +'<div class="hint" style="margin:0 0 8px">'+rc.from+' → '+rc.to+' · <b>'+matchedN+'</b> matched · <b>'+bankOnly.length+'</b> in bank only · <b>'+ledgerOnly.length+'</b> in ledger only — <b>the highlighted rows below are what make up the variance; reconcile those.</b></div>'
     +(bankOnly.length?'<div class="bankcap" style="font-size:14px;color:var(--out)">🏦 In bank, not in your books — <span class="hint" style="font-weight:400">review &amp; book (fees, debits, credits you missed)</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th><th class="amt"></th></tr>'+boRows+'</table>':'<div class="hint" style="color:var(--in)">✓ Every bank transaction in this range is matched in the ledger.</div>')
     +(ledgerOnly.length?'<div class="bankcap" style="font-size:14px;margin-top:16px">📒 In your books, not (yet) in the bank — <span class="hint" style="font-weight:400">uncleared / timing, or non-1.0 items</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+loRows+'</table>':'');
   el.innerHTML=recon+recSec;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
