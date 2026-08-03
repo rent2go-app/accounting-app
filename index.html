@@ -712,12 +712,48 @@ function renderBank(){
     +'<tr><td class="desc">Sheet running total · '+sheetDay+'</td><td class="amt">'+fmt(sheetTot)+'</td></tr>'
     +'<tr class="tot"><td class="desc">Variance (bank − sheet)</td><td class="amt" style="color:'+(Math.abs(variance)<0.01?'var(--in)':'var(--out)')+'">'+fmt(variance)+(Math.abs(variance)<0.01?' ✓':'')+'</td></tr></table>'
     +(Math.abs(variance)>=0.01?'<div style="margin:10px 0"><button class="btn small" id="bankReconBtn">Book adjustment to match bank</button> <span class="hint">books a Balance adjustment on today so the sheet equals the bank</span></div>':'');
-  var tx=BANKTX.slice(0,150);
-  var txRows=tx.map(function(t){var amt=+t.amount||0;return '<tr><td class="d">'+esc(t.transacted_at||t.posted_at||'—')+'</td><td class="desc">'+esc(t.description||'')+'</td><td class="amt" style="color:'+(amt>=0?'var(--in)':'var(--out)')+'">'+fmt(amt)+'</td></tr>';}).join('');
-  var txTbl=tx.length?('<div class="bankcap">Bank transactions <span class="hint" style="font-weight:400">('+BANKTX.length+' total · showing '+tx.length+')</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+txRows+'</table>'):'<p class="hint">Balance is linked. No transactions yet — if the Transactions feature is still pending Stripe approval they\'ll appear once active (Refresh from bank / next daily sync).</p>';
-  el.innerHTML=recon+txTbl;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
+  // ── transaction-level reconciliation: match bank ↔ ledger, surface what's unmatched each way ──
+  var rc=reconcile();
+  var winBtns=[[7,'7d'],[30,'30d'],[90,'90d'],[99999,'All']].map(function(w){return '<button class="qchip'+(REC_WIN===w[0]?' on':'')+'" data-recwin="'+w[0]+'">'+w[1]+'</button>';}).join('');
+  var bankOnly=rc.bank.filter(function(b){return !b.matched;});
+  var ledgerOnly=rc.ledger.filter(function(l,j){return !rc.used[j];});
+  var matchedN=rc.bank.length-bankOnly.length;
+  var boRows=bankOnly.map(function(b){var a=+b.amt||0;return '<tr><td class="d">'+esc(b.d||'—')+'</td><td class="desc">'+esc(b.desc)+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td><td class="amt"><button class="btn small" data-bkadd="'+esc(b.id)+'">+ book</button></td></tr>';}).join('');
+  var loRows=ledgerOnly.map(function(l){var a=+l.amt||0;return '<tr><td class="d">'+esc(l.d)+'</td><td class="desc">'+esc(l.desc||'')+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td></tr>';}).join('');
+  var recSec='<div class="bankcap" style="margin-top:20px">Transaction reconciliation <span class="qfilters" style="display:inline-flex;margin-left:8px">'+winBtns+'</span></div>'
+    +'<div class="hint" style="margin:0 0 8px">'+rc.from+' → '+rc.to+' · <b>'+matchedN+'</b> matched · <b>'+bankOnly.length+'</b> in bank only · <b>'+ledgerOnly.length+'</b> in ledger only</div>'
+    +(bankOnly.length?'<div class="bankcap" style="font-size:14px;color:var(--out)">🏦 In bank, not in your books — <span class="hint" style="font-weight:400">review &amp; book (fees, debits, credits you missed)</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th><th class="amt"></th></tr>'+boRows+'</table>':'<div class="hint" style="color:var(--in)">✓ Every bank transaction in this range is matched in the ledger.</div>')
+    +(ledgerOnly.length?'<div class="bankcap" style="font-size:14px;margin-top:16px">📒 In your books, not (yet) in the bank — <span class="hint" style="font-weight:400">uncleared / timing, or non-1.0 items</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+loRows+'</table>':'');
+  el.innerHTML=recon+recSec;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
   var rb=document.getElementById('bankReconBtn');
   if(rb)rb.onclick=function(){snapshot();setDayAdj(TODAY,r2(bankTot-(M[TODAY]?M[TODAY].total:0)));save();recompute();render();renderBank();};
+  document.querySelectorAll('[data-recwin]').forEach(function(b){b.onclick=function(){REC_WIN=+b.dataset.recwin;renderBank();};});
+  document.querySelectorAll('[data-bkadd]').forEach(function(b){b.onclick=function(){bookBankTx(b.dataset.bkadd);};});
+}
+var REC_WIN=30;   // reconciliation window in days (7/30/90/All)
+// Match bank transactions to ledger cash entries (deposits + income positive, expenses negative)
+// by equal amount within ±4 days. Returns both sides so we can show matched / bank-only / ledger-only.
+function reconcile(){
+  var to=TODAY,from=(REC_WIN>=9999)?'2000-01-01':addDays(TODAY,-REC_WIN);
+  var ledger=[];
+  DK.forEach(function(d){ if(d<from||d>to||!MD[d])return;
+    (MD[d].d||[]).forEach(function(x){ledger.push({d:d,amt:dval(x),desc:dauto(x)?('Stripe payout '+(x.lbl||'')):'Deposit'});});
+    (MD[d].j||[]).forEach(function(l){if(!isAdj(l))ledger.push({d:d,amt:+l[1]||0,desc:l[0]||'Income'});});
+    (MD[d].e||[]).forEach(function(l){ledger.push({d:d,amt:-(+l[1]||0),desc:l[0]||'Expense'});});
+  });
+  var bank=BANKTX.filter(function(t){var dt=t.transacted_at||t.posted_at;return dt&&dt>=from&&dt<=to;}).map(function(t){return {id:t.id,amt:+t.amount||0,desc:t.description||'',d:t.transacted_at||t.posted_at,matched:false};});
+  var used={};
+  bank.forEach(function(b){for(var j=0;j<ledger.length;j++){if(used[j])continue;var l=ledger[j];if(Math.abs(l.amt-b.amt)<0.01 && Math.abs((new Date(l.d)-new Date(b.d))/86400000)<=4){used[j]=1;b.matched=true;break;}}});
+  return {bank:bank,ledger:ledger,used:used,from:from,to:to};
+}
+async function bookBankTx(id){
+  var t=BANKTX.find(function(x){return x.id===id;});if(!t)return;
+  var amt=+t.amount||0,day=t.transacted_at||t.posted_at||TODAY;
+  if(!MD[day]){alert('No ledger day for '+day+' — add that month first (＋ Add month).');return;}
+  snapshot();var desc=(t.description||'Bank item').slice(0,120);
+  if(amt>=0)MD[day].j.push([desc,r2(amt),'Other Income','','bk:'+id]);
+  else MD[day].e.push([desc,r2(-amt),'Other',true,'']);
+  save();recompute();render();renderBank();
 }
 async function connectBank(btn){
   if(!R2G_FC_PK||typeof Stripe==='undefined'){alert('Bank connect needs the RENT 2 GO - 1.0 publishable key set (R2G_FC_PK). Ask your developer.');return;}
