@@ -715,7 +715,10 @@ async function connectBank(btn){
   try{
     var r=await sb.functions.invoke('bank-connect',{body:{}});
     if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);
-    var res=await Stripe(R2G_FC_PK).collectFinancialConnectionsAccounts({clientSecret:r.data.client_secret});
+    var bw=document.getElementById('bankwrap');if(bw)bw.hidden=true;   // hide the full-screen panel so Stripe's modal isn't behind it
+    var res;
+    try{res=await Stripe(R2G_FC_PK).collectFinancialConnectionsAccounts({clientSecret:r.data.client_secret});}
+    finally{if(bw)bw.hidden=false;}
     if(res.error)throw res.error;
     var n=(res.financialConnectionsSession&&res.financialConnectionsSession.accounts&&res.financialConnectionsSession.accounts.length)||0;
     btn.textContent='Linked '+n+' — importing…';
