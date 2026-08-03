@@ -67,6 +67,23 @@ async function createOne(feeIn: any) {
   return { invoice_id: feeIn.invoice_id, ok: true, created: true, emailed: true, hosted: f.hosted };
 }
 
+// List a customer's OPEN $10 late-fee invoices (to spot duplicates).
+async function listLateFees(account_label: string, customer_id: string) {
+  const key = keyFor(account_label); if (!key) return { error: "no key for " + account_label };
+  const r = await fetch(`https://api.stripe.com/v1/invoices?customer=${customer_id}&status=open&limit=100`, { headers: { Authorization: `Bearer ${key}` } });
+  const d = await r.json();
+  const fees = (d.data || []).filter((i: any) => i.amount_due === 1000).map((i: any) => ({ id: i.id, number: i.number, created: i.created, amount: (i.amount_due || 0) / 100, status: i.status }));
+  return { fees };
+}
+// Void a specific finalized invoice (removes the charge; leaves an auditable voided record in Stripe).
+async function voidInvoice(account_label: string, sid: string) {
+  const key = keyFor(account_label); if (!key) return { error: "no key for " + account_label };
+  const r = await stripeForm(`https://api.stripe.com/v1/invoices/${sid}/void`, new URLSearchParams({}), key);
+  if (r.error) return { error: r.error.message || JSON.stringify(r.error) };
+  await sbPatch(`linda_fees?stripe_invoice_id=eq.${encodeURIComponent(sid)}`, { status: "voided" });
+  return { ok: true, id: sid, status: r.status };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const auth = (req.headers.get("Authorization") || "").replace("Bearer ", "");
@@ -75,6 +92,14 @@ Deno.serve(async (req) => {
   if (!ok) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
   try {
     const body = await req.json().catch(() => ({}));
+    // LIST a customer's open $10 late-fee invoices (spot duplicates). {list_fees:true,account_label,customer_id}
+    if (body.list_fees && body.customer_id) {
+      return new Response(JSON.stringify(await listLateFees(body.account_label, body.customer_id)), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+    // VOID a specific finalized invoice (remove a duplicate late fee). {void:true,account_label,stripe_invoice_id}
+    if (body.void && body.stripe_invoice_id) {
+      return new Response(JSON.stringify(await voidInvoice(body.account_label, body.stripe_invoice_id)), { headers: { ...CORS, "Content-Type": "application/json" } });
+    }
     // CREATE (+finalize +email) a single fee directly — no draft stage. {create:true,invoice_id,account_label,customer_id,memo}
     if (body.create && body.invoice_id) {
       const r = await createOne(body);

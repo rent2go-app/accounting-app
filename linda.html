@@ -482,6 +482,8 @@ function renderReportOut(out,series,gran){
     +'</div>'+conf
     +'<table class="reptbl"><thead><tr><th>'+(gran==='month'?'Month':'Week of')+'</th><th style="text-align:right">Paid</th><th style="text-align:right">On-time</th><th style="text-align:right">Avg late</th><th style="text-align:right">Collected</th><th style="text-align:right">Past-due open</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
+// A grace/extension request only counts as CURRENT if received in the last 12 hours; older = stale.
+function graceCurrent(m){return !m.handled&&m.is_grace_request&&(Date.now()-new Date(m.received_at).getTime())<=12*3600*1000;}
 function render(){
   var rem=DRAFTS.filter(x=>x.kind==='reminder').length,disc=DRAFTS.filter(x=>x.kind==='disconnect').length,rec=DRAFTS.filter(x=>x.kind==='recovery').length;
   var out=CUSTS.reduce((s,c)=>s+(+c.outstanding||0),0);
@@ -1179,7 +1181,9 @@ function dynBody(d){
     if(d.kind==='disconnect')b=graceRewrite(b,dr);
     else b=insertAfterGreeting(b,'📅 As requested, your payment deadline has been extended to '+fullET(dr.grace_until)+'. Please settle by then to keep your vehicle active.');
   } else {
-    var req=MSGS.find(function(m){return !m.handled&&m.is_grace_request&&m.account_label===d.account_label&&m.customer_id===d.customer_id;});
+    // Only a grace request from the LAST 12 HOURS counts as a current extension ask — otherwise an old
+    // message keeps leading the notice for days. Older than 12h → treat as no new request.
+    var req=MSGS.find(function(m){return !m.handled&&m.is_grace_request&&m.account_label===d.account_label&&m.customer_id===d.customer_id&&(Date.now()-new Date(m.received_at).getTime())<=12*3600*1000;});
     if(req){
       // Don't ask for a date/time if they've already acted: paid since asking (kept the promise), or
       // they're no longer behind (nothing to grant an extension on). Avoids a stale grace ask that

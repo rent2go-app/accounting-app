@@ -154,8 +154,16 @@ async function scanAccount(acc: any) {
     let behindDays = prevPlan.plan_behind_days || 0;
     let lastBehindDay = prevPlan.plan_last_behind_day || null;
     if (onPlan) {
-      const isDaily = /per day/i.test(planmap[cid]);
-      planBehind = isDaily ? !(planPaidR >= 2 && planPaidLF >= 2) : (rental_pd.length >= 2);
+      const terms = planmap[cid];
+      const isDaily = /per day/i.test(terms);
+      const mR = /(\d+)\s*rental/i.exec(terms), mL = /(\d+)\s*late/i.exec(terms);
+      const reqR = mR ? +mR[1] : 2, reqLF = mL ? +mL[1] : 2;
+      const noFeesLeft = latefee_open.length === 0;   // nothing more to pay on late fees
+      // Met if rentals are covered AND (late fees covered OR there are none left to pay); OR they simply
+      // made at least the full daily count of payments with no fees outstanding. Don't stay stuck on the
+      // "2 late fees" rule when a customer has kept up and there are no fees left to make.
+      const planMet = (planPaidR >= reqR && (planPaidLF >= reqLF || noFeesLeft)) || ((planPaidR + planPaidLF) >= (reqR + reqLF) && noFeesLeft);
+      planBehind = isDaily ? !planMet : (rental_pd.length >= 2);
       if (planBehind) { if (lastBehindDay !== todaystr) { behindDays = behindDays + 1; lastBehindDay = todaystr; } }
       else { behindDays = 0; lastBehindDay = null; }
       // A plan you set is STICKY — on_plan persists day-to-day and is NEVER auto-cleared, even here.
@@ -195,7 +203,7 @@ async function scanAccount(acc: any) {
       const isDaily = /per day/i.test(terms);
       const paidLine = `Recently you've paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}${isDaily ? " (your plan asks for 2 of each per day)" : ""}.`;
       subj = "Thank you — your Rent 2 Go payment plan is on track";
-      intro = `Good morning ${nm} 👋\n\nThank you for keeping to your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
+      intro = `Good morning ${nm} 👋\n\nThank you for keeping up your commitment to your account — you're on track with your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
       closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
       kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
     } else if (disc) {
