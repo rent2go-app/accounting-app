@@ -703,6 +703,7 @@ function repCSV(){if(!repCurrent)return;var L=[];if(repCurrent.cols)L.push(repCu
 document.getElementById('repBtn').onclick=function(){document.getElementById('repFrom').value=repFrom;document.getElementById('repTo').value=repTo;document.getElementById('reports').hidden=false;renderReport();};
 // ── 🏦 BANK RECONCILIATION (Stripe Financial Connections) ──
 var R2G_FC_PK='pk_live_51RKwuDCNoE1t9xuMxepa4EUiIeD6rGnyIrluQyjhiq5rJCwnAEzPhw3o08YKWDs2BTma6xhBwJXtmXx6WZWaJ7bG00oRtlIVWI';   // RENT 2 GO - 1.0 publishable key (public)
+var IGNORE_LAST4={'2185':1};   // bank accounts (by last 4) to exclude from the running total & reconciliation — Employee ····2185
 function renderBank(){
   var el=document.getElementById('bankBody');if(!el)return;var info=document.getElementById('bankInfo');
   if(!BANKACCTS.length){el.innerHTML='<p class="hint" style="padding:12px">No bank connected yet. Click <b>🔗 Connect bank</b> to securely link your Rent 2 Go bank account through Stripe — you log in with your bank; we never see your credentials. Your balance and transactions then appear here to reconcile against the sheet.</p>';if(info)info.textContent='';return;}
@@ -712,12 +713,12 @@ function renderBank(){
   var sheetTot=OPEN;
   DK.forEach(function(d){if(d>sheetDay||!MD[d])return;sheetTot+=incReal(d);(MD[d].e||[]).forEach(function(l){if(l[3])sheetTot-=(+l[1]||0);});});
   sheetTot=r2(sheetTot);
-  var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings')savingsIds[a.id]=1;});
+  var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings'||IGNORE_LAST4[a.last4||''])savingsIds[a.id]=1;});   // savings + explicitly-ignored accounts (e.g. Employee ····2185) excluded from the running total
   var bankTot=BANKACCTS.reduce(function(s,a){return s+(savingsIds[a.id]?0:(+a.balance_current||0));},0);
   var variance=r2(bankTot-sheetTot);
   var acctRows=BANKACCTS.map(function(a){var sav=savingsIds[a.id];return '<tr'+(sav?' style="opacity:.55"':'')+'><td class="desc">'+esc(a.institution||a.display_name||'Bank')+(a.last4?' ····'+esc(a.last4):'')+' <span style="color:var(--muted);font-size:11px">'+esc(a.subcategory||a.category||'')+(sav?' · excluded from total':'')+'</span></td><td class="amt">'+fmt(+a.balance_current||0)+'</td></tr>';}).join('');
   var recon='<div class="bankcap">Balance reconciliation</div><table class="banktbl"><tr><th class="desc">Account (available balance)</th><th class="amt">Balance</th></tr>'+acctRows
-    +'<tr class="tot"><td class="desc">Bank total (excl. savings)</td><td class="amt">'+fmt(bankTot)+'</td></tr>'
+    +'<tr class="tot"><td class="desc">Bank total (excl. savings &amp; ignored)</td><td class="amt">'+fmt(bankTot)+'</td></tr>'
     +'<tr><td class="desc">Sheet actual cash · paid only · '+sheetDay+'</td><td class="amt">'+fmt(sheetTot)+'</td></tr>'
     +'<tr class="tot"><td class="desc">Variance (bank − sheet)</td><td class="amt" style="color:'+(Math.abs(variance)<0.01?'var(--in)':'var(--out)')+'">'+fmt(variance)+(Math.abs(variance)<0.01?' ✓':'')+'</td></tr></table>'
     +(Math.abs(variance)>=0.01?'<div style="margin:10px 0"><button class="btn small" id="bankReconBtn">Book adjustment to match bank</button> <span class="hint">books a Balance adjustment on today so the sheet equals the bank</span></div>':'');
@@ -750,7 +751,7 @@ function reconcile(){
     (MD[d].j||[]).forEach(function(l){if(!isAdj(l))ledger.push({d:d,amt:+l[1]||0,desc:l[0]||'Income'});});
     (MD[d].e||[]).forEach(function(l){if(l[3])ledger.push({d:d,amt:-(+l[1]||0),desc:l[0]||'Expense'});});   // only PAID (green) expenses are actuals that hit the bank
   });
-  var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings')savingsIds[a.id]=1;});
+  var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings'||IGNORE_LAST4[a.last4||''])savingsIds[a.id]=1;});
   var bank=BANKTX.filter(function(t){var dt=t.transacted_at||t.posted_at;return dt&&dt>=from&&dt<=to&&!savingsIds[t.account_id];}).map(function(t){return {id:t.id,amt:+t.amount||0,desc:t.description||'',d:t.transacted_at||t.posted_at,matched:false};});
   var used={};
   bank.forEach(function(b){for(var j=0;j<ledger.length;j++){if(used[j])continue;var l=ledger[j];if(Math.abs(l.amt-b.amt)<0.01 && Math.abs((new Date(l.d)-new Date(b.d))/86400000)<=4){used[j]=1;b.matched=true;break;}}});
