@@ -270,10 +270,11 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .txntype.expense{color:var(--out,#b3261e);background:color-mix(in srgb,var(--out,#b3261e) 14%,transparent)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://js.stripe.com/v3/"></script>
 <script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
 <div id="cashbar" class="cashbar" hidden></div>
 <div id="loginwrap" style="display:none"><form class="logincard" id="li_form"><div class="loginlogo"><img src="assets/logo.png" alt="Rent 2 Go"></div><p>Sign in to your accounting ledger.</p><label>Email</label><input id="li_email" type="email" autocomplete="username" required><label>Password</label><input id="li_pass" type="password" autocomplete="current-password" required><button id="li_btn" type="submit">Sign in</button><div class="loginerr" id="li_err"></div></form></div>
-<div id="appwrap" style="display:none"><div class="topbar"><div class="brand"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"></div><div class="legend"><span><span class="dot a"></span>Actual</span><span><span class="dot b"></span>Projected</span></div><div class="spacer"></div><span class="rangeLbl">USD · 2dp</span><span class="robadge" id="robadge" hidden>👁 View only</span><span class="savestate" id="savestate"></span><button class="btn" id="ownersBtn" hidden>👥 Owners</button><button class="btn" onclick="location.href='cars.html'">🚙 Fleet</button><button class="btn" onclick="location.href='team.html'" title="Team tasks &amp; payouts">🧰 Team</button><button class="btn" onclick="location.href='gps.html'" title="GPS Tracker Control">🚗 GPS Tracker Control</button><button class="btn" onclick="location.href='renters.html'">🪪 Renters</button><button class="btn" id="homeBtn" hidden>🏠 Home</button><button class="btn" id="repBtn">📊 Reports</button><button class="btn" id="mtagBtn">🔧 Maint. tags</button><button class="btn" onclick="location.href='linda.html'" title="Linda — automated billing agent"><img src="assets/linda-sm.png" alt="" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px">Billing Agent</button><button class="btn" id="undoBtn" disabled>↶ Undo</button><button class="btn" id="setBtn">⚙ Settings</button><button class="btn" id="reset">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
+<div id="appwrap" style="display:none"><div class="topbar"><div class="brand"><img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go"></div><div class="legend"><span><span class="dot a"></span>Actual</span><span><span class="dot b"></span>Projected</span></div><div class="spacer"></div><span class="rangeLbl">USD · 2dp</span><span class="robadge" id="robadge" hidden>👁 View only</span><span class="savestate" id="savestate"></span><button class="btn" id="ownersBtn" hidden>👥 Owners</button><button class="btn" onclick="location.href='cars.html'">🚙 Fleet</button><button class="btn" onclick="location.href='team.html'" title="Team tasks &amp; payouts">🧰 Team</button><button class="btn" onclick="location.href='gps.html'" title="GPS Tracker Control">🚗 GPS Tracker Control</button><button class="btn" onclick="location.href='renters.html'">🪪 Renters</button><button class="btn" id="homeBtn" hidden>🏠 Home</button><button class="btn" id="bankBtn">🏦 Bank</button><button class="btn" id="repBtn">📊 Reports</button><button class="btn" id="mtagBtn">🔧 Maint. tags</button><button class="btn" onclick="location.href='linda.html'" title="Linda — automated billing agent"><img src="assets/linda-sm.png" alt="" style="width:18px;height:18px;border-radius:50%;vertical-align:middle;margin-right:5px">Billing Agent</button><button class="btn" id="undoBtn" disabled>↶ Undo</button><button class="btn" id="setBtn">⚙ Settings</button><button class="btn" id="reset">↻ Refresh</button><button class="btn" id="signout">Sign out</button></div>
 <div id="settings" class="setpanel" hidden><div class="setmtop"><h2>⚙ Settings</h2><button class="btn" id="setX" title="Close">✕</button></div><div class="setgrid"><div class="setrow"><label>SA lines (Owner’s Draws) shown in</label><select id="setCur"><option value="ZAR">ZAR (Rand)</option><option value="AED">AED (Dirham)</option></select></div><div class="setrow"><label>ZAR per USD (today’s rate)</label><input type="number" step="0.01" id="setZar"></div><div class="setrow"><label>AED per USD (for the Dubai move)</label><input type="number" step="0.0001" id="setAed"></div><div class="setrow"><label>Owner salary $/mo (normalised EBITDA)</label><input type="number" step="100" id="setSal"></div></div><p class="hint" style="margin:8px 0 0">Applies to every Owner’s Draw / Home Expense line. USD stays the base currency.</p>
 <div class="setdiv"></div>
 <h3 class="seth">Your account</h3>
@@ -302,6 +303,10 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 <div class="repctl"><label>From</label><input type="date" id="repFrom"><label>To</label><input type="date" id="repTo"><button class="qchip" data-rp="2026">2026</button><button class="qchip" data-rp="2027">2027 Q1</button><button class="qchip" data-rp="all">All</button><div class="spacer"></div><button class="btn" id="repCSV">⬇ Download CSV</button><button class="btn" id="repPrint">🖨 Print / PDF</button></div>
 <div class="reptabs"><button class="rtab on" data-r="pl">Profit &amp; Loss</button><button class="rtab" data-r="proj">📈 Projections</button><button class="rtab" data-r="ownrev">👥 Owner Revenue</button><button class="rtab" data-r="exp">Expenses by Category</button><button class="rtab" data-r="draw">Owner&#39;s Drawings</button><button class="rtab" data-r="cash">Cash Flow</button><button class="rtab" data-r="avgdep">💵 Daily Deposits &amp; Avg</button><button class="rtab" data-r="trend">Monthly Trend</button><button class="rtab" data-r="bva">Budget vs Actual</button><button class="rtab" data-r="pay">Payroll</button><button class="rtab" data-r="ap">Payables</button></div>
 <div id="repBody"></div></div>
+<div id="bankwrap" class="repwrap" hidden>
+<div class="rephead"><h2>🏦 Bank reconciliation</h2><button class="btn" id="bankClose">✕ Close</button></div>
+<div class="repctl"><button class="btn pri" id="bankConnect">🔗 Connect bank</button><button class="btn" id="bankRefresh">🔄 Refresh from bank</button><span class="spacer"></span><span class="srinfo" id="bankInfo"></span></div>
+<div id="bankBody"></div></div>
 <div id="mtag" class="repwrap" hidden><div class="rephead"><h2>🔧 Maintenance attribution</h2><button class="btn" id="mtagClose">✕ Close</button></div><div class="repctl"><span id="mtagInfo" class="hint"></span><div class="spacer"></div><label>Show</label><select id="mtagFilter"><option value="sug">Auto-suggested</option><option value="none">No suggestion</option><option value="all">All untagged</option></select><span class="pill">Bulk-set shown →</span><select id="mtagBulk"></select><button class="btn" id="mtagApplyBulk">Apply to shown</button><button class="btn pri" id="mtagSave">💾 Save</button></div><div id="mtagBody"></div></div>
 <a href="linda.html" title="Ask Linda — Billing Agent" style="position:fixed;left:16px;bottom:18px;z-index:40"><img src="assets/linda-sm.png" alt="Linda" style="width:52px;height:52px;border-radius:50%;box-shadow:0 6px 18px rgba(0,0,0,.28);border:2px solid #fff"></a>
 <p class="hint">One unbroken chain: <b>Carried forward</b> of each day = <b>Starting balance</b> of the next, across every month. Edit deposits, income or expenses and it cascades down through every following day. Type over the <b>Running total</b> (or a Starting balance) to reconcile to the bank — it books a visible <b>Balance adjustment</b>, kept out of the income/expense totals. Expenses split into <b>Operating (blue) · Home (yellow) · MMF (grey) · Other (sky)</b>.</p></main></div>
@@ -313,7 +318,7 @@ function showApp(){document.getElementById('loginwrap').style.display='none';doc
 async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(em.toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}
 async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(((s.data.session.user.email)||'').toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}else{showLogin();}}
 async function runApp(){
-let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={},NOTES={},NOTEAUTHOR='',STRIPEROWS=[];
+let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={},NOTES={},NOTEAUTHOR='',STRIPEROWS=[],BANKACCTS=[],BANKTX=[];
 async function load(){
   var res=await sb.from('day_blocks').select('*');
   if(res.error){setStatus('error');console.error(res.error);}
@@ -324,6 +329,8 @@ async function load(){
   var rows=res.data||[];MD={};rows.forEach(function(r){MD[r.day]={d:(r.deposits||[]).map(function(x){return (x&&typeof x==='object')?x:Number(x);}),j:(r.income||[]),e:(r.expenses||[])};});
   for(var d in MD){MD[d].j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});MD[d].e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(d<=TODAY);if(l.length<5)l.push('');});}
   DK=Object.keys(MD).sort();
+  try{var ba=await sb.from('bank_accounts').select('*');BANKACCTS=ba.data||[];}catch(e){BANKACCTS=[];}
+  try{var bt=await sb.from('bank_transactions').select('*').order('transacted_at',{ascending:false}).limit(300);BANKTX=bt.data||[];}catch(e){BANKTX=[];}
   if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
   LASTOPEN=OPEN;LASTFX=JSON.stringify({z:CFG.zar,a:CFG.aed,s:CFG.sacur});LASTCATSEG=JSON.stringify(CATSEG);LASTSAL=OWNERSAL;LASTSYNC={};for(var d2 in MD)LASTSYNC[d2]=JSON.stringify(MD[d2]);
   setStatus('saved');
@@ -681,6 +688,46 @@ function buildAvgDep(days){
 function renderReport(){var days=repDays();var rep=repType==='ownrev'?buildOwnerRev():repType==='proj'?buildProj():repType==='pl'?buildPL(days):repType==='exp'?buildExp(days):repType==='draw'?buildDraw(days):repType==='cash'?buildCash(days):repType==='trend'?buildTrend(days):repType==='avgdep'?buildAvgDep(days):repType==='ap'?buildAP(days):repType==='pay'?buildPay(days):buildBVA(days);repCurrent=rep;var html='<div class="repcap">'+rep.cap+' · '+repFrom+' to '+repTo+'</div><table class="reptab">';if(rep.cols)html+='<tr class="hd">'+rep.cols.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';rep.rows.forEach(function(rr){html+='<tr'+(rr.cls?' class="'+rr.cls+'"':'')+'>'+rr.cells.map(function(c){return '<td>'+((typeof c==='number')?fmt(c):(c||''))+'</td>';}).join('')+'</tr>';});html+='</table>';document.getElementById('repBody').innerHTML=html;}
 function repCSV(){if(!repCurrent)return;var L=[];if(repCurrent.cols)L.push(repCurrent.cols);repCurrent.rows.forEach(function(rr){L.push(rr.cells.map(function(c){return typeof c==='number'?c:(c||'');}));});var csv=L.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var b=new Blob([csv],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='r2g-'+repType+'-'+repFrom+'_'+repTo+'.csv';a.click();}
 document.getElementById('repBtn').onclick=function(){document.getElementById('repFrom').value=repFrom;document.getElementById('repTo').value=repTo;document.getElementById('reports').hidden=false;renderReport();};
+// ── 🏦 BANK RECONCILIATION (Stripe Financial Connections) ──
+var R2G_FC_PK='';   // RENT 2 GO - 1.0 publishable key (pk_live_…) — set once, then Connect works
+function renderBank(){
+  var el=document.getElementById('bankBody');if(!el)return;var info=document.getElementById('bankInfo');
+  if(!BANKACCTS.length){el.innerHTML='<p class="hint" style="padding:12px">No bank connected yet. Click <b>🔗 Connect bank</b> to securely link your Rent 2 Go bank account through Stripe — you log in with your bank; we never see your credentials. Your balance and transactions then appear here to reconcile against the sheet.</p>';if(info)info.textContent='';return;}
+  var sheetDay=DK.filter(function(d){return d<=TODAY;}).pop()||DK[DK.length-1];
+  var sheetTot=(M[sheetDay]?M[sheetDay].total:0);
+  var bankTot=BANKACCTS.reduce(function(s,a){return s+(+a.balance_current||0);},0);
+  var variance=r2(bankTot-sheetTot);
+  var acctRows=BANKACCTS.map(function(a){return '<tr><td>'+esc(a.institution||a.display_name||'Bank')+(a.last4?' ····'+esc(a.last4):'')+'</td><td>'+esc(a.subcategory||a.category||'')+'</td><td class="n">'+fmt(+a.balance_current||0)+'</td><td>'+(a.balance_as_of?new Date(a.balance_as_of).toLocaleString():'—')+'</td></tr>';}).join('');
+  var recon='<div class="repcap">Balance reconciliation</div><table class="reptab"><tr class="hd"><td>Bank</td><td>Type</td><td class="n">Balance</td><td>As of</td></tr>'+acctRows
+    +'<tr class="tot"><td colspan="2">Bank total</td><td class="n">'+fmt(bankTot)+'</td><td></td></tr>'
+    +'<tr><td colspan="2">Sheet running total ('+sheetDay+')</td><td class="n">'+fmt(sheetTot)+'</td><td></td></tr>'
+    +'<tr class="big"><td colspan="2">Variance (bank − sheet)</td><td class="n">'+fmt(variance)+'</td><td>'+(Math.abs(variance)<0.01?'✓ matched':'<button class="btn small" id="bankReconBtn">Book adjustment to match</button>')+'</td></tr></table>';
+  var tx=BANKTX.slice(0,100);
+  var txRows=tx.map(function(t){return '<tr><td>'+esc(t.transacted_at||t.posted_at||'')+'</td><td>'+esc(t.description||'')+'</td><td class="n">'+fmt(+t.amount||0)+'</td></tr>';}).join('');
+  var txTbl=tx.length?('<div class="repcap" style="margin-top:16px">Bank transactions ('+BANKTX.length+')</div><table class="reptab"><tr class="hd"><td>Date</td><td>Description</td><td class="n">Amount</td></tr>'+txRows+'</table>'):'<p class="hint" style="margin-top:14px">Balance is linked. No transactions yet — if the Transactions feature is still pending Stripe approval they\'ll appear once it\'s active (use Refresh from bank).</p>';
+  el.innerHTML=recon+txTbl;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
+  var rb=document.getElementById('bankReconBtn');
+  if(rb)rb.onclick=function(){snapshot();setDayAdj(TODAY,r2(bankTot-(M[TODAY]?M[TODAY].total:0)));save();recompute();render();renderBank();};
+}
+async function connectBank(btn){
+  if(!R2G_FC_PK||typeof Stripe==='undefined'){alert('Bank connect needs the RENT 2 GO - 1.0 publishable key set (R2G_FC_PK). Ask your developer.');return;}
+  var o=btn.textContent;btn.disabled=true;btn.textContent='Opening…';
+  try{
+    var r=await sb.functions.invoke('bank-connect',{body:{}});
+    if(r.error)throw r.error;if(r.data&&r.data.error)throw new Error(r.data.error);
+    var res=await Stripe(R2G_FC_PK).collectFinancialConnectionsAccounts({clientSecret:r.data.client_secret});
+    if(res.error)throw res.error;
+    var n=(res.financialConnectionsSession&&res.financialConnectionsSession.accounts&&res.financialConnectionsSession.accounts.length)||0;
+    btn.textContent='Linked '+n+' — importing…';
+    await sb.functions.invoke('bank-refresh',{body:{}});await load();renderBank();
+    btn.textContent='✓ Connected';setTimeout(function(){btn.textContent=o;btn.disabled=false;},2500);
+  }catch(e){alert('Connect failed: '+(e.message||e));btn.textContent=o;btn.disabled=false;}
+}
+async function refreshBank(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='🔄 Refreshing…';try{var r=await sb.functions.invoke('bank-refresh',{body:{}});if(r.error)throw r.error;await load();renderBank();}catch(e){alert('Refresh failed: '+(e.message||e));}finally{btn.textContent=o;btn.disabled=false;}}
+document.getElementById('bankBtn').onclick=function(){document.getElementById('bankwrap').hidden=false;renderBank();};
+document.getElementById('bankClose').onclick=function(){document.getElementById('bankwrap').hidden=true;};
+document.getElementById('bankConnect').onclick=function(){connectBank(this);};
+document.getElementById('bankRefresh').onclick=function(){refreshBank(this);};
 if(location.hash==='#reports'){var _rb=document.getElementById('repBtn');if(_rb)_rb.click();}
 window.addEventListener('hashchange',function(){if(location.hash==='#reports'){var b=document.getElementById('repBtn');if(b)b.click();}});
 document.getElementById('mtagBtn').onclick=openMaintAttrib;
