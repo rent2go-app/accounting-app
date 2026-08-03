@@ -708,10 +708,11 @@ function renderBank(){
   var el=document.getElementById('bankBody');if(!el)return;var info=document.getElementById('bankInfo');
   if(!BANKACCTS.length){el.innerHTML='<p class="hint" style="padding:12px">No bank connected yet. Click <b>🔗 Connect bank</b> to securely link your Rent 2 Go bank account through Stripe — you log in with your bank; we never see your credentials. Your balance and transactions then appear here to reconcile against the sheet.</p>';if(info)info.textContent='';return;}
   var sheetDay=DK.filter(function(d){return d<=TODAY;}).pop()||DK[DK.length-1];
-  // Reconcile to ACTUAL cash: opening + income − ONLY PAID (green) expenses, through today. Unpaid
-  // expenses are budget/future — they haven't left the bank yet — so they're excluded here.
+  // Reconcile to ACTUAL cash: opening + income + reconciliation adjustments − ONLY PAID (green) expenses,
+  // through today. Unpaid expenses are budget/future (not yet out of the bank) so they're excluded. Adjustment
+  // lines are documented true-ups that anchor the sheet to a known bank balance, so they count as real cash here.
   var sheetTot=OPEN;
-  DK.forEach(function(d){if(d>sheetDay||!MD[d])return;sheetTot+=incReal(d);(MD[d].e||[]).forEach(function(l){if(l[3])sheetTot-=(+l[1]||0);});});
+  DK.forEach(function(d){if(d>sheetDay||!MD[d])return;sheetTot+=incChain(d);(MD[d].e||[]).forEach(function(l){if(l[3])sheetTot-=(+l[1]||0);});});
   sheetTot=r2(sheetTot);
   var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings'||IGNORE_LAST4[a.last4||''])savingsIds[a.id]=1;});   // savings + explicitly-ignored accounts (e.g. Employee ····2185) excluded from the running total
   var bankTot=BANKACCTS.reduce(function(s,a){return s+(savingsIds[a.id]?0:(+a.balance_current||0));},0);
