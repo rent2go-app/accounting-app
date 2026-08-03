@@ -708,21 +708,30 @@ function renderBank(){
   var el=document.getElementById('bankBody');if(!el)return;var info=document.getElementById('bankInfo');
   if(!BANKACCTS.length){el.innerHTML='<p class="hint" style="padding:12px">No bank connected yet. Click <b>🔗 Connect bank</b> to securely link your Rent 2 Go bank account through Stripe — you log in with your bank; we never see your credentials. Your balance and transactions then appear here to reconcile against the sheet.</p>';if(info)info.textContent='';return;}
   var sheetDay=DK.filter(function(d){return d<=TODAY;}).pop()||DK[DK.length-1];
-  // Reconcile to ACTUAL cash: opening + income + reconciliation adjustments − ONLY PAID (green) expenses,
-  // through today. Unpaid expenses are budget/future (not yet out of the bank) so they're excluded. Adjustment
-  // lines are documented true-ups that anchor the sheet to a known bank balance, so they count as real cash here.
+  // Reconcile as of the last COMPLETED day, NOT today. Today's payouts are still in transit (recorded as
+  // deposits but not yet credited to the bank) and same-day expenses may not have cleared, so an intraday
+  // tie is always noisy. Settling to yesterday gives an apples-to-apples, stable comparison.
+  var settleDay=DK.filter(function(d){return d<TODAY&&MD[d];}).pop()||sheetDay;
+  // Sheet ACTUAL cash through settleDay: opening + income + reconciliation adjustments − ONLY PAID (green)
+  // expenses. Unpaid expenses are budget/future (not out of the bank yet). Adjustment lines are documented
+  // true-ups that anchor the sheet to a known bank balance, so they count as real cash here.
   var sheetTot=OPEN;
-  DK.forEach(function(d){if(d>sheetDay||!MD[d])return;sheetTot+=incChain(d);(MD[d].e||[]).forEach(function(l){if(l[3])sheetTot-=(+l[1]||0);});});
+  DK.forEach(function(d){if(d>settleDay||!MD[d])return;sheetTot+=incChain(d);(MD[d].e||[]).forEach(function(l){if(l[3])sheetTot-=(+l[1]||0);});});
   sheetTot=r2(sheetTot);
   var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings'||IGNORE_LAST4[a.last4||''])savingsIds[a.id]=1;});   // savings + explicitly-ignored accounts (e.g. Employee ····2185) excluded from the running total
   var bankTot=BANKACCTS.reduce(function(s,a){return s+(savingsIds[a.id]?0:(+a.balance_current||0));},0);
-  var variance=r2(bankTot-sheetTot);
+  // Bank as of settleDay close = live balance − any bank activity dated AFTER settleDay (today's, still settling).
+  var todayBank=r2(BANKTX.reduce(function(s,t){var dt=t.transacted_at||t.posted_at||'';return s+((dt>settleDay&&!savingsIds[t.account_id])?(+t.amount||0):0);},0));
+  var bankSettled=r2(bankTot-todayBank);
+  var variance=r2(bankSettled-sheetTot);
   var acctRows=BANKACCTS.map(function(a){var sav=savingsIds[a.id];return '<tr'+(sav?' style="opacity:.55"':'')+'><td class="desc">'+esc(a.institution||a.display_name||'Bank')+(a.last4?' ····'+esc(a.last4):'')+' <span style="color:var(--muted);font-size:11px">'+esc(a.subcategory||a.category||'')+(sav?' · excluded from total':'')+'</span></td><td class="amt">'+fmt(+a.balance_current||0)+'</td></tr>';}).join('');
-  var recon='<div class="bankcap">Balance reconciliation</div><table class="banktbl"><tr><th class="desc">Account (available balance)</th><th class="amt">Balance</th></tr>'+acctRows
-    +'<tr class="tot"><td class="desc">Bank total (excl. savings &amp; ignored)</td><td class="amt">'+fmt(bankTot)+'</td></tr>'
-    +'<tr><td class="desc">Sheet actual cash · paid only · '+sheetDay+'</td><td class="amt">'+fmt(sheetTot)+'</td></tr>'
+  var recon='<div class="bankcap">Balance reconciliation <span class="hint" style="font-weight:400">· settled as of '+settleDay+' (today is still in flight — see in-transit items below)</span></div><table class="banktbl"><tr><th class="desc">Account (available balance)</th><th class="amt">Balance</th></tr>'+acctRows
+    +'<tr class="tot"><td class="desc">Bank total now (excl. savings &amp; ignored)</td><td class="amt">'+fmt(bankTot)+'</td></tr>'
+    +(Math.abs(todayBank)>=0.01?'<tr><td class="desc">less bank activity after '+settleDay+' (still settling)</td><td class="amt">'+fmt(-todayBank)+'</td></tr>':'')
+    +'<tr class="tot"><td class="desc">Bank as of '+settleDay+' close</td><td class="amt">'+fmt(bankSettled)+'</td></tr>'
+    +'<tr><td class="desc">Sheet actual cash · paid only · '+settleDay+'</td><td class="amt">'+fmt(sheetTot)+'</td></tr>'
     +'<tr class="tot"><td class="desc">Variance (bank − sheet)</td><td class="amt" style="color:'+(Math.abs(variance)<0.01?'var(--in)':'var(--out)')+'">'+fmt(variance)+(Math.abs(variance)<0.01?' ✓':'')+'</td></tr></table>'
-    +(Math.abs(variance)>=0.01?'<div style="margin:10px 0"><button class="btn small" id="bankReconBtn">Book adjustment to match bank</button> <span class="hint">books a Balance adjustment on today so the sheet equals the bank</span></div>':'');
+    +(Math.abs(variance)>=0.01?'<div style="margin:10px 0"><button class="btn small" id="bankReconBtn">Book true-up as of '+settleDay+'</button> <span class="hint">adds a documented Adjustment on '+settleDay+' so the settled sheet equals the bank</span></div>':'');
   // ── transaction-level reconciliation: match bank ↔ ledger, surface what's unmatched each way ──
   var rc=reconcile();
   var winBtns=[[7,'7d'],[30,'30d'],[90,'90d'],[99999,'All']].map(function(w){return '<button class="qchip'+(REC_WIN===w[0]?' on':'')+'" data-recwin="'+w[0]+'">'+w[1]+'</button>';}).join('');
@@ -737,7 +746,7 @@ function renderBank(){
     +(ledgerOnly.length?'<div class="bankcap" style="font-size:14px;margin-top:16px">📒 In your books, not (yet) in the bank — <span class="hint" style="font-weight:400">uncleared / timing, or non-1.0 items</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+loRows+'</table>':'');
   el.innerHTML=recon+recSec;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
   var rb=document.getElementById('bankReconBtn');
-  if(rb)rb.onclick=function(){snapshot();setDayAdj(TODAY,r2(bankTot-(M[TODAY]?M[TODAY].total:0)));save();recompute();render();renderBank();};
+  if(rb)rb.onclick=function(){snapshot();setDayAdj(settleDay,variance);save();recompute();render();renderBank();};   // variance = bankSettled − sheetTot(actual), so adding it as an Adjustment on settleDay zeroes the tie
   document.querySelectorAll('[data-recwin]').forEach(function(b){b.onclick=function(){REC_WIN=+b.dataset.recwin;renderBank();};});
   document.querySelectorAll('[data-bkadd]').forEach(function(b){b.onclick=function(){bookBankTx(b.dataset.bkadd);};});
 }
