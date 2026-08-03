@@ -689,7 +689,7 @@ function renderReport(){var days=repDays();var rep=repType==='ownrev'?buildOwner
 function repCSV(){if(!repCurrent)return;var L=[];if(repCurrent.cols)L.push(repCurrent.cols);repCurrent.rows.forEach(function(rr){L.push(rr.cells.map(function(c){return typeof c==='number'?c:(c||'');}));});var csv=L.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var b=new Blob([csv],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='r2g-'+repType+'-'+repFrom+'_'+repTo+'.csv';a.click();}
 document.getElementById('repBtn').onclick=function(){document.getElementById('repFrom').value=repFrom;document.getElementById('repTo').value=repTo;document.getElementById('reports').hidden=false;renderReport();};
 // ── 🏦 BANK RECONCILIATION (Stripe Financial Connections) ──
-var R2G_FC_PK='';   // RENT 2 GO - 1.0 publishable key (pk_live_…) — set once, then Connect works
+var R2G_FC_PK='pk_live_51RKwuDCNoE1t9xuMxepa4EUiIeD6rGnyIrluQyjhiq5rJCwnAEzPhw3o08YKWDs2BTma6xhBwJXtmXx6WZWaJ7bG00oRtlIVWI';   // RENT 2 GO - 1.0 publishable key (public)
 function renderBank(){
   var el=document.getElementById('bankBody');if(!el)return;var info=document.getElementById('bankInfo');
   if(!BANKACCTS.length){el.innerHTML='<p class="hint" style="padding:12px">No bank connected yet. Click <b>🔗 Connect bank</b> to securely link your Rent 2 Go bank account through Stripe — you log in with your bank; we never see your credentials. Your balance and transactions then appear here to reconcile against the sheet.</p>';if(info)info.textContent='';return;}
