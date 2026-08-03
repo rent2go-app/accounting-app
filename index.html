@@ -217,6 +217,15 @@ body.readonly .noteadd,body.readonly .postit .notebtns,body.readonly .postit .no
 .reptab tr.hd td{background:var(--surface-2);font-weight:800;text-transform:uppercase;font-size:11px;letter-spacing:.04em;color:var(--muted)}
 .reptab tr.tot td{font-weight:800;border-top:2px solid var(--line-strong)}
 .reptab tr.big td{font-weight:900;font-size:16px;background:color-mix(in srgb,var(--brand) 8%,transparent)}
+#bankBody{max-width:960px;margin:0 auto;padding:0 22px 44px}
+.bankcap{font-size:18px;font-weight:800;margin:16px 0 8px}
+.banktbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;font-size:13.5px;box-shadow:var(--shadow);table-layout:fixed}
+.banktbl td,.banktbl th{padding:8px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.banktbl th{background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:800}
+.banktbl .d{width:96px;white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+.banktbl .desc{word-break:break-word}
+.banktbl .amt{width:118px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
+.banktbl tr.tot td{font-weight:800;border-top:2px solid var(--line-strong)}
 @media print{.topbar,.rephead,.repctl,.reptabs{display:none!important}.repwrap{position:static}#appwrap>.wrap{display:none}}
 .di{border:1px solid transparent;border-radius:6px;padding:3px 6px;font-size:13.5px;background:transparent;color:var(--text);font-family:inherit;flex:1;min-width:60px}
 .di:hover{border-color:var(--line)}.di:focus{outline:none;border-color:var(--brand);background:var(--surface)}
@@ -697,14 +706,15 @@ function renderBank(){
   var sheetTot=(M[sheetDay]?M[sheetDay].total:0);
   var bankTot=BANKACCTS.reduce(function(s,a){return s+(+a.balance_current||0);},0);
   var variance=r2(bankTot-sheetTot);
-  var acctRows=BANKACCTS.map(function(a){return '<tr><td>'+esc(a.institution||a.display_name||'Bank')+(a.last4?' ····'+esc(a.last4):'')+'</td><td>'+esc(a.subcategory||a.category||'')+'</td><td class="n">'+fmt(+a.balance_current||0)+'</td><td>'+(a.balance_as_of?new Date(a.balance_as_of).toLocaleString():'—')+'</td></tr>';}).join('');
-  var recon='<div class="repcap">Balance reconciliation</div><table class="reptab"><tr class="hd"><td>Bank</td><td>Type</td><td class="n">Balance</td><td>As of</td></tr>'+acctRows
-    +'<tr class="tot"><td colspan="2">Bank total</td><td class="n">'+fmt(bankTot)+'</td><td></td></tr>'
-    +'<tr><td colspan="2">Sheet running total ('+sheetDay+')</td><td class="n">'+fmt(sheetTot)+'</td><td></td></tr>'
-    +'<tr class="big"><td colspan="2">Variance (bank − sheet)</td><td class="n">'+fmt(variance)+'</td><td>'+(Math.abs(variance)<0.01?'✓ matched':'<button class="btn small" id="bankReconBtn">Book adjustment to match</button>')+'</td></tr></table>';
-  var tx=BANKTX.slice(0,100);
-  var txRows=tx.map(function(t){return '<tr><td>'+esc(t.transacted_at||t.posted_at||'')+'</td><td>'+esc(t.description||'')+'</td><td class="n">'+fmt(+t.amount||0)+'</td></tr>';}).join('');
-  var txTbl=tx.length?('<div class="repcap" style="margin-top:16px">Bank transactions ('+BANKTX.length+')</div><table class="reptab"><tr class="hd"><td>Date</td><td>Description</td><td class="n">Amount</td></tr>'+txRows+'</table>'):'<p class="hint" style="margin-top:14px">Balance is linked. No transactions yet — if the Transactions feature is still pending Stripe approval they\'ll appear once it\'s active (use Refresh from bank).</p>';
+  var acctRows=BANKACCTS.map(function(a){return '<tr><td class="desc">'+esc(a.institution||a.display_name||'Bank')+(a.last4?' ····'+esc(a.last4):'')+' <span style="color:var(--muted);font-size:11px">'+esc(a.subcategory||a.category||'')+'</span></td><td class="amt">'+fmt(+a.balance_current||0)+'</td></tr>';}).join('');
+  var recon='<div class="bankcap">Balance reconciliation</div><table class="banktbl"><tr><th class="desc">Account (available balance)</th><th class="amt">Balance</th></tr>'+acctRows
+    +'<tr class="tot"><td class="desc">Bank total</td><td class="amt">'+fmt(bankTot)+'</td></tr>'
+    +'<tr><td class="desc">Sheet running total · '+sheetDay+'</td><td class="amt">'+fmt(sheetTot)+'</td></tr>'
+    +'<tr class="tot"><td class="desc">Variance (bank − sheet)</td><td class="amt" style="color:'+(Math.abs(variance)<0.01?'var(--in)':'var(--out)')+'">'+fmt(variance)+(Math.abs(variance)<0.01?' ✓':'')+'</td></tr></table>'
+    +(Math.abs(variance)>=0.01?'<div style="margin:10px 0"><button class="btn small" id="bankReconBtn">Book adjustment to match bank</button> <span class="hint">books a Balance adjustment on today so the sheet equals the bank</span></div>':'');
+  var tx=BANKTX.slice(0,150);
+  var txRows=tx.map(function(t){var amt=+t.amount||0;return '<tr><td class="d">'+esc(t.transacted_at||t.posted_at||'—')+'</td><td class="desc">'+esc(t.description||'')+'</td><td class="amt" style="color:'+(amt>=0?'var(--in)':'var(--out)')+'">'+fmt(amt)+'</td></tr>';}).join('');
+  var txTbl=tx.length?('<div class="bankcap">Bank transactions <span class="hint" style="font-weight:400">('+BANKTX.length+' total · showing '+tx.length+')</span></div><table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+txRows+'</table>'):'<p class="hint">Balance is linked. No transactions yet — if the Transactions feature is still pending Stripe approval they\'ll appear once active (Refresh from bank / next daily sync).</p>';
   el.innerHTML=recon+txTbl;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked';
   var rb=document.getElementById('bankReconBtn');
   if(rb)rb.onclick=function(){snapshot();setDayAdj(TODAY,r2(bankTot-(M[TODAY]?M[TODAY].total:0)));save();recompute();render();renderBank();};
