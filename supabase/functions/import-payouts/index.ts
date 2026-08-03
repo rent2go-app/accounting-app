@@ -42,7 +42,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({} as any));
     const now = Math.floor(Date.now() / 1000);
-    // Lookback covers the current + previous noon-to-noon day (default 60h). Backfill can pass {from:<unix>}.
+    // Lookback: cron passes nothing → 60h (covers current+previous day, cheap). The manual button passes
+    // {hours:720} (30 days) so a human "Pull now" sweeps up ANY payout that slipped. Backfill: {from:<unix>}.
     const from = body.from ? Number(body.from) : now - (Number(body.hours) || 60) * 3600;
 
     const byDay: Record<string, { id: string; amount: number; lbl: string; ts: string }[]> = {};
@@ -52,7 +53,8 @@ Deno.serve(async (req) => {
       if (!short || !a.key) continue;
       const payouts = await stripeAll(`https://api.stripe.com/v1/payouts?limit=100&created%5Bgte%5D=${from}`, a.key);
       for (const p of payouts) {
-        if (p.method !== "instant") continue;                 // instant payouts only
+        // Pull EVERY payout that actually paid out — instant AND standard/automatic. Any payout is cash
+        // leaving Stripe for the bank, so it must land in the ledger. Deduped by id, so no double-count.
         if (p.status === "canceled" || p.status === "failed") continue;
         const amt = Math.round(p.amount || 0) / 100;
         if (amt <= 0) continue;
