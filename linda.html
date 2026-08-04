@@ -1166,6 +1166,7 @@ function renderFeeLedger(){
   var refreshBar='<div class="ledgerbar'+(isStale(LEDGER_REFRESHED)?' stale':'')+'">🕒 Ledger last refreshed: <b>'+(LEDGER_REFRESHED?shortET(LEDGER_REFRESHED)+' ET':'—')+'</b>'+(LEDGER_REFRESHED?' ('+agoText(LEDGER_REFRESHED)+')':'')+(isStale(LEDGER_REFRESHED)?' — may be out of date':'')+' <button class="btn small pri" data-refreshledger="1" title="Re-scan Stripe (all accounts) and refresh the invoice/fee ledger — picks up account changes">🔄 Refresh ledger</button></div>';
   var main='<details class="feewrap" data-sec="fees"'+(OPENSEC.fees?' open':'')+'><summary>'+IC_FEE+'$10 late fees — <b>'+toRaise+'</b> to invoice'+(inProg?' <span class="hint">· '+inProg+' in progress</span>':'')+' <span class="hint">(grouped by fleet — create invoice → paid)</span></summary>'
     +refreshBar
+    +(toRaise>1?'<div style="margin:8px 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--brand) 8%,var(--surface))"><button class="btn pri" data-raiseallfleets="1" title="Create &amp; email every $10 late-fee invoice across ALL fleets in one click">🧾 Create ALL '+toRaise+' invoices — every fleet, one click</button> <span class="hint">runs every fleet below at once — each is emailed to the customer to pay, never auto-charged</span></div>':'')
     +groups
     +'<p class="hint"><b>🧾 Create invoice</b> → creates the $10 invoice in Stripe and <b>emails it to the customer to pay</b> (never auto-charged) in one step. <b>✓ Done</b> → clears it without invoicing. <b>✕ Dismiss</b> spares the customer today. (Any older <b>📝 leftover draft</b> still shows a 📧 Send to finish it.)</p></details>';
   el.innerHTML=main+dismBlock;
@@ -1344,6 +1345,7 @@ function wire(){
   document.querySelectorAll('[data-sendfee]').forEach(b=>b.onclick=()=>sendFee(b.dataset.sendfee,b));
   document.querySelectorAll('[data-raisefee]').forEach(b=>b.onclick=()=>raiseFee(b.dataset.raisefee,b));
   document.querySelectorAll('[data-raiseallacct]').forEach(b=>b.onclick=()=>raiseAllFees(b,b.dataset.raiseallacct));
+  document.querySelectorAll('[data-raiseallfleets]').forEach(b=>b.onclick=()=>raiseAllFees(b));   // no account = ALL fleets in one click
   document.querySelectorAll('[data-sendallacct]').forEach(b=>b.onclick=()=>sendAllFees(b,b.dataset.sendallacct));
   document.querySelectorAll('[data-refreshledger]').forEach(b=>b.onclick=()=>refreshLedger(b));
   document.querySelectorAll('[data-discsig]').forEach(b=>b.onchange=async()=>{var c=DISCROWS[b.dataset.discsig];if(b.checked&&c.sarekon_device_id){var r=await gpsCommand(c,'disable');if(r&&r.cancelled){b.checked=false;return;}}setDisc(c,{signal_sent:b.checked,signal_sent_at:b.checked?new Date().toISOString():null});});
