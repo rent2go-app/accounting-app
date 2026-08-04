@@ -356,7 +356,7 @@ async function load(){
   for(var d in MD){MD[d].j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});MD[d].e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(d<=TODAY);if(l.length<5)l.push('');});}
   DK=Object.keys(MD).sort();
   try{var ba=await sb.from('bank_accounts').select('*');BANKACCTS=ba.data||[];}catch(e){BANKACCTS=[];}
-  try{var bt=await sb.from('bank_transactions').select('*').order('transacted_at',{ascending:false}).limit(300);BANKTX=bt.data||[];}catch(e){BANKTX=[];}
+  try{var bt=await sb.from('bank_transactions').select('*').order('transacted_at',{ascending:false}).limit(2500);BANKTX=bt.data||[];}catch(e){BANKTX=[];}
   if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
   LASTOPEN=OPEN;LASTFX=JSON.stringify({z:CFG.zar,a:CFG.aed,s:CFG.sacur});LASTCATSEG=JSON.stringify(CATSEG);LASTSAL=OWNERSAL;LASTSYNC={};for(var d2 in MD)LASTSYNC[d2]=JSON.stringify(MD[d2]);
   setStatus('saved');
