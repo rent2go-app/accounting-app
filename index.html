@@ -793,7 +793,7 @@ async function connectBank(btn){
     btn.textContent='✓ Connected';setTimeout(function(){btn.textContent=o;btn.disabled=false;},2500);
   }catch(e){alert('Connect failed: '+(e.message||e));btn.textContent=o;btn.disabled=false;}
 }
-async function refreshBank(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='🔄 Refreshing…';try{var r=await sb.functions.invoke('bank-refresh',{body:{}});if(r.error)throw r.error;await load();renderBank();}catch(e){alert('Refresh failed: '+(e.message||e));}finally{btn.textContent=o;btn.disabled=false;}}
+async function refreshBank(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='🔄 Refreshing…';try{var r=await sb.functions.invoke('bank-refresh',{body:{sync_transactions:true,refresh:true,days:14}});if(r.error)throw r.error;await load();renderBank();}catch(e){alert('Refresh failed: '+(e.message||e));}finally{btn.textContent=o;btn.disabled=false;}}
 document.getElementById('bankBtn').onclick=function(){document.getElementById('bankwrap').hidden=false;renderBank();};
 document.getElementById('bankClose').onclick=function(){document.getElementById('bankwrap').hidden=true;};
 document.getElementById('bankConnect').onclick=function(){connectBank(this);};

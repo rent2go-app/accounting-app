@@ -28,6 +28,8 @@ Deno.serve(async (req) => {
   try {
     const bodyIn = await req.json().catch(() => ({} as any));
     const doTx = !!bodyIn.sync_transactions;
+    const doRefresh = !!bodyIn.refresh;                                   // trigger a fresh pull from the bank (button)
+    const sinceUnix = bodyIn.days ? Math.floor(Date.now() / 1000) - Number(bodyIn.days) * 86400 : 0;  // only list recent txns (fast)
     const key = keyFor(LABEL);
     if (!key) return json({ error: "no Stripe key for " + LABEL });
     const cust = (await sGET(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(HOLDER_EMAIL)}&limit=1`, key)).data?.[0];
@@ -59,7 +61,15 @@ Deno.serve(async (req) => {
       if (doTx) {
         try {
           if (!(acct.subscriptions || []).includes("transactions")) await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/subscribe`, key, new URLSearchParams([["features[]", "transactions"]]));
-          const txns = await stripeAll(`https://api.stripe.com/v1/financial_connections/transactions?account=${a.id}&limit=100`, key);
+          // Ask Stripe to pull the latest transactions from the bank, then poll briefly (button uses this to
+          // surface today's activity). NOTE: banks refresh transactions on their own schedule (often ~daily),
+          // so a manual refresh may still return no newer rows until the institution next posts them.
+          if (doRefresh) {
+            await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/refresh`, key, new URLSearchParams([["features[]", "transactions"]])).catch(() => ({}));
+            for (let i = 0; i < 10; i++) { const c = await sGET(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}`, key); if (c.transaction_refresh?.status === "succeeded") break; await sleep(1500); }
+          }
+          const sinceQ = sinceUnix ? `&transacted_at%5Bgte%5D=${sinceUnix}` : "";   // window to recent txns → fast
+          const txns = await stripeAll(`https://api.stripe.com/v1/financial_connections/transactions?account=${a.id}&limit=100${sinceQ}`, key, sinceUnix ? 600 : 2000);
           for (const t of txns) { await sbPost(`bank_transactions?on_conflict=id`, [{ id: t.id, account_id: a.id, amount: (t.amount || 0) / 100, currency: t.currency || ccy, status: t.status || null, description: t.description || null, transacted_at: t.transacted_at ? ymd(t.transacted_at) : null, posted_at: t.status_transitions?.posted_at ? ymd(t.status_transitions.posted_at) : null, updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal"); txCount++; }
         } catch (_) { /* transactions feature may be pending */ }
       }
