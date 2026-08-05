@@ -792,6 +792,11 @@ function reconcile(){
 async function bookBankTx(id){
   var t=BANKTX.find(function(x){return x.id===id;});if(!t)return;
   var amt=+t.amount||0,day=t.transacted_at||t.posted_at||TODAY;
+  // GUARD: never inject a duplicate. Reject if this exact bank txn is already booked, or if the reconciler
+  // already matches it to an existing ledger line (deposit / income / paid expense).
+  if(bookedBankIds()[id]){alert('🔔 Already in the ledger — this exact transaction was already booked, so it was NOT added again.');return;}
+  var rcChk=reconcile();var meChk=rcChk.bank.find(function(b){return b.id===id;});
+  if(meChk&&meChk.matched){alert('🔔 Already present in the ledger — a matching entry of '+fmt(Math.abs(amt))+' on/near '+day+' already exists, so it was NOT added again.');renderBank();return;}
   if(!MD[day]){alert('No ledger day for '+day+' — add that month first (＋ Add month).');return;}
   snapshot();var desc=(t.description||'Bank item').slice(0,120);
   if(amt>=0)MD[day].j.push([desc,r2(amt),'Other Income','','bk:'+id]);
