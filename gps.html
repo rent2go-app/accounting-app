@@ -270,6 +270,11 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .gpsdetail{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
 .dethead{font-size:15px;margin-bottom:9px}
 .detctrl{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.starterrib{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;padding:8px 12px;border-radius:9px;margin:8px 0 10px}
+.starterrib.dis{background:#fdeaea;color:#b3261e;border:1px solid #f3b4b4}
+.starterrib.en{background:#e7f6ec;color:#0f8a4d;border:1px solid #a8dcbc}
+.starterrib .rsince{font-weight:600;opacity:.8;font-size:12px}
+.disflag{font-size:11px;vertical-align:middle}
 .detstat{display:flex;flex-direction:column;gap:8px;font-size:13px}
 .gpscard{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--surface-2);max-width:460px}
 .gpscard .gcr{display:flex;gap:12px;padding:2px 0}
@@ -332,7 +337,8 @@ function renderSide(){
       var sel=(SELECTED&&SELECTED.customer_id===c.customer_id&&SELECTED.account_label===c.account_label)?' sel':'';
       var top=linked?esc(c.sarekon_device_label||'linked'):esc(c.name);
       var sub=linked?esc(c.name):'<span class="nolink">no car linked</span>';
-      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+top+'</div><div class="carsub">'+sub+'</div></div>';
+      var flag=c.starter_state==='disabled'?' <span class="disflag" title="Starter is DISABLED">🔴</span>':'';
+      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+top+flag+'</div><div class="carsub">'+sub+'</div></div>';
     }).join('');
     return '<div class="caracc">'+esc(acc)+'</div>'+rows;
   }).join('');
@@ -341,6 +347,13 @@ function renderSide(){
 }
 function selectCar(idx){SELECTED=CUSTS[idx];TRACK=null;renderSide();renderMain();if(SELECTED.sarekon_device_id){setMap(null);trackSel();}else{setMap(null);}}
 
+// Persistent starter-state ribbon — reflects the CURRENT commanded state (survives reload) so you know it took.
+function starterRibbon(c){
+  if(!c)return '';
+  if(c.starter_state==='disabled')return '<div class="starterrib dis">🔴 STARTER DISABLED'+(c.starter_changed_at?' <span class="rsince">since '+esc(fmtDT(c.starter_changed_at))+'</span>':'')+'</div>';
+  if(c.starter_state==='enabled')return '<div class="starterrib en">🟢 Starter enabled'+(c.starter_changed_at?' <span class="rsince">since '+esc(fmtDT(c.starter_changed_at))+'</span>':'')+'</div>';
+  return '';
+}
 function renderMain(){
   var d=document.getElementById('gpsdetail');
   if(!SELECTED){d.innerHTML='<p class="hint" style="margin:0">Select a car from the list.</p>';return;}
@@ -363,6 +376,7 @@ function renderMain(){
     +'</div>'):'';
   var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap"><summary>recent events</summary>'+t.events.slice(0,10).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('')+'</details>'):'';
   d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+' · '+esc(c.sarekon_device_label||'')+'</span></div>'
+    +starterRibbon(c)
     +'<div class="detctrl"><button class="btn small" id="btnLocate">📍 Locate</button> <button class="btn small" id="btnTrack">↻ Track</button> <button class="btn small danger" id="btnDisable">🔴 Disable starter</button> <button class="btn small ok" id="btnEnable">🟢 Enable starter</button> <button class="btn small" id="btnUnlink">unlink</button></div>'
     +'<div class="detstat">'+badges+card+ev+'<div id="detmsg" class="hint"></div></div>';
   document.getElementById('btnLocate').onclick=locateSel;
@@ -373,7 +387,14 @@ function renderMain(){
 }
 async function trackSel(){var c=SELECTED;if(!c||!c.sarekon_device_id)return;var m=document.getElementById('detmsg');if(m)m.textContent='locating…';try{TRACK=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});renderMain();if(TRACK.lat&&TRACK.lng)setMap(TRACK.lat,TRACK.lng);}catch(e){var m2=document.getElementById('detmsg');if(m2)m2.textContent='Track failed: '+(e.message||e);}}
 async function locateSel(){var c=SELECTED;var m=document.getElementById('detmsg');if(m)m.textContent='pinging the car for a fresh location…';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});if(m)m.textContent='ping sent — refreshing position in ~15s…';setTimeout(trackSel,15000);}catch(e){if(m)m.textContent='Locate failed: '+(e.message||e);}}
-async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm(verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')? This is LIVE.'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var m=document.getElementById('detmsg');if(m)m.textContent='sending…';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:false});if(m)m.innerHTML=(kind==='disable'?'<span style="display:inline-block;padding:4px 11px;border-radius:999px;font-weight:800;background:#fdeaea;color:#b3261e">🔴 STARTER DISABLED</span> <span class="hint">command sent'+(d.command_queue_id?' · #'+d.command_queue_id:'')+' · takes effect next ignition-off</span>':'<span style="display:inline-block;padding:4px 11px;border-radius:999px;font-weight:800;background:#e7f6ec;color:#0f8a4d">🟢 STARTER ENABLED</span> <span class="hint">command sent'+(d.command_queue_id?' · #'+d.command_queue_id:'')+'</span>');toast(kind==='disable'?'Starter DISABLED':'Starter ENABLED');}catch(e){if(m)m.textContent='Failed: '+(e.message||e);}}
+async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm(verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')? This is LIVE.'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var m=document.getElementById('detmsg');if(m)m.textContent='sending…';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:false});
+  var ns=kind==='disable'?'disabled':'enabled';var now=new Date().toISOString();
+  try{await sb.from('linda_customers').update({starter_state:ns,starter_changed_at:now}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);}catch(_){}
+  c.starter_state=ns;c.starter_changed_at=now;                 // persist locally so the ribbon shows immediately
+  renderSide();renderMain();                                    // redraw → persistent ribbon now reflects the state
+  var m2=document.getElementById('detmsg');if(m2)m2.innerHTML='<span class="hint">✓ command sent'+(d.command_queue_id?' · #'+d.command_queue_id:'')+(kind==='disable'?' · takes effect next ignition-off':'')+'</span>';
+  toast(kind==='disable'?'Starter DISABLED':'Starter ENABLED');
+}catch(e){if(m)m.textContent='Failed: '+(e.message||e);}}
 async function linkSel(){var c=SELECTED;var sel=document.getElementById('linksel');var id=sel.value;if(!id){alert('Pick a car first.');return;}var label=sel.options[sel.selectedIndex].text;var r=await sb.from('linda_customers').update({sarekon_device_id:id,sarekon_device_label:label}).eq('account_label',c.account_label).eq('customer_id',c.customer_id).select();if(r.error){alert(r.error.message);return;}toast('Car linked');await reloadKeepSel(c);trackSel();}
 async function unlinkSel(){var c=SELECTED;if(!confirm('Unlink this car?'))return;await sb.from('linda_customers').update({sarekon_device_id:null,sarekon_device_label:null}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);await reloadKeepSel(c);}
 async function reloadKeepSel(c){var d=await sb.from('linda_customers').select('*');CUSTS=(d.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});SELECTED=CUSTS.find(function(x){return x.customer_id===c.customer_id&&x.account_label===c.account_label;})||null;TRACK=null;renderSide();renderMain();}
