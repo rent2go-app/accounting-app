@@ -43,7 +43,10 @@ Deno.serve(async (req) => {
         if (minCents && amount < minCents) { out.push({ account: short, currency, skipped: "below min", amount: amount / 100 }); continue; }
         if (dry) { out.push({ account: short, currency, would_pay: amount / 100 }); continue; }
         const form = new URLSearchParams({ amount: String(amount), currency, method: "instant" });
-        const idem = `ip_${a.label}_${currency}_${hourBucket}`;
+        // Idempotency key MUST include the amount: a time-only key gets locked to the first amount for 24h,
+        // so when new funds accumulate (a different amount) in the same window Stripe rejects the payout and
+        // the balance never sweeps. amount+hour → same-amount retries dedupe, new amounts always pay out.
+        const idem = `ip_${a.label}_${currency}_${amount}_${hourBucket}`;
         const r = await sPOST("https://api.stripe.com/v1/payouts", a.key, form, idem);
         if (r.ok && !r.d.error) out.push({ account: short, currency, paid: amount / 100, id: r.d.id, status: r.d.status });
         else out.push({ account: short, currency, amount: amount / 100, error: (r.d.error && r.d.error.message) || `HTTP ${r.ok}` });
