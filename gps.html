@@ -275,6 +275,10 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .starterrib.en{background:#e7f6ec;color:#0f8a4d;border:1px solid #a8dcbc}
 .starterrib .rsince{font-weight:600;opacity:.8;font-size:12px}
 .disflag{font-size:11px;vertical-align:middle}
+.stdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.04)}
+.stdot.en{background:#18c06a}
+.stdot.dis{background:#e5484d}
+.stdot.off{background:#9aa4ad}
 .detstat{display:flex;flex-direction:column;gap:8px;font-size:13px}
 .gpscard{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--surface-2);max-width:460px}
 .gpscard .gcr{display:flex;gap:12px;padding:2px 0}
@@ -337,8 +341,10 @@ function renderSide(){
       var sel=(SELECTED&&SELECTED.customer_id===c.customer_id&&SELECTED.account_label===c.account_label)?' sel':'';
       var top=linked?esc(c.sarekon_device_label||'linked'):esc(c.name);
       var sub=linked?esc(c.name):'<span class="nolink">no car linked</span>';
-      var flag=c.starter_state==='disabled'?' <span class="disflag" title="Starter is DISABLED">🔴</span>':'';
-      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+top+flag+'</div><div class="carsub">'+sub+'</div></div>';
+      var dot=c.starter_state==='enabled'?'<span class="stdot en" title="Starter ENABLED"></span>'
+             :c.starter_state==='disabled'?'<span class="stdot dis" title="Starter DISABLED"></span>'
+             :'<span class="stdot off" title="'+(linked?'Starter state unknown':'No device linked / offline')+'"></span>';
+      return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+dot+top+'</div><div class="carsub">'+sub+'</div></div>';
     }).join('');
     return '<div class="caracc">'+esc(acc)+'</div>'+rows;
   }).join('');
