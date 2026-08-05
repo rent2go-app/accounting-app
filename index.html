@@ -344,7 +344,7 @@ function showApp(){document.getElementById('loginwrap').style.display='none';doc
 async function doLogin(ev){ev.preventDefault();var em=document.getElementById('li_email').value.trim();var pw=document.getElementById('li_pass').value;var er=document.getElementById('li_err');er.textContent='';var b=document.getElementById('li_btn');b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:em,password:pw});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(em.toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}
 async function boot(){var s=await sb.auth.getSession();var f=document.getElementById('li_form');if(f)f.addEventListener('submit',doLogin);var so=document.getElementById('signout');if(so)so.onclick=async function(){await sb.auth.signOut();location.reload();};if(s.data.session){if(['gorentaride@gmail.com','thurstonrdavis@gmail.com'].indexOf(((s.data.session.user.email)||'').toLowerCase())<0){location.replace('mybudget.html');return;}showApp();runApp();}else{showLogin();}}
 async function runApp(){
-let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={},NOTES={},NOTEAUTHOR='',STRIPEROWS=[],BANKACCTS=[],BANKTX=[];
+let LASTSYNC={},LASTOPEN=0,LASTFX='',LASTCATSEG='{}',LASTSAL=12000,flushTimer=null,FLEETCARS=[],MVCTX=null,WEEKLY={},NOTES={},NOTEAUTHOR='',STRIPEROWS=[],BANKACCTS=[],BANKTX=[],RECONREPORT=null;
 async function load(){
   var res=await sb.from('day_blocks').select('*');
   if(res.error){setStatus('error');console.error(res.error);}
@@ -357,6 +357,7 @@ async function load(){
   DK=Object.keys(MD).sort();
   try{var ba=await sb.from('bank_accounts').select('*');BANKACCTS=ba.data||[];}catch(e){BANKACCTS=[];}
   try{var bt=await sb.from('bank_transactions').select('*').order('transacted_at',{ascending:false}).limit(2500);BANKTX=bt.data||[];}catch(e){BANKTX=[];}
+  try{var rr=await sb.from('reconcile_reports').select('*').order('ran_at',{ascending:false}).limit(1);RECONREPORT=(rr.data&&rr.data[0])||null;}catch(e){RECONREPORT=null;}
   if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
   LASTOPEN=OPEN;LASTFX=JSON.stringify({z:CFG.zar,a:CFG.aed,s:CFG.sacur});LASTCATSEG=JSON.stringify(CATSEG);LASTSAL=OWNERSAL;LASTSYNC={};for(var d2 in MD)LASTSYNC[d2]=JSON.stringify(MD[d2]);
   setStatus('saved');
@@ -761,7 +762,9 @@ function renderBank(){
     +(ledgerOnly.length?'<details style="margin-top:16px"><summary class="hint" style="cursor:pointer">📒 '+ledgerOnly.length+' in your books, not (yet) in the bank <span style="font-weight:400">(uncleared / timing — tap to view)</span></summary><table class="banktbl" style="margin-top:8px"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+loRows+'</table></details>':'');
   var deadConn=BANKACCTS.filter(function(a){return !savingsIds[a.id]&&a.status&&a.status!=='active';});
   var connWarn=deadConn.length?'<div style="margin:0 0 12px;padding:11px 13px;border:1px solid var(--out);border-radius:10px;background:color-mix(in srgb,var(--out) 12%,var(--surface))"><b style="color:var(--out)">⚠ Bank connection needs re-authorising</b><div class="hint" style="margin-top:3px">'+deadConn.map(function(a){return '····'+esc(a.last4||'?')+' ('+esc(a.status)+')';}).join(', ')+' — balance &amp; transactions are frozen at the last good sync. Click <b>🔗 Connect bank</b> and log into your bank again to resume live updates. (Refresh alone can’t fix this — only you can re-authorise.)</div></div>':'';
-  el.innerHTML=connWarn+recon+recSec;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked'+(deadConn.length?' · ⚠ '+deadConn.length+' need reconnect':'');
+  var rrCard='';
+  if(RECONREPORT&&RECONREPORT.summary){var ran=RECONREPORT.ran_at?new Date(RECONREPORT.ran_at).toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';rrCard='<div style="margin:0 0 12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--brand) 6%,var(--surface))"><b>🧾 Last auto-reconciliation</b> <span class="hint">'+esc(ran)+' ET</span><div class="hint" style="margin-top:3px;color:var(--text)">'+esc(RECONREPORT.summary)+'</div></div>';}
+  el.innerHTML=connWarn+rrCard+recon+recSec;if(info)info.textContent=BANKACCTS.length+' account'+(BANKACCTS.length===1?'':'s')+' linked'+(deadConn.length?' · ⚠ '+deadConn.length+' need reconnect':'');
   var rb=document.getElementById('bankReconBtn');
   if(rb)rb.onclick=function(){snapshot();setDayAdj(settleDay,variance);save();recompute();render();renderBank();};   // variance = bankSettled − sheetTot(actual), so adding it as an Adjustment on settleDay zeroes the tie
   document.querySelectorAll('[data-recwin]').forEach(function(b){b.onclick=function(){REC_WIN=+b.dataset.recwin;renderBank();};});
