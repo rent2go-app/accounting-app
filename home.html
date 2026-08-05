@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Rent 2 Go">
-<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+<script>if("serviceWorker" in navigator){var _r2gReloaded=false;navigator.serviceWorker.addEventListener("controllerchange",function(){if(_r2gReloaded)return;_r2gReloaded=true;location.reload();});window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").then(function(reg){reg.update();setInterval(function(){reg.update();},300000);}).catch(function(){});});}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--line-strong:#9aa8b8;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--gold:#eab54e;--band:#1f3a5f;--shadow:0 1px 2px rgba(16,24,40,.08),0 1px 3px rgba(16,24,40,.06);--radius:12px}

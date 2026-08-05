@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Rent 2 Go">
-<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+<script>if("serviceWorker" in navigator){var _r2gReloaded=false;navigator.serviceWorker.addEventListener("controllerchange",function(){if(_r2gReloaded)return;_r2gReloaded=true;location.reload();});window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").then(function(reg){reg.update();setInterval(function(){reg.update();},300000);}).catch(function(){});});}</script>
 
   <link rel="stylesheet" href="assets/style.css">
 </head>
