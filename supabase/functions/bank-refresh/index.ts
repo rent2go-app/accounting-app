@@ -17,6 +17,13 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function sGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}`, "User-Agent": "bank-refresh" } }); return await r.json(); }
 async function sPOST(url: string, key: string, form: URLSearchParams) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "bank-refresh" }, body: form }); return await r.json(); }
 async function sbPost(path: string, body: unknown, prefer: string) { await fetch(`${SB}/rest/v1/${path}`, { method: "POST", headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: prefer }, body: JSON.stringify(body) }); }
+async function sbGetJson(path: string) { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } }); return r.ok ? await r.json() : []; }
+async function sbReq(path: string, method: string, body?: unknown) { await fetch(`${SB}/rest/v1/${path}`, { method, headers: { apikey: SR, Authorization: `Bearer ${SR}`, "Content-Type": "application/json", Prefer: "return=minimal" }, body: body ? JSON.stringify(body) : undefined }); }
+// SELF-HEAL: reconnecting the bank mints NEW ids for the same real account + transactions, so the FC list
+// can hold duplicates. The dedupe_bank() DB function keeps one row per last4 (active/newest), moves
+// transactions onto it, drops stale account rows, and removes duplicate transactions by natural key —
+// so a reconnect updates in place instead of inflating balances/transactions.
+async function dedupeAccounts() { await sbReq(`rpc/dedupe_bank`, "POST", {}); }
 async function stripeAll(base: string, key: string, cap = 2000) { let out: any[] = [], sa: string | null = null; while (out.length < cap) { const d = await sGET(base + (sa ? `&starting_after=${sa}` : ""), key); const rows = d.data || []; out = out.concat(rows); if (d.has_more && rows.length) sa = rows[rows.length - 1].id; else break; } return out; }
 
 Deno.serve(async (req) => {
@@ -35,18 +42,23 @@ Deno.serve(async (req) => {
     const cust = (await sGET(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(HOLDER_EMAIL)}&limit=1`, key)).data?.[0];
     if (!cust) return json({ ok: true, accounts: 0, note: "no bank connected yet" });
     const accounts = await stripeAll(`https://api.stripe.com/v1/financial_connections/accounts?account_holder%5Bcustomer%5D=${cust.id}&limit=100`, key);
-    const out: any[] = [];
-    for (const a of accounts) {
-      // BALANCE — kick a refresh, then poll (~18s max) for a FRESH figure so we don't store a stale snapshot.
-      await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/refresh`, key, new URLSearchParams([["features[]", "balance"]])).catch(() => ({}));
+    let latestTx = "";
+    // Refresh every account in PARALLEL (was sequential ≈ 3× slower). One refresh call kicks BOTH balance
+    // and (when asked) transactions; we poll once for both to go "succeeded", then read balance + list txns.
+    const out = await Promise.all(accounts.map(async (a: any) => {
+      const feats = ["balance"]; if (doTx && doRefresh) feats.push("transactions");
+      if (doTx && !(a.subscriptions || []).includes("transactions")) await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/subscribe`, key, new URLSearchParams([["features[]", "transactions"]])).catch(() => ({}));
+      await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/refresh`, key, new URLSearchParams(feats.map((f) => ["features[]", f]))).catch(() => ({}));
       let acct = a;
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
         acct = await sGET(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}`, key);
-        if (acct.balance_refresh?.status === "succeeded" && acct.balance?.current) break;
+        const balOk = acct.balance_refresh?.status === "succeeded" && (acct.balance?.cash?.available || acct.balance?.current);
+        const txOk = !feats.includes("transactions") || acct.transaction_refresh?.status === "succeeded" || acct.transaction_refresh?.status === "failed";
+        if (balOk && txOk) break;
         await sleep(1500);
       }
-      // Use the AVAILABLE balance (balance.cash.available) — that's what the bank shows as "Available
-      // balance"; `current` is a ledger figure that can include uncleared items. Fall back to current.
+      // Use the AVAILABLE balance (balance.cash.available) — what the bank shows as "Available balance";
+      // `current` is a ledger figure that can include uncleared items. Fall back to current.
       const cashAv = acct.balance?.cash?.available || {};
       const cur = acct.balance?.current || {};
       const ccy = Object.keys(cashAv)[0] || Object.keys(cur)[0] || "usd";
@@ -60,21 +72,18 @@ Deno.serve(async (req) => {
       let txCount = 0;
       if (doTx) {
         try {
-          if (!(acct.subscriptions || []).includes("transactions")) await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/subscribe`, key, new URLSearchParams([["features[]", "transactions"]]));
-          // Ask Stripe to pull the latest transactions from the bank, then poll briefly (button uses this to
-          // surface today's activity). NOTE: banks refresh transactions on their own schedule (often ~daily),
-          // so a manual refresh may still return no newer rows until the institution next posts them.
-          if (doRefresh) {
-            await sPOST(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}/refresh`, key, new URLSearchParams([["features[]", "transactions"]])).catch(() => ({}));
-            for (let i = 0; i < 10; i++) { const c = await sGET(`https://api.stripe.com/v1/financial_connections/accounts/${a.id}`, key); if (c.transaction_refresh?.status === "succeeded") break; await sleep(1500); }
-          }
           const sinceQ = sinceUnix ? `&transacted_at%5Bgte%5D=${sinceUnix}` : "";   // window to recent txns → fast
           const txns = await stripeAll(`https://api.stripe.com/v1/financial_connections/transactions?account=${a.id}&limit=100${sinceQ}`, key, sinceUnix ? 600 : 2000);
-          for (const t of txns) { await sbPost(`bank_transactions?on_conflict=id`, [{ id: t.id, account_id: a.id, amount: (t.amount || 0) / 100, currency: t.currency || ccy, status: t.status || null, description: t.description || null, transacted_at: t.transacted_at ? ymd(t.transacted_at) : null, posted_at: t.status_transitions?.posted_at ? ymd(t.status_transitions.posted_at) : null, updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal"); txCount++; }
+          for (const t of txns) {
+            const td = t.transacted_at ? ymd(t.transacted_at) : (t.status_transitions?.posted_at ? ymd(t.status_transitions.posted_at) : null);
+            if (td && td > latestTx) latestTx = td;
+            await sbPost(`bank_transactions?on_conflict=id`, [{ id: t.id, account_id: a.id, amount: (t.amount || 0) / 100, currency: t.currency || ccy, status: t.status || null, description: t.description || null, transacted_at: t.transacted_at ? ymd(t.transacted_at) : null, posted_at: t.status_transitions?.posted_at ? ymd(t.status_transitions.posted_at) : null, updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal"); txCount++;
+          }
         } catch (_) { /* transactions feature may be pending */ }
       }
-      out.push({ id: acct.id, bank: acct.institution_name, last4: acct.last4, balance: balAmt, available: acct.balance?.cash?.available, current: acct.balance?.current, type: acct.balance?.type, as_of: acct.balance?.as_of, fresh: acct.balance_refresh?.status, transactions: txCount });
-    }
-    return json({ ok: true, accounts: accounts.length, synced_transactions: doTx, detail: out });
+      return { id: acct.id, bank: acct.institution_name, last4: acct.last4, balance: balAmt, type: acct.balance?.type, as_of: acct.balance?.as_of, fresh: acct.balance_refresh?.status, tx_fresh: acct.transaction_refresh?.status, transactions: txCount };
+    }));
+    await dedupeAccounts();   // collapse any duplicate rows a reconnect created (keep active/newest per last4)
+    return json({ ok: true, accounts: accounts.length, synced_transactions: doTx, latest_txn: latestTx || null, total_transactions: out.reduce((s: number, x: any) => s + (x.transactions || 0), 0), detail: out });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
