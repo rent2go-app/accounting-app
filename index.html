@@ -753,12 +753,15 @@ function renderBank(){
   var bankOnly=rc.bank.filter(function(b){return !b.matched;});
   var ledgerOnly=rc.ledger.filter(function(l,j){return !rc.used[j];});
   var matchedN=rc.bank.length-bankOnly.length;
-  var boRows=bankOnly.map(function(b){var a=+b.amt||0;return '<tr class="flag"><td class="d">'+esc(b.d||'—')+'</td><td class="desc">'+esc(b.desc)+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td><td class="amt"><button class="btn small" data-bkadd="'+esc(b.id)+'">+ book</button></td></tr>';}).join('');
+  var boRows=bankOnly.map(function(b){var a=+b.amt||0;return '<tr class="flag"><td class="d">'+esc(b.d||'—')+'</td><td class="desc">'+esc(b.desc)+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td><td class="amt" style="white-space:nowrap"><button class="btn small" data-bkadd="'+esc(b.id)+'">+ book</button> <button class="btn small" data-bkignore="'+esc(b.id)+'" title="Hide this from the list — I won\'t book it">✕ ignore</button></td></tr>';}).join('');
+  var stripeMatched=rc.bank.filter(function(b){return b.stripe;});
+  var ignoredRows=BANKTX.filter(function(t){var dt=t.transacted_at||t.posted_at;return t.ignored&&dt&&dt>=rc.from&&dt<=rc.to&&!savingsIds[t.account_id];});
   var loRows=ledgerOnly.map(function(l){var a=+l.amt||0;return '<tr class="flagpink"><td class="d">'+esc(l.d)+'</td><td class="desc">'+esc(l.desc||'')+'</td><td class="amt" style="color:'+(a>=0?'var(--in)':'var(--out)')+'">'+fmt(a)+'</td></tr>';}).join('');
   var recSec='<div class="bankcap" style="margin-top:20px">Bank transactions not yet in the ledger <span class="qfilters" style="display:inline-flex;margin-left:8px">'+winBtns+'</span></div>'
-    +'<div class="hint" style="margin:0 0 8px">'+rc.from+' → '+rc.to+' · <b>'+bankOnly.length+'</b> to pull in · <b>'+matchedN+'</b> already matched</div>'
-    +(bankOnly.length?'<div style="margin:0 0 8px"><button class="btn small pri" id="bulkBookBtn" title="Book every bank transaction here into the ledger (credits→income, debits→paid expense). Deduped — safe to re-run.">📥 Pull all '+bankOnly.length+' into ledger</button> <span class="hint">includes transfers &amp; personal spending — review after</span></div>'
+    +'<div class="hint" style="margin:0 0 8px">'+rc.from+' → '+rc.to+' · <b>'+bankOnly.length+'</b> to pull in · <b>'+matchedN+'</b> already matched'+(stripeMatched.length?' <span style="color:var(--in)">· ⚡ '+stripeMatched.length+' Stripe payout(s) auto-matched to deposits</span>':'')+'</div>'
+    +(bankOnly.length?'<div style="margin:0 0 8px"><button class="btn small pri" id="bulkBookBtn" title="Book every bank transaction here into the ledger (credits→income, debits→paid expense). Deduped — safe to re-run.">📥 Pull all '+bankOnly.length+' into ledger</button> <span class="hint">includes transfers &amp; personal spending — review after · use ✕ ignore to skip one</span></div>'
       +'<table class="banktbl"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th><th class="amt"></th></tr>'+boRows+'</table>':'<div class="hint" style="color:var(--in)">✓ Every bank transaction in this range is already in the ledger.</div>')
+    +(ignoredRows.length?'<details style="margin-top:12px"><summary class="hint" style="cursor:pointer">🙈 '+ignoredRows.length+' ignored (hidden from pull list) — tap to review / restore</summary><table class="banktbl" style="margin-top:8px"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th><th class="amt"></th></tr>'+ignoredRows.map(function(t){var a=+t.amount||0;return '<tr><td class="d">'+esc(t.transacted_at||t.posted_at||'')+'</td><td class="desc">'+esc(t.description||'')+'</td><td class="amt">'+fmt(a)+'</td><td class="amt"><button class="btn small" data-bkrestore="'+esc(t.id)+'">↩ restore</button></td></tr>';}).join('')+'</table></details>':'')
     +(ledgerOnly.length?'<details style="margin-top:16px"><summary class="hint" style="cursor:pointer">📒 '+ledgerOnly.length+' in your books, not (yet) in the bank <span style="font-weight:400">(uncleared / timing — tap to view)</span></summary><table class="banktbl" style="margin-top:8px"><tr><th class="d">Date</th><th class="desc">Description</th><th class="amt">Amount</th></tr>'+loRows+'</table></details>':'');
   var deadConn=BANKACCTS.filter(function(a){return !savingsIds[a.id]&&a.status&&a.status!=='active';});
   var connWarn=deadConn.length?'<div style="margin:0 0 12px;padding:11px 13px;border:1px solid var(--out);border-radius:10px;background:color-mix(in srgb,var(--out) 12%,var(--surface))"><b style="color:var(--out)">⚠ Bank connection needs re-authorising</b><div class="hint" style="margin-top:3px">'+deadConn.map(function(a){return '····'+esc(a.last4||'?')+' ('+esc(a.status)+')';}).join(', ')+' — balance &amp; transactions are frozen at the last good sync. Click <b>🔗 Connect bank</b> and log into your bank again to resume live updates. (Refresh alone can’t fix this — only you can re-authorise.)</div></div>':'';
@@ -769,6 +772,8 @@ function renderBank(){
   if(rb)rb.onclick=function(){snapshot();setDayAdj(settleDay,variance);save();recompute();render();renderBank();};   // variance = bankSettled − sheetTot(actual), so adding it as an Adjustment on settleDay zeroes the tie
   document.querySelectorAll('[data-recwin]').forEach(function(b){b.onclick=function(){REC_WIN=+b.dataset.recwin;renderBank();};});
   document.querySelectorAll('[data-bkadd]').forEach(function(b){b.onclick=function(){bookBankTx(b.dataset.bkadd);};});
+  document.querySelectorAll('[data-bkignore]').forEach(function(b){b.onclick=function(){ignoreBankTx(b.dataset.bkignore,false);};});
+  document.querySelectorAll('[data-bkrestore]').forEach(function(b){b.onclick=function(){ignoreBankTx(b.dataset.bkrestore,true);};});
   var _bb=document.getElementById('bulkBookBtn');if(_bb)_bb.onclick=function(){bulkBookBank();};
 }
 var REC_WIN=30;   // reconciliation window in days (7/30/90/All)
@@ -783,15 +788,26 @@ function reconcile(){
     (MD[d].e||[]).forEach(function(l){if(l[3])ledger.push({d:d,amt:-(+l[1]||0),desc:l[0]||'Expense'});});   // only PAID (green) expenses are actuals that hit the bank
   });
   var savingsIds={};BANKACCTS.forEach(function(a){if((a.subcategory||'').toLowerCase()==='savings'||IGNORE_LAST4[a.last4||''])savingsIds[a.id]=1;});
-  var bank=BANKTX.filter(function(t){var dt=t.transacted_at||t.posted_at;return dt&&dt>=from&&dt<=to&&!savingsIds[t.account_id];}).map(function(t){return {id:t.id,amt:+t.amount||0,desc:t.description||'',d:t.transacted_at||t.posted_at,matched:false};});
+  // Ignored bank txns are hidden from the pull list entirely (user chose to skip them).
+  var bank=BANKTX.filter(function(t){var dt=t.transacted_at||t.posted_at;return dt&&dt>=from&&dt<=to&&!savingsIds[t.account_id]&&!t.ignored;}).map(function(t){return {id:t.id,amt:+t.amount||0,desc:t.description||'',d:t.transacted_at||t.posted_at,matched:false,stripe:false};});
   var used={};
-  // First pass: any bank txn already booked into the ledger (carries a bk:<id> tag) is matched by ID — so a
-  // transaction you've pulled in is NEVER suggested again, even if another line shares its amount/date.
   var booked=bookedBankIds();
-  bank.forEach(function(b){if(booked[b.id])b.matched=true;});
-  // Second pass: match the rest by amount (±$0.01) within ±4 days.
+  bank.forEach(function(b){
+    // 1) already booked into the ledger (bk:<id> tag) → matched by ID, never re-suggested.
+    if(booked[b.id]){b.matched=true;return;}
+    // 2) a Stripe payout landing in the bank → the SAME money is already in as a green/purple deposit
+    //    (import-payouts). Auto-match so it's never suggested (prevents doubling rental income).
+    if(isStripePayoutCredit(b)){b.matched=true;b.stripe=true;return;}
+  });
+  // 3) match the rest by amount (±$0.01) within ±4 days.
   bank.forEach(function(b){if(b.matched)return;for(var j=0;j<ledger.length;j++){if(used[j])continue;var l=ledger[j];if(Math.abs(l.amt-b.amt)<0.01 && Math.abs((new Date(l.d)-new Date(b.d))/86400000)<=4){used[j]=1;b.matched=true;break;}}});
   return {bank:bank,ledger:ledger,used:used,from:from,to:to};
+}
+// A bank credit that is a Stripe payout landing (already captured as a deposit via import-payouts).
+function isStripePayoutCredit(b){if((+b.amt||0)<=0)return false;var u=(b.desc||'').toUpperCase();return u.indexOf('STRIPE')>=0||u.indexOf('REAL TIME PAYMENT CREDIT')>=0||u.indexOf('RENT A RIDE 2 GO')>=0;}
+async function ignoreBankTx(id,restore){
+  try{await sb.from('bank_transactions').update({ignored:!restore}).eq('id',id);}catch(e){alert('Could not update: '+(e.message||e));return;}
+  var t=BANKTX.find(function(x){return x.id===id;});if(t)t.ignored=!restore;renderBank();
 }
 async function bookBankTx(id){
   var t=BANKTX.find(function(x){return x.id===id;});if(!t)return;
