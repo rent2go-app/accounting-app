@@ -40,6 +40,23 @@ Deno.serve(async (req) => {
     const s = await getSid(g);
     if (!s) return json({ error: "GPS auth failed for " + (g.username || "?") });
 
+    // STARTER STATE — read the tracker's command history to derive the current starter state. A starter is
+    // ENABLED (on) by default; it's only DISABLED if the latest starter command is an Auto-Disable. Returns
+    // {device_id: 'enabled'|'disabled'} for one device or a batch ({device_ids:[...]}).
+    if (body.action === "starter_state") {
+      const ids: string[] = body.device_ids ? body.device_ids : (body.device_id ? [body.device_id] : []);
+      if (!ids.length) return json({ error: "device_id or device_ids required" });
+      const cq = await gpsCall(g, s, "/command_queue/list.json", { "device_ids[]": ids });
+      const cmds = (cq.data.commands || cq.data.command_queues || cq.data || []) as any[];
+      const out: Record<string, string> = {};
+      for (const id of ids) {
+        const starter = cmds
+          .filter((c) => String(c.device_id) === String(id) && /starter/i.test(c.message_type_description || ""))
+          .sort((a, b) => String(b.scheduled_on_local || "").localeCompare(String(a.scheduled_on_local || "")));
+        out[id] = (starter.length && /disable/i.test(starter[0].message_type_description || "")) ? "disabled" : "enabled";
+      }
+      return json({ ok: true, states: out });
+    }
     // list this fleet's devices (for the link-a-device picker)
     if (body.action === "devices") {
       const r = await gpsCall(g, s, "/dvd/enumerate.json", {});

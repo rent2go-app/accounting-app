@@ -186,7 +186,8 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 .ignbadge.on{background:color-mix(in srgb,var(--out) 18%,var(--surface));color:var(--out)}
 .ignbadge.off{background:color-mix(in srgb,var(--in) 18%,var(--surface));color:var(--in)}
 .gpsmot{color:var(--muted)}
-.gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gpsev{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding:3px 0;border-bottom:1px solid var(--line)}
+.gpsev .evaddr{display:block;color:var(--text);font-size:11px;margin-top:1px}
 .gpsok{font-weight:700;color:var(--in)}
 .gpsmap{width:100%;max-width:520px;height:240px;border:1px solid var(--line);border-radius:9px;margin-top:4px}
 .gpsdry{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin:0 0 10px}
@@ -301,6 +302,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div class="gpstop">
   <h2 style="margin:0;flex:0 0 auto">🚗 GPS Tracker Control</h2>
   <button class="btn small pri" id="loadall">🚗 Load all cars</button>
+  <button class="btn small" id="readstates" title="Read each car's current starter state from the trackers (command history)">🔄 Read starter states</button>
   <span class="hint" style="color:var(--out);font-weight:700">⚡ Commands are LIVE</span>
 </div>
 <div class="gpslayout">
@@ -329,7 +331,7 @@ async function loadGpsDevices(acc){var k=gpsKeyFor(acc);if(GPSDEV[k])return GPSD
 let CUSTS=[], SELECTED=null, TRACK=null, SEARCH='';
 function fmtDT(str){if(!str)return '-';var m=String(str).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);if(!m)return str;var mon=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var h=+m[4],ap=h>=12?'PM':'AM',h12=((h+11)%12)+1;return h12+':'+m[5]+' '+ap+' \u00b7 '+mon[(+m[2])-1]+' '+(+m[3]);}
 
-function setMap(lat,lng){var m=document.getElementById('gpsmap');if(lat&&lng){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lng)+'&z=15&output=embed"></iframe>';}else{m.innerHTML='<div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div>';}}
+function setMap(lat,lng,address){var m=document.getElementById('gpsmap');if(lat&&lng){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(lat+','+lng)+'&z=15&output=embed"></iframe>';}else if(address){m.innerHTML='<iframe loading="lazy" src="https://maps.google.com/maps?q='+encodeURIComponent(address)+'&z=15&output=embed"></iframe>';}else{m.innerHTML='<div class="mapempty">Pick a car on the left, then Track it to see it on the map.</div>';}}
 
 function renderSide(){
   var q=SEARCH.toLowerCase();
@@ -341,9 +343,10 @@ function renderSide(){
       var sel=(SELECTED&&SELECTED.customer_id===c.customer_id&&SELECTED.account_label===c.account_label)?' sel':'';
       var top=linked?esc(c.sarekon_device_label||'linked'):esc(c.name);
       var sub=linked?esc(c.name):'<span class="nolink">no car linked</span>';
-      var dot=c.starter_state==='enabled'?'<span class="stdot en" title="Starter ENABLED"></span>'
+      // Starter is ON by default; only RED if explicitly disabled. Gray only when no device is linked.
+      var dot=!linked?'<span class="stdot off" title="No device linked / offline"></span>'
              :c.starter_state==='disabled'?'<span class="stdot dis" title="Starter DISABLED"></span>'
-             :'<span class="stdot off" title="'+(linked?'Starter state unknown':'No device linked / offline')+'"></span>';
+             :'<span class="stdot en" title="Starter enabled (on)"></span>';
       return '<div class="carrow'+sel+'" data-car="'+idx+'"><div class="carnm">'+dot+top+'</div><div class="carsub">'+sub+'</div></div>';
     }).join('');
     return '<div class="caracc">'+esc(acc)+'</div>'+rows;
@@ -351,7 +354,18 @@ function renderSide(){
   document.getElementById('carlist').innerHTML=html||'<p class="hint" style="padding:12px">No matches.</p>';
   document.querySelectorAll('[data-car]').forEach(function(b){b.onclick=function(){selectCar(+b.dataset.car);};});
 }
-function selectCar(idx){SELECTED=CUSTS[idx];TRACK=null;renderSide();renderMain();if(SELECTED.sarekon_device_id){setMap(null);trackSel();}else{setMap(null);}}
+function selectCar(idx){SELECTED=CUSTS[idx];TRACK=null;renderSide();renderMain();if(SELECTED.sarekon_device_id){trackSel();}else{setMap(null);}}   // don't blank the map — trackSel replaces it once the new position loads, so it persists
+// Read each linked car's CURRENT starter state from the trackers (command history) and persist it.
+async function readStarterStates(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Reading trackers…';
+  var byAcc={};CUSTS.forEach(function(c){if(c.sarekon_device_id)(byAcc[c.account_label]=byAcc[c.account_label]||[]).push(c);});
+  var n=0;
+  for(var acc in byAcc){var ids=byAcc[acc].map(function(c){return c.sarekon_device_id;});
+    try{var d=await gpsInvoke({action:'starter_state',account_label:acc,device_ids:ids});var states=(d&&d.states)||{};
+      for(var i=0;i<byAcc[acc].length;i++){var c=byAcc[acc][i];var st=states[c.sarekon_device_id];if(!st)continue;if(st!==c.starter_state){c.starter_state=st;n++;try{await sb.from('linda_customers').update({starter_state:st,starter_changed_at:new Date().toISOString()}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);}catch(_){}}else{c.starter_state=st;}}
+    }catch(e){}
+  }
+  renderSide();if(SELECTED)renderMain();btn.disabled=false;btn.textContent=o;toast('Starter states read from trackers'+(n?' · '+n+' updated':' · all current'));
+}
 
 // Persistent starter-state ribbon — reflects the CURRENT commanded state (survives reload) so you know it took.
 function starterRibbon(c){
@@ -380,7 +394,7 @@ function renderMain(){
     +'<div class="gcr"><span class="gk">Location</span><span class="gv">'+esc(t.address||'-')+((t.lat&&t.lng)?'<br><span class="coords">'+esc(t.lat)+', '+esc(t.lng)+'</span>':'')+'</span></div>'
     +((t.lat&&t.lng)?'<div class="gclinks"><a href="'+esc(t.maps)+'" target="_blank" rel="noopener">Google Maps</a> <span>|</span> <a href="https://www.bing.com/maps?cp='+encodeURIComponent(t.lat+'~'+t.lng)+'&lvl=16" target="_blank" rel="noopener">Bing Maps</a></div>':'')
     +'</div>'):'';
-  var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap"><summary>recent events</summary>'+t.events.slice(0,10).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' - '+esc(e.event||'')+'</div>';}).join('')+'</details>'):'';
+  var ev=(t&&t.events&&t.events.length)?('<details class="gpsevwrap" open><summary>recent events</summary>'+t.events.slice(0,12).map(function(e){return '<div class="gpsev">'+esc(e.time||'')+' — '+esc(e.event||'')+(e.address?'<span class="evaddr">📍 '+esc(e.address)+'</span>':'')+'</div>';}).join('')+'</details>'):'';
   d.innerHTML='<div class="dethead"><b>'+esc(c.name)+'</b> <span class="hint">'+esc(c.account_label)+' · '+esc(c.sarekon_device_label||'')+'</span></div>'
     +starterRibbon(c)
     +'<div class="detctrl"><button class="btn small" id="btnLocate">📍 Locate</button> <button class="btn small" id="btnTrack">↻ Track</button> <button class="btn small danger" id="btnDisable">🔴 Disable starter</button> <button class="btn small ok" id="btnEnable">🟢 Enable starter</button> <button class="btn small" id="btnUnlink">unlink</button></div>'
@@ -391,7 +405,7 @@ function renderMain(){
   document.getElementById('btnEnable').onclick=function(){cmdSel('enable');};
   document.getElementById('btnUnlink').onclick=unlinkSel;
 }
-async function trackSel(){var c=SELECTED;if(!c||!c.sarekon_device_id)return;var m=document.getElementById('detmsg');if(m)m.textContent='locating…';try{TRACK=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});renderMain();if(TRACK.lat&&TRACK.lng)setMap(TRACK.lat,TRACK.lng);}catch(e){var m2=document.getElementById('detmsg');if(m2)m2.textContent='Track failed: '+(e.message||e);}}
+async function trackSel(){var c=SELECTED;if(!c||!c.sarekon_device_id)return;var m=document.getElementById('detmsg');if(m)m.textContent='locating…';try{TRACK=await gpsInvoke({action:'track',account_label:c.account_label,device_id:c.sarekon_device_id});renderMain();if(TRACK.lat&&TRACK.lng)setMap(TRACK.lat,TRACK.lng,TRACK.address);else if(TRACK.address)setMap(null,null,TRACK.address);}catch(e){var m2=document.getElementById('detmsg');if(m2)m2.textContent='Track failed: '+(e.message||e);}}
 async function locateSel(){var c=SELECTED;var m=document.getElementById('detmsg');if(m)m.textContent='pinging the car for a fresh location…';try{await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:'locate',dry_run:false});if(m)m.textContent='ping sent — refreshing position in ~15s…';setTimeout(trackSel,15000);}catch(e){if(m)m.textContent='Locate failed: '+(e.message||e);}}
 async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE the starter on':'ENABLE the starter on';if(!confirm(verb+' '+c.name+"'s car ("+(c.sarekon_device_label||'')+')? This is LIVE.'+(kind==='disable'?'\n\nTakes effect the next time the ignition is OFF.':'')))return;var m=document.getElementById('detmsg');if(m)m.textContent='sending…';try{var d=await gpsInvoke({action:'send',account_label:c.account_label,device_id:c.sarekon_device_id,kind:kind,dry_run:false});
   var ns=kind==='disable'?'disabled':'enabled';var now=new Date().toISOString();
@@ -407,7 +421,7 @@ async function reloadKeepSel(c){var d=await sb.from('linda_customers').select('*
 async function loadAll(btn){var o=btn.textContent;btn.disabled=true;btn.textContent='Loading all cars…';try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');toast('Loaded '+(GPSDEV['default']||[]).length+' main + '+(GPSDEV['jjt']||[]).length+' JJT cars');if(SELECTED)renderMain();}catch(e){alert('Load failed: '+(e.message||e));}btn.disabled=false;btn.textContent=o;}
 
 async function load(){var c=await sb.from('linda_customers').select('*');CUSTS=(c.data||[]).filter(function(x){return x.sub_status!=='no_subscription'||x.sarekon_device_id;});renderSide();}
-async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('loadall').onclick=function(){loadAll(document.getElementById('loadall'));};document.getElementById('carsearch').oninput=function(e){SEARCH=e.target.value;renderSide();};await load();try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');}catch(e){}}
+async function boot(){var s=await sb.auth.getSession();var u=s.data.session&&s.data.session.user;if(!u)return;if(ADMINS.indexOf((u.email||'').toLowerCase())<0){document.getElementById('loginwrap').style.display='none';document.getElementById('noadmin').style.display='flex';document.getElementById('noadmin_who').textContent='Signed in as '+u.email+' — this page is limited to admins.';return;}document.getElementById('loginwrap').style.display='none';document.getElementById('appwrap').style.display='block';document.getElementById('loadall').onclick=function(){loadAll(document.getElementById('loadall'));};var _rs=document.getElementById('readstates');if(_rs)_rs.onclick=function(){readStarterStates(_rs);};document.getElementById('carsearch').oninput=function(e){SEARCH=e.target.value;renderSide();};await load();try{await loadGpsDevices('RENT 2 GO - 1.0');await loadGpsDevices('RENT 2 Go - JJTusa');}catch(e){}}
 document.getElementById('li_form').addEventListener('submit',async function(ev){ev.preventDefault();var b=document.getElementById('li_btn');var er=document.getElementById('li_err');er.textContent='';b.disabled=true;b.textContent='Signing in…';var r=await sb.auth.signInWithPassword({email:document.getElementById('li_email').value.trim(),password:document.getElementById('li_pass').value});b.disabled=false;b.textContent='Sign in';if(r.error){er.textContent=r.error.message;return;}location.reload();});
 document.getElementById('signout').onclick=async()=>{await sb.auth.signOut();location.reload();};
 document.getElementById('na_out').onclick=async()=>{await sb.auth.signOut();location.reload();};
