@@ -355,7 +355,8 @@ async function load(){
   var rows=res.data||[];MD={};rows.forEach(function(r){MD[r.day]={d:(r.deposits||[]).map(function(x){return (x&&typeof x==='object')?x:Number(x);}),j:(r.income||[]),e:(r.expenses||[])};});
   for(var d in MD){MD[d].j.forEach(function(l){if(l.length<3)l.push('Other Income');if(l.length<4)l.push('');});MD[d].e.forEach(function(l){if(l.length<3)l.push('Other');if(l.length<4)l.push(d<=TODAY);if(l.length<5)l.push('');});}
   DK=Object.keys(MD).sort();
-  try{var ba=await sb.from('bank_accounts').select('*');BANKACCTS=ba.data||[];}catch(e){BANKACCTS=[];}
+  try{await sb.rpc('dedupe_bank');}catch(e){}   // collapse any reconnect-created duplicate accounts/txns before loading
+  try{var ba=await sb.from('bank_accounts').select('*');BANKACCTS=dedupeAcctList(ba.data||[]);}catch(e){BANKACCTS=[];}
   try{var bt=await sb.from('bank_transactions').select('*').order('transacted_at',{ascending:false}).limit(2500);BANKTX=bt.data||[];}catch(e){BANKTX=[];}
   try{var rr=await sb.from('reconcile_reports').select('*').order('ran_at',{ascending:false}).limit(1);RECONREPORT=(rr.data&&rr.data[0])||null;}catch(e){RECONREPORT=null;}
   if(st.data){OPEN=+st.data.opening_balance||0;CFG.zar=+st.data.fx_zar;CFG.aed=+st.data.fx_aed;CFG.sacur=st.data.sa_currency;CATSEG=st.data.cat_segments||{};OWNERSAL=+st.data.owner_salary||12000;WEEKLY=st.data.fx_weekly||{};}
@@ -779,6 +780,9 @@ function renderBank(){
 var REC_WIN=30;   // reconciliation window in days (7/30/90/All)
 // Match bank transactions to ledger cash entries (deposits + income positive, expenses negative)
 // by equal amount within ±4 days. Returns both sides so we can show matched / bank-only / ledger-only.
+// Keep ONE account row per last4 (prefer active, then newest) — defensive against reconnect duplicates
+// so the bank total is never multiplied even if the DB briefly holds stale copies.
+function dedupeAcctList(list){var by={};(list||[]).forEach(function(a){var k=a.last4||a.id;var cur=by[k];if(!cur){by[k]=a;return;}var an=(a.status==='active'),cn=(cur.status==='active');var newer=String(a.balance_as_of||a.updated_at||'')>String(cur.balance_as_of||cur.updated_at||'');if((an&&!cn)||(an===cn&&newer))by[k]=a;});return Object.keys(by).map(function(k){return by[k];});}
 function reconcile(){
   var to=TODAY,from=(REC_WIN>=9999)?'2000-01-01':addDays(TODAY,-REC_WIN);
   var ledger=[];
