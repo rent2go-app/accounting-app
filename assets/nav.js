@@ -12,6 +12,7 @@
   var MENU = [
     { g: "Money", icon: "💰", items: [
       { t: "Daily Sheet", h: "index.html", icon: "📒" },
+      { t: "Bank", h: "index.html#bank", icon: "🏦" },
       { t: "Ledger", h: "ledger.html", icon: "📗" },
       { t: "Budget & Projection", h: "budget.html", icon: "📈" },
       { t: "Management Accounts", h: "index.html#reports", icon: "📊" },

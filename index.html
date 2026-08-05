@@ -845,7 +845,8 @@ document.getElementById('bankConnect').onclick=function(){connectBank(this);};
 document.getElementById('bankRefresh').onclick=function(){refreshBank(this);};
 (function(){var mb=document.getElementById('sideMenuBtn'),dr=document.getElementById('sideDrawer'),ov=document.getElementById('sideOverlay'),cl=document.getElementById('sideClose');if(!mb||!dr)return;function openD(){dr.classList.add('open');ov.hidden=false;dr.setAttribute('aria-hidden','false');}function closeD(){dr.classList.remove('open');ov.hidden=true;dr.setAttribute('aria-hidden','true');}mb.onclick=openD;if(cl)cl.onclick=closeD;if(ov)ov.onclick=closeD;document.addEventListener('keydown',function(e){if(e.key==='Escape'&&dr.classList.contains('open'))closeD();});dr.querySelectorAll('.btn').forEach(function(b){b.addEventListener('click',function(){setTimeout(closeD,80);});});})();
 if(location.hash==='#reports'){var _rb=document.getElementById('repBtn');if(_rb)_rb.click();}
-window.addEventListener('hashchange',function(){if(location.hash==='#reports'){var b=document.getElementById('repBtn');if(b)b.click();}});
+if(location.hash==='#bank'){var _bk=document.getElementById('bankBtnTop')||document.getElementById('bankBtn');if(_bk)_bk.click();}
+window.addEventListener('hashchange',function(){if(location.hash==='#reports'){var b=document.getElementById('repBtn');if(b)b.click();}if(location.hash==='#bank'){var k=document.getElementById('bankBtnTop')||document.getElementById('bankBtn');if(k)k.click();}});
 document.getElementById('mtagBtn').onclick=openMaintAttrib;
 document.getElementById('mtagClose').onclick=function(){document.getElementById('mtag').hidden=true;};
 document.getElementById('mtagFilter').onchange=renderMtag;
