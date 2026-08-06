@@ -812,8 +812,9 @@ function reconcile(){
     //    (import-payouts). Auto-match so it's never suggested (prevents doubling rental income).
     if(isStripePayoutCredit(b)){b.matched=true;b.stripe=true;return;}
   });
-  // 3) match the rest by amount (±$0.01) within ±4 days.
-  bank.forEach(function(b){if(b.matched)return;for(var j=0;j<ledger.length;j++){if(used[j])continue;var l=ledger[j];if(Math.abs(l.amt-b.amt)<0.01 && Math.abs((new Date(l.d)-new Date(b.d))/86400000)<=4){used[j]=1;b.matched=true;break;}}});
+  // 3) fallback: match the rest by amount (±$0.01) SAME-DAY only (±1 day). Tight window so recurring
+  //    same-amount charges (daily Lyft/OPTIMUS) don't cross-match a different day's entry.
+  bank.forEach(function(b){if(b.matched)return;for(var j=0;j<ledger.length;j++){if(used[j])continue;var l=ledger[j];if(Math.abs(l.amt-b.amt)<0.01 && Math.abs((new Date(l.d)-new Date(b.d))/86400000)<=1){used[j]=1;b.matched=true;break;}}});
   return {bank:bank,ledger:ledger,used:used,from:from,to:to};
 }
 // A bank credit that is a Stripe payout landing (already captured as a deposit via import-payouts).
