@@ -285,9 +285,9 @@ function carDays(car,ym){var d=dim(ym);return (car.days&&car.days[ym]!=null)?Mat
 function ownerTotal(o,ym){return r2((o.cars||[]).reduce((s,c)=>s+carFee(c,ym),0));}
 const WD=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 function occ4(ym,wd){var y=+ym.split('-')[0],m=+ym.split('-')[1],last=dim(ym),out=[];for(var d=1;d<=last&&out.length<4;d++){if(new Date(y,m-1,d).getDay()===wd)out.push(ym+'-'+pad(d));}return out;}
-function weeklyMonthly(o){return r2((o.cars||[]).reduce((s,c)=>s+(+c.rate||0),0));}
+function weeklyMonthly(o,ym){return ownerTotal(o,ym||YM);}   // weekly = prorated monthly total (then split /4 at push)
 function weeklySplit(total){var w=r2(total/4);return [w,w,w,r2(total-w*3)];}
-function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o):ownerTotal(o,ym);}
+function ownerMonthTotal(o,ym){return o.cadence==='weekly'?weeklyMonthly(o,ym):ownerTotal(o,ym);}
 
 let STATE=[];let YM='';let YM_ALL=false;let SAVET=null;let STRIPEROWS=[];let HIST=[];let OPEN=new Set();let LEDGERPOSTED={};let FLEET=[];let REASONS=[];
 async function loadLedgerPosted(){try{var last=dim(YM),from=YM+'-01',to=YM+'-'+pad(last);var res=await sb.from('day_blocks').select('day,income').gte('day',from).lte('day',to);LEDGERPOSTED={};(res.data||[]).forEach(function(r){(r.income||[]).forEach(function(l){var ref=(l&&l[4])||'';if(ref.indexOf('op:')===0){(LEDGERPOSTED[ref]=LEDGERPOSTED[ref]||[]).push({day:r.day,amt:+l[1]||0});}});});}catch(e){LEDGERPOSTED={};}}
@@ -471,11 +471,8 @@ function render(){
     var weekly=o.cadence==='weekly';var wd=(o.weekday!=null)?+o.weekday:5;
     var ot=ownerMonthTotal(o,YM);grand+=ot;
     var carsHTML=(o.cars||[]).map(function(c,ci){
-      if(weekly){
-        return '<div class="crow wk"><div class="cnamewrap"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Fleet / description"><div class="cids"><input class="cplate" data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate"><input class="cvin" data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN"></div></div>'
-          +'<input class="wkamt tnum" type="number" min="0" step="1" data-crate="'+oi+'|'+ci+'" value="'+(+c.rate||0)+'" placeholder="$ / month">'
-          +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove">×</button></div>';
-      }
+      // Both monthly AND weekly owners use the same per-car row: rate + days → prorated fee. (Weekly just
+      // splits the prorated monthly total into 4 weekly payments at push time.)
       var full=dim(YM),days=carDays(c,YM),fee=carFee(c,YM),pro=days<full;
       var isCustom=[500,350,300,250].indexOf(+c.rate)<0;var disc='<div class="disc"><select class="cdisc" data-cdisc="'+oi+'|'+ci+'"><option value="500"'+(+c.rate===500?' selected':'')+'>No discount · $500</option><option value="350"'+(+c.rate===350?' selected':'')+'>Preferred −$150 · $350</option><option value="300"'+(+c.rate===300?' selected':'')+'>Preferred −$200 · $300</option><option value="250"'+(+c.rate===250?' selected':'')+'>Preferred −$250 · $250</option><option value="custom"'+(isCustom?' selected':'')+'>Custom…</option></select>'+(isCustom?'<input class="ccustom tnum" type="number" min="0" step="1" data-ccustom="'+oi+'|'+ci+'" value="'+(+c.rate||0)+'" placeholder="$ / car" title="Amount they pay per car">':'')+'</div>';
       return '<div class="crow"><div class="cnamewrap"><input class="cname" data-cn="'+oi+'|'+ci+'" value="'+esc(c.name||'')+'" placeholder="Car name"><div class="cids"><input class="cplate" data-cp="'+oi+'|'+ci+'" value="'+esc(c.plate||'')+'" placeholder="Plate"><input class="cvin" data-cv="'+oi+'|'+ci+'" value="'+esc(c.vin||'')+'" placeholder="VIN"></div></div>'
@@ -492,9 +489,7 @@ function render(){
     var totLine=weekly
       ? '<div class="l">'+fmt(r2(ot/4))+' / wk · 4 payments on '+WD[wd]+'s</div><div class="v tnum">'+fmt(ot)+'</div>'
       : '<div class="l">'+((o.cars||[]).length)+' car'+((o.cars||[]).length===1?'':'s')+' · month total</div><div class="v tnum">'+fmt(ot)+'</div>';
-    var hdr=weekly
-      ? '<div class="chdr wk"><span>Fleet / description</span><span>$ / month</span><span></span></div>'
-      : '<div class="chdr"><span>Car / plate</span><span>Discount / pays</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
+    var hdr='<div class="chdr"><span>Car / plate</span><span>Discount / pays</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
     var open=OPEN.has(o.id);var s=stripeFor(o.stripeLabel||'');var nc=(o.cars||[]).length;var mm=maintYM(o);var netAfter=r2(s.n-mm);
     var summary='<div class="otot"><div class="l">Platform fees /mo</div><div class="v tnum">'+fmt(ot)+'</div><div class="osnap"><span class="chip earn"><span class="cl">Earned '+fmtYM(YM)+'</span><span class="cv">'+fmt(s.n)+'</span></span><span class="chip paid"><span class="cl">Paid out'+(s.fi>0?' *':'')+'</span><span class="cv">'+fmt(s.pn)+'</span></span>'+(mm?'<span class="chip net"><span class="cl">Net −maint</span><span class="cv">'+fmt(netAfter)+'</span></span>':'')+'</div><div class="l" style="margin-top:4px;text-transform:none">'+nc+' car'+(nc===1?'':'s')+(mm?' · maint −'+fmt(mm)+' this mo':'')+'</div></div>';
     var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">';
@@ -555,7 +550,7 @@ function wire(){
 function buildOwnerLines(o,ym){
   var dm=dim(ym),lines=[],tag=o.tag||'Owners Programme',oid=o.id,n=(o.cars||[]).length;
   if(o.cadence==='weekly'){
-    var total=weeklyMonthly(o);if(total<=0)return lines;
+    var total=weeklyMonthly(o,ym);if(total<=0)return lines;
     var wd=(o.weekday!=null)?+o.weekday:5;var occ=occ4(ym,wd);var parts=weeklySplit(total);
     occ.forEach(function(date,i){var amt=parts[i]!=null?parts[i]:r2(total/4);var desc=(o.name||'Owner')+' — Owners Programme (weekly '+(i+1)+'/'+occ.length+')';lines.push({date:date,info:WD[wd].slice(0,3)+' · wk '+(i+1),amt:amt,line:[desc,amt,tag,'','op:'+oid]});});
   }else{
