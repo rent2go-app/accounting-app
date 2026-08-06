@@ -1216,7 +1216,9 @@ function paidToday(){return PAY.filter(p=>etDate(p.paid_at)===todayET());}
 function timeET(iso){try{return new Date(iso).toLocaleString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
 function renderOutstanding(){
   var el=document.getElementById('loutstanding');if(!el)return;
-  var owing=CUSTS.filter(function(c){return (+c.outstanding||0)>0;}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  // Only ACTIVE customers count as "still owe". Cancelled / no-subscription / ended contracts drop out of
+  // the register (they move to the Ended-contracts section) — they're no longer active customers.
+  var owing=CUSTS.filter(function(c){return (+c.outstanding||0)>0 && c.state!=='ended' && c.sub_status!=='canceled' && c.sub_status!=='no_subscription';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
   var tot=owing.reduce(function(s,c){return s+(+c.outstanding||0);},0);
   if(!owing.length){el.innerHTML='<p class="hint">Nothing outstanding — everyone\'s paid up! 🎉</p>';return;}
   var rows=owing.map(function(c){
@@ -1229,7 +1231,7 @@ function renderOutstanding(){
 }
 function renderEnded(){
   var el=document.getElementById('lended');if(!el)return;
-  var ended=CUSTS.filter(function(c){return c.state==='ended';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
+  var ended=CUSTS.filter(function(c){return c.state==='ended'||c.sub_status==='canceled'||(c.sub_status==='no_subscription'&&(+c.outstanding||0)>0);}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
   if(!ended.length){el.innerHTML='<p class="hint">No ended contracts — every tracked customer has an active subscription.</p>';return;}
   var tot=ended.reduce(function(s,c){return s+(+c.outstanding||0);},0);
   var owe=ended.filter(function(c){return (+c.outstanding||0)>0;}).length;
