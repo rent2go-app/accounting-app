@@ -79,6 +79,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .hint{color:var(--muted);font-size:12px}
 .chdr{display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:10px;padding:6px 6px 2px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
 .iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--muted);font-weight:800;font-family:inherit}
+.crowbtns{display:flex;gap:4px}
 .iconbtn:hover{border-color:var(--out);color:var(--out)}
 .ofoot{padding:10px 16px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .lbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:4px 9px;border-radius:8px;margin-left:8px;white-space:nowrap}
@@ -480,7 +481,7 @@ function render(){
         +'<input class="days tnum" type="number" min="0" max="'+full+'" data-cd="'+oi+'|'+ci+'" value="'+days+'" title="Days available (of '+full+')">'
         +'<span class="pill">/ '+full+'d</span>'
         +'<span class="fee tnum'+(pro?' pro':'')+'" title="'+(pro?'Prorated '+days+'/'+full+' days':'Full month')+'">'+fmt(fee)+'</span>'
-        +'<button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></div>';
+        +'<span class="crowbtns"><button class="iconbtn" data-carhist="'+oi+'|'+ci+'" title="Full maintenance history for this car">📋</button><button class="iconbtn" data-delcar="'+oi+'|'+ci+'" title="Remove car">×</button></span></div>';
     }).join('');
     var cadSeg='<div class="tiers cad"><button class="'+(weekly?'':'on')+'" data-cad="'+oi+'|monthly">Monthly</button><button class="'+(weekly?'on':'')+'" data-cad="'+oi+'|weekly">Weekly</button></div>';
     var whenCtl=weekly
@@ -543,6 +544,7 @@ function wire(){
   document.querySelectorAll('[data-mdel]').forEach(el=>el.onclick=()=>{snap();var p=el.dataset.mdel.split('|');STATE[+p[0]].maint.splice(+p[1],1);scheduleSave();render();});
   document.querySelectorAll('[data-mf]').forEach(el=>el.onchange=()=>{snap();var p=el.dataset.mf.split('|');var m=STATE[+p[0]].maint[+p[1]];var f=p[2];var v=el.value;if(f==='cost')m.cost=+v||0;else if(f==='markup')m.markup=(v===''?null:+v);else if(f==='mileage')m.mileage=(v===''?null:+v);else m[f]=v;scheduleSave();if(f==='cost'||f==='carId'||f==='cat'||f==='date')render();});
   document.querySelectorAll('[data-delcar]').forEach(el=>el.onclick=()=>{var p=el.dataset.delcar.split('|');if(!confirm('Remove this car?'))return;snap();STATE[+p[0]].cars.splice(+p[1],1);scheduleSave();render();});
+  document.querySelectorAll('[data-carhist]').forEach(el=>el.onclick=()=>{var p=el.dataset.carhist.split('|');carHistory(+p[0],+p[1]);});
   document.querySelectorAll('[data-delowner]').forEach(el=>el.onclick=()=>{var o=STATE[+el.dataset.delowner];if(!confirm('Remove owner "'+(o.name||'Unnamed')+'" and their fleet?'))return;snap();STATE.splice(+el.dataset.delowner,1);scheduleSave();render();});
 }
 
@@ -573,6 +575,19 @@ function buildOwnerMaint(o,ym){
   return {exp:exp,inc:inc,mt:mt};
 }
 function ownerLedgerPack(o,ym){var m=buildOwnerMaint(o,ym);return {inc:buildOwnerLines(o,ym).concat(m.inc),exp:m.exp,mt:m.mt};}
+// Full maintenance history for one car — last-done for key preventive items (or "never") + every record.
+function carHistory(oi,ci){
+  var o=STATE[oi];var c=(o.cars||[])[ci];if(!c)return;
+  var recs=(o.maint||[]).filter(function(m){return m.carId===c.id;}).sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));});
+  function lastFor(kw){for(var i=0;i<recs.length;i++){var t=((recs[i].cat||'')+' '+(recs[i].desc||'')).toLowerCase();if(t.indexOf(kw)>=0)return recs[i];}return null;}
+  var KEY=[['Oil change','oil'],['Battery','batter'],['Brakes','brake'],['Tyres/Tires','tire'],['Service','service'],['Inspection','inspect']];
+  var chips=KEY.map(function(k){var l=lastFor(k[1]);return '<span class="mchip">'+esc(k[0])+': '+(l?'<b>'+esc(l.date||'?')+'</b>'+(l.mileage?' · '+esc(l.mileage)+'mi':''):'<b style="color:var(--out)">never</b>')+'</span>';}).join(' ');
+  var rows=recs.length?recs.map(function(m){return '<tr><td>'+esc(m.date||'')+'</td><td>'+esc(m.cat||'')+'</td><td>'+esc(m.desc||'')+'</td><td class="n">'+(m.mileage?esc(m.mileage):'')+'</td><td class="n">'+fmt(r2(+m.cost||0))+'</td></tr>';}).join(''):'<tr><td colspan="5" class="hint" style="padding:10px">No maintenance recorded for this car yet.</td></tr>';
+  var tot=r2(recs.reduce(function(s,m){return s+(+m.cost||0);},0));
+  var html='<div class="modal"><div class="mcard" style="max-width:780px;max-height:86vh;overflow:auto"><div class="mhd">🔧 Maintenance history — '+esc(c.name||'car')+'</div><div class="mbody"><div class="mchips" style="margin-bottom:12px">'+chips+'</div><table class="dtbl small"><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th class="n">Mileage</th><th class="n">Cost</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:800;padding:8px">All-time total</td><td class="n" style="font-weight:800">'+fmt(tot)+'</td></tr></tfoot></table></div><div class="mfoot"><button class="btn pri" id="chClose">Close</button></div></div></div>';
+  document.getElementById('modalHost').innerHTML=html;
+  document.getElementById('chClose').onclick=function(){document.getElementById('modalHost').innerHTML='';};
+}
 function openPushOwner(oi){
   var o=STATE[oi],ym=YM,pack=ownerLedgerPack(o,ym);
   var incTot=r2(pack.inc.reduce((s,l)=>s+l.amt,0)),expTot=r2(pack.exp.reduce((s,l)=>s+l.amt,0));
