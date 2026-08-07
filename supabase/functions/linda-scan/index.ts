@@ -119,7 +119,8 @@ async function scanAccount(acc: any) {
     // ONE $10 late fee per customer — attached to the LATEST past-due rental only.
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
     const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
-    if (latestPd) {
+    const subActive = substatus !== "canceled" && substatus !== "no_subscription";   // terminated subs accrue NO new late fees
+    if (latestPd && subActive) {
       const i = latestPd;
       const dd = i.due_date || i.created || now;
       // a rental's late fee is raised the DAY AFTER it goes past due, so an existing fee lands on due+1 (allow +2 slack)
