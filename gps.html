@@ -411,6 +411,7 @@ async function cmdSel(kind){var c=SELECTED;var verb=kind==='disable'?'DISABLE th
   var ns=kind==='disable'?'disabled':'enabled';var now=new Date().toISOString();
   try{await sb.from('linda_customers').update({starter_state:ns,starter_changed_at:now}).eq('account_label',c.account_label).eq('customer_id',c.customer_id);}catch(_){}
   c.starter_state=ns;c.starter_changed_at=now;                 // persist locally so the ribbon shows immediately
+  try{await sb.from('linda_disconnections').upsert({account_label:c.account_label,customer_id:c.customer_id,customer_name:c.name,signal_sent:kind==='disable',signal_sent_at:kind==='disable'?now:null,restored:kind==='enable',restored_at:kind==='enable'?now:null,updated_at:now},{onConflict:'account_label,customer_id'});}catch(_){}  /* mirror to the disconnection module */
   renderSide();renderMain();                                    // redraw → persistent ribbon now reflects the state
   var m2=document.getElementById('detmsg');if(m2)m2.innerHTML='<span class="hint">✓ command sent'+(d.command_queue_id?' · #'+d.command_queue_id:'')+(kind==='disable'?' · takes effect next ignition-off':'')+'</span>';
   toast(kind==='disable'?'Starter DISABLED':'Starter ENABLED');
