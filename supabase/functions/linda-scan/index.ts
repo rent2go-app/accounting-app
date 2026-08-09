@@ -243,6 +243,11 @@ async function scanAccount(acc: any) {
       subj = "⚠ Important — your Rent 2 Go late fees have reached " + m(unpaid_latefees);
       intro = `Good morning ${nm},\n\nYour unpaid late fees have now built up to ${m(unpaid_latefees)} — past the $70 mark. Right now your rentals are current, so your account is still active. But please be aware: the moment a rental falls past due while these fees remain unpaid, your Rent 2 Go rental will be scheduled for disconnection. Clearing these fees now protects your account.`;
       closing = "Please tap Pay now above to clear your late fees and avoid an imminent service interruption. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
+    } else if (latefee_open.length >= 3) {
+      // 3+ unpaid late fees building up — flag the accumulation before it contributes to a disconnection.
+      subj = "Please clear your Rent 2 Go late fees — " + m(unpaid_latefees) + " building up";
+      intro = `Good morning ${nm},\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}We're a little concerned about the accumulation of late fees on your account — there are now ${latefee_open.length} unpaid late fees totalling ${m(unpaid_latefees)}. Please clear these as soon as possible so they don't keep building up and contribute to a disconnection ahead.`;
+      closing = "Tap Pay now above to clear your late fees. If anything has changed, reach out and we'll gladly help you get back on track.";
     } else {
       subj = "A gentle reminder about your Rent 2 Go account — " + m(pd_total) + " in late fees";
       intro = `Good morning ${nm} 👋\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Just a gentle reminder that there's ${m(pd_total)} in late fees on your account whenever you have a moment to take care of it.`;
