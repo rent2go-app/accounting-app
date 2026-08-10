@@ -619,6 +619,7 @@ function draftCard(d){
     +(!isSent?(d.email?'<button class="btn small ok" data-send="'+d.id+'" title="Email this notice to the customer now (from billing@rentaride2go.com)">📧 Send email</button>':'<span class="hint" style="align-self:center">⚠ no email — use Copy for SMS/WhatsApp</span>')+(((cust&&cust.phone)||d.phone)?'<button class="btn small ok" data-sms="'+d.id+'" title="Text this notice from your Rent 2 Go number">💬 Text</button>':'')
         +'<button class="btn small" data-edit="'+d.id+'">✏️ Edit</button>'
         +'<button class="btn small" data-airedraft="'+d.id+'" title="Rewrite this notice with Linda AI (you can still edit before sending)">✨ AI rewrite</button>'
+        +(AIUNDO[d.id]!=null?'<button class="btn small" data-aiundo="'+d.id+'" title="Revert the AI rewrite to the previous notice">↩ Undo AI</button>':'')
         +'<button class="btn small'+(d.reviewed_at?' on':'')+'" data-review="'+d.id+'">'+(d.reviewed_at?'✓ Reviewed':'👁 Mark reviewed')+'</button>'
         +'<button class="btn small ok" data-sent="'+d.id+'" title="I have sent this to the customer (email / WhatsApp / SMS)">✅ Mark sent</button>'
         +'<button class="btn small'+(onPlan?' on':'')+'" data-plan="'+d.id+'" title="Put this customer on a payment plan (softer, plan-continuation notice — no disconnection)">'+(onPlan?'✓ On plan':'📋 Plan')+'</button>'
@@ -1330,6 +1331,7 @@ function wire(){
   document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=()=>upd(b.dataset.restore,{status:'draft',skipped_at:null}));
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send(b.dataset.send,b));
   document.querySelectorAll('[data-airedraft]').forEach(b=>b.onclick=()=>aiRedraft(b.dataset.airedraft,b));
+  document.querySelectorAll('[data-aiundo]').forEach(b=>b.onclick=()=>undoAI(b.dataset.aiundo));
   document.querySelectorAll('[data-sms]').forEach(b=>b.onclick=()=>sendSms(b.dataset.sms,b));
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editDraft(b.dataset.edit));
   document.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>sendTest(b.dataset.test,b));
@@ -1449,19 +1451,24 @@ async function sendTest(id,btn){
 }
 // ✨ Rewrite a notice with Linda AI — sends the customer's live situation to the linda-draft LLM and
 // replaces the notice body. You can still edit/send after; each edit teaches Linda your wording.
+var AIUNDO={};
 async function aiRedraft(id,btn){
   var d=DRAFTS.find(x=>x.id==id);if(!d)return;
   var c=CUSTS.find(x=>x.customer_id===d.customer_id&&x.account_label===d.account_label)||{};
   var o=btn.textContent;btn.disabled=true;btn.textContent='✨ writing…';
   try{
-    var sit={state:c.state||d.kind,pastdue_count:+(c.pastdue_count||0),outstanding:+(c.outstanding||d.amount||0),on_plan:!!c.on_plan,late_fees:+(c.pastdue_count!=null?0:0)};
-    var r=await sb.functions.invoke('linda-draft',{body:{name:(d.customer_name||'there').split(' ')[0],scenario:c.state||d.kind,situation:sit}});
+    AIUNDO[id]=d.body;   // stash the current notice so ↩ Undo AI can restore it
+    var sit={state:c.state||d.kind,pastdue_count:+(c.pastdue_count||0),outstanding:+(c.outstanding||d.amount||0),on_plan:!!c.on_plan};
+    // Pass the CURRENT notice (with its Pay-now links + itemised invoices) so the AI rewrites in place and
+    // preserves every amount/date/link — it improves wording only, never strips the payment details.
+    var r=await sb.functions.invoke('linda-draft',{body:{name:(d.customer_name||'there').split(' ')[0],scenario:c.state||d.kind,situation:sit,customer_id:d.customer_id,current_body:dynBody(d)}});
     if(r.error)throw r.error;var dd=r.data||{};if(!dd.draft)throw new Error(dd.error||'no draft returned');
     await upd(id,{body:dd.draft});
-    toast('Linda rewrote the notice ✨ — review & send');
+    toast('Linda rewrote the notice ✨ — review, or ↩ Undo AI to revert');
   }catch(e){alert('AI rewrite failed: '+(e.message||e));}
   btn.disabled=false;btn.textContent=o;
 }
+function undoAI(id){var d=DRAFTS.find(x=>x.id==id);if(!d||AIUNDO[id]==null){toast('Nothing to undo');return;}upd(id,{body:AIUNDO[id]});delete AIUNDO[id];toast('↩ Reverted to the previous notice');}
 async function upd(id,patch){
   var d=DRAFTS.find(x=>x.id==id);
   // Draft row ids are regenerated on every sweep, so a stale page's id can be gone. Update by id first;

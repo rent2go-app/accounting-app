@@ -27,14 +27,28 @@ Deno.serve(async (req) => {
     let ex = await sbGet(`linda_notice_learnings?scenario=eq.${encodeURIComponent(scenario)}&order=created_at.desc&limit=6&select=situation,approved_text`);
     if (!ex.length) ex = await sbGet(`linda_notice_learnings?order=created_at.desc&limit=6&select=situation,approved_text`);
     const examples = (ex || []).map((e: any, i: number) => `EXAMPLE ${i + 1}\nSituation: ${JSON.stringify(e.situation)}\nApproved notice:\n${e.approved_text}`).join("\n\n---\n\n");
-    const system = "You are Linda, the friendly, professional billing assistant for Rent 2 Go LLC (a US car-rental business). " +
-      "Write a SHORT daily account notice email to the customer, based only on the account situation given. " +
-      "Rules: warm and respectful, never threatening or abusive; be specific about amounts and what's past due; " +
-      "give a clear next step (settle the balance or reply to arrange a plan); no legal threats; " +
-      "sign off as 'Rent 2 Go LLC'. Keep it concise (a greeting + 1-3 short paragraphs). " +
-      "IMPORTANT: match the tone, phrasing and structure of the approved examples below — they show how we actually write for this scenario. Return ONLY the email body, no subject line, no preamble.";
-    const user = "Customer: " + name + "\nAccount situation:\n" + JSON.stringify(sit, null, 1) +
-      (examples ? "\n\nHere is how we have written approved notices for similar situations — match this style:\n\n" + examples : "\n\n(No past examples yet — write a clear, kind, professional notice.)");
+    // Pull the customer's recent INBOUND texts so the notice can acknowledge what they've said (esp. grace /
+    // "give me until X" requests) and reflect it — instead of ignoring a message they just sent.
+    let texts: any[] = [];
+    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&direction=eq.in&order=received_at.desc&limit=4&select=body,received_at,is_grace_request`); } catch (_) { /* */ } }
+    const textBlock = (texts && texts.length) ? "\n\nThe customer recently texted us (most recent first) — acknowledge these naturally, and if they asked for more time / grace until a specific day or time, recognise it warmly and reference it:\n" + texts.map((t: any) => `• "${(t.body || "").slice(0, 200)}"${t.is_grace_request ? " (grace request)" : ""}`).join("\n") : "";
+    const hasBody = !!b.current_body;
+    const system = hasBody
+      ? "You are Linda, the friendly, professional billing assistant for Rent 2 Go LLC (a US car-rental business). " +
+        "You are REWRITING an existing daily account notice so the wording reads more naturally and warm. " +
+        "CRITICAL — you MUST preserve, EXACTLY and unchanged: every invoice/line item, every amount, every date, " +
+        "every 'Pay now:' URL, subtotals/total, and the customer portal link that appear in the current notice. " +
+        "Do NOT remove, summarise, reorder, or alter any figure or link — the payment links and amounts are the " +
+        "whole point of the notice. Only improve the greeting, the sentences around the items, and the closing. " +
+        "If the customer recently texted (especially a grace / 'give me until X' request), acknowledge it warmly. " +
+        "Sign off 'Rent 2 Go LLC'. Return ONLY the full rewritten notice body — same information and links, better wording."
+      : "You are Linda, the friendly, professional billing assistant for Rent 2 Go LLC (a US car-rental business). " +
+        "Write a SHORT daily account notice based on the situation. Warm, specific about amounts and what's past due, " +
+        "clear next step, no legal threats. Sign off 'Rent 2 Go LLC'. Return ONLY the email body.";
+    const user = hasBody
+      ? "Customer: " + name + textBlock + "\n\nCURRENT NOTICE — rewrite this, keeping EVERY amount, date and Pay-now link exactly as they are:\n\n" + b.current_body + (examples ? "\n\nStyle reference (match the tone, not the content):\n\n" + examples : "")
+      : "Customer: " + name + "\nAccount situation:\n" + JSON.stringify(sit, null, 1) + textBlock +
+        (examples ? "\n\nHere is how we have written approved notices for similar situations — match this style:\n\n" + examples : "\n\n(No past examples yet — write a clear, kind, professional notice.)");
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": AK, "anthropic-version": "2023-06-01", "content-type": "application/json" },
