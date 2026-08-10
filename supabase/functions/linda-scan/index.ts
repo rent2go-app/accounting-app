@@ -256,7 +256,11 @@ async function scanAccount(acc: any) {
     // Whenever there are past-due RENTALS, remind them a $10 late fee applies and to settle ASAP to
     // avoid further penalties / service interruption. Skip for disconnect (its own stronger language)
     // and for plan customers (they're on an agreed catch-up plan).
-    if (rental_pd.length > 0 && kind !== "disconnect" && !onPlan) closing = closing + " " + LATEFEE_NOTE;
+    // Only state that a late fee applies when one actually does — a fee was raised this run for THIS
+    // customer, OR they already carry open late fees. Without this, a customer whose fee was dismissed
+    // (grace) still gets told "a $10 late fee has been applied", which is false.
+    const feeInPlay = unpaid_latefees > 0 || fees.some((f: any) => f.customer_id === cid);
+    if (rental_pd.length > 0 && kind !== "disconnect" && !onPlan && feeInPlay) closing = closing + " " + LATEFEE_NOTE;
     const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you so much for your urgent attention to this matter.\n\nRent 2 Go" + FOOTER;
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
     custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: onPlan, plan_terms: onPlan ? (planExisting[cid] && planExisting[cid].plan_terms) : null, plan_paid_rentals: planPaidR, plan_paid_latefees: planPaidLF, plan_behind_days: behindDays, plan_last_behind_day: lastBehindDay, updated_at: nowISO });

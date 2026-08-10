@@ -29,9 +29,13 @@ Deno.serve(async (req) => {
     const examples = (ex || []).map((e: any, i: number) => `EXAMPLE ${i + 1}\nSituation: ${JSON.stringify(e.situation)}\nApproved notice:\n${e.approved_text}`).join("\n\n---\n\n");
     // Pull the customer's recent INBOUND texts so the notice can acknowledge what they've said (esp. grace /
     // "give me until X" requests) and reflect it — instead of ignoring a message they just sent.
+    // Pull the WHOLE recent conversation — BOTH the customer's inbound texts AND our own outbound replies —
+    // so the notice is reconciled against what was actually said on both sides (e.g. the customer states an
+    // invoice is already paid, or we replied agreeing to waive a fee). Without our side, the notice can
+    // contradict a promise we already made in writing.
     let texts: any[] = [];
-    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&direction=eq.in&order=received_at.desc&limit=4&select=body,received_at,is_grace_request`); } catch (_) { /* */ } }
-    const textBlock = (texts && texts.length) ? "\n\nThe customer recently texted us (most recent first) — acknowledge these plainly, and if they asked for more time or grace until a specific day, confirm that it has been noted and reference it:\n" + texts.map((t: any) => `• "${(t.body || "").slice(0, 200)}"${t.is_grace_request ? " (grace request)" : ""}`).join("\n") : "";
+    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&order=received_at.desc&limit=10&select=body,received_at,direction,is_grace_request`); } catch (_) { /* */ } }
+    const textBlock = (texts && texts.length) ? "\n\nRECENT CONVERSATION with this customer (most recent first) — read BOTH sides. Reconcile the notice against it: if the customer states (credibly) that a listed invoice has already been paid, do NOT present it as currently owed and NEVER attach a late fee to it — instead note it as \"you have indicated this is paid; we are confirming on our end\". If they asked for more time / grace until a specific day, confirm it has been noted. Do not contradict anything we ourselves already told them:\n" + texts.map((t: any) => `${t.direction === "out" ? "US → them" : "THEM → us"}: "${(t.body || "").slice(0, 220)}"${t.is_grace_request ? " (grace request)" : ""}`).join("\n") : "";
     const hasBody = !!b.current_body;
     const system = hasBody
       ? "You are Linda, the billing assistant for Rent 2 Go LLC (a US car-rental business). Your register is that of a professional accounts department: courteous, measured and businesslike — never chatty or effusive, with no exclamation marks and no decorative emoji — BUT you MUST keep the 🔴 (past-due) and 🟢 (current/coming-due) status markers on the invoice lines exactly as they appear, since they colour-code the balance and are essential. " +
@@ -40,8 +44,8 @@ Deno.serve(async (req) => {
         "every 'Pay now:' URL, subtotals/total, and the customer portal link that appear in the current notice. " +
         "Do NOT remove, summarise, reorder, or alter any figure or link — the payment links and amounts are the " +
         "whole point of the notice. Only improve the greeting, the sentences around the items, and the closing. " +
-        "If the customer recently texted (especially a grace / 'give me until X' request), acknowledge it plainly and confirm what has been noted. " +
-        "Sign off 'Rent 2 Go LLC'. Return ONLY the full rewritten notice body — same information and links, better wording."
+        "COHERENCE IS MANDATORY — the notice must read as one consistent message, never contradict itself. If you acknowledge a grace request (e.g. 'until tomorrow'), you must NOT in the same notice demand payment 'today' or state the vehicle is 'scheduled for disconnection today' — soften the demand to match the grace you just granted (e.g. 'we ask that this be resolved by tomorrow as agreed'). If the customer credibly states an invoice is already paid, do not list it as owed and never attach a late fee to it. Every late-fee line and invoice line that legitimately remains owed MUST stay in the notice — do not drop any line item; only late fees tied to an invoice the customer has shown is paid should be removed. " +
+        "Sign off 'Rent 2 Go LLC'. Return ONLY the full rewritten notice body — same information and links, better wording, internally consistent."
       : "You are Linda, the billing assistant for Rent 2 Go LLC (a US car-rental business). Your register is that of a professional accounts department: courteous, measured and businesslike — never chatty or effusive, with no exclamation marks and no decorative emoji — BUT you MUST keep the 🔴 (past-due) and 🟢 (current/coming-due) status markers on the invoice lines exactly as they appear, since they colour-code the balance and are essential. " +
         "Write a SHORT daily account notice based on the situation. State the amounts and what is past due precisely, " +
         "give one clear next step, and stay firm without threatening. Address the customer by name, with no greeting emoji. Sign off 'Rent 2 Go LLC'. Return ONLY the email body.";
@@ -52,7 +56,7 @@ Deno.serve(async (req) => {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": AK, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 700, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 2400, system, messages: [{ role: "user", content: user }] }),
     });
     const d = await r.json();
     if (d.error) return json({ error: d.error.message || JSON.stringify(d.error) }, 502);
@@ -64,6 +68,6 @@ Deno.serve(async (req) => {
       .replace(/^\s*-{2,}\s*\n+/, "").replace(/\n+\s*-{2,}\s*$/, "")      // leading/trailing --- fences
       .replace(/\n\s*-{2,}\s*\n/g, "\n\n")                                // collapse mid-body divider lines
       .trim();
-    return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length });
+    return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length, stop_reason: d.stop_reason || null });
   } catch (e) { return json({ error: String(e) }, 500); }
 });

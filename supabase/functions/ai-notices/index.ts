@@ -25,15 +25,31 @@ Deno.serve(async (req) => {
     if (!drafts.length) return json({ ok: true, drafted: 0, note: "nothing to AI-draft" });
     const custs = await sbGet(`linda_customers?select=customer_id,account_label,state,pastdue_count,outstanding,on_plan`);
     const cmap: Record<string, any> = {}; for (const c of custs) cmap[c.account_label + "|" + c.customer_id] = c;
-    let done = 0;
+    let done = 0, skipped = 0;
     for (let i = 0; i < drafts.length; i += 6) {   // batches of 6 to stay within the wall-clock budget
       const batch = drafts.slice(i, i + 6);
       await Promise.all(batch.map(async (d: any) => {
         const c = cmap[d.account_label + "|" + d.customer_id] || {};
         const sit = { state: c.state || d.kind, pastdue_count: +(c.pastdue_count || 0), outstanding: +(c.outstanding || 0), on_plan: !!c.on_plan };
-        try { const r = await draft(d, sit); if (r && r.draft) { await sbPatch(`linda_drafts?id=eq.${d.id}`, { body: r.draft, ai_drafted: true }); done++; } } catch (_) { /* leave template if AI fails */ }
+        try {
+          const r = await draft(d, sit);
+          // SAFETY GUARD — never save a rewrite that lost content or was cut off. Keep the clean template
+          // instead. Guards against: (1) truncation mid-URL (broken Pay-now links), (2) dropped Pay-now
+          // links, (3) dropped 🔴/🟢 line items, (4) suspiciously short output. A rejected draft stays as
+          // the template with ai_drafted unset, so it is retried on the next run rather than lost.
+          if (r && r.draft) {
+            const links = (s: string) => (s.match(/invoice\.stripe\.com/g) || []).length;
+            const marks = (s: string) => (s.match(/🔴|🟢/g) || []).length;
+            const truncated = r.stop_reason === "max_tokens";
+            const lostLinks = links(r.draft) < links(d.body);
+            const lostLines = marks(r.draft) < marks(d.body);
+            const tooShort = r.draft.length < d.body.length * 0.5;
+            if (truncated || lostLinks || lostLines || tooShort) { skipped++; return; }   // keep template, retry next run
+            await sbPatch(`linda_drafts?id=eq.${d.id}`, { body: r.draft, ai_drafted: true }); done++;
+          }
+        } catch (_) { /* leave template if AI fails */ }
       }));
     }
-    return json({ ok: true, drafted: done, seen: drafts.length });
+    return json({ ok: true, drafted: done, skipped, seen: drafts.length });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
