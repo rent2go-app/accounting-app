@@ -78,6 +78,15 @@ Deno.serve(async (req) => {
       .replace(/^\s*-{2,}\s*\n+/, "").replace(/\n+\s*-{2,}\s*$/, "")      // leading/trailing --- fences
       .replace(/\n\s*-{2,}\s*\n/g, "\n\n")                                // collapse mid-body divider lines
       .trim();
+    // Deterministically remove any of OUR OWN auto-reply blocks the model may have echoed (📩 SMS
+    // auto-responder text) — never rely on the prompt alone for this. Drop whole paragraphs that carry
+    // the auto-reply signature, then normalise Pay-now links to ONE consistent "Pay now: URL" format.
+    text = text.split(/\n{2,}/)
+      .filter((p: string) => !/📩|managed by an automated system|reply with an exact date/i.test(p))
+      .join("\n\n")
+      .replace(/\[\s*Pay now\s*\]\((https?:\/\/[^\s)]+)\)/gi, "Pay now: $1")   // [Pay now](url) -> Pay now: url
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1: $2")                // any other [text](url) -> text: url
+      .trim();
     return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length, stop_reason: d.stop_reason || null });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
