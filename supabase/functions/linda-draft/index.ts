@@ -84,8 +84,10 @@ Deno.serve(async (req) => {
     text = text.split(/\n{2,}/)
       .filter((p: string) => !/📩|managed by an automated system|reply with an exact date/i.test(p))
       .join("\n\n")
-      .replace(/\[\s*Pay now\s*\]\((https?:\/\/[^\s)]+)\)/gi, "Pay now: $1")   // [Pay now](url) -> Pay now: url
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1: $2")                // any other [text](url) -> text: url
+      // FOLD links into clickable markdown so raw URLs never show. "Pay now: <url>" -> "[Pay now](<url>)".
+      .replace(/\[\s*Pay now\s*\]\s*:\s*(https?:\/\/[^\s)]+)/gi, "[Pay now]($1)")   // fix a mangled "[Pay now]: url"
+      .replace(/Pay now:\s*(https?:\/\/[^\s)]+)/gi, "[Pay now]($1)")               // Pay now: url -> [Pay now](url)
+      .replace(/Customer Portal:\s*(https?:\/\/[^\s)]+)/gi, "[Customer Portal]($1)") // Customer Portal: url -> folded
       .trim();
     // Deterministically GUARANTEE the 3+-late-fee accumulation warning survives. The model repeatedly
     // softens it to a vague "avoid further fees" line; if the template we sent carried the specific
@@ -95,6 +97,16 @@ Deno.serve(async (req) => {
       if (am && !/concerned about the accumulation/i.test(text)) {
         text = /\n\n\s*Rent 2 Go/i.test(text) ? text.replace(/\n\n\s*(Rent 2 Go)/i, "\n\n" + am[0] + "\n\n$1") : text + "\n\n" + am[0];
       }
+    }
+    // Deterministically GUARANTEE a disconnection notice states the escalation. The model tends to soften a
+    // disconnect into a thank-you when the customer has paid something; if the account is at disconnection
+    // and the rewrite never says so, insert the escalation statement right after the greeting.
+    const isDisc = b.scenario === "disconnect" || (sit && sit.state === "disconnect");
+    if (isDisc && !/disconnect/i.test(text)) {
+      const stmt = "Please be aware that your account has been escalated and your vehicle is scheduled for disconnection. To prevent this, the past-due balance must be cleared without delay.";
+      const parts = text.split(/\n{2,}/);
+      parts.splice(parts.length > 1 ? 1 : parts.length, 0, stmt);
+      text = parts.join("\n\n");
     }
     return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length, stop_reason: d.stop_reason || null });
   } catch (e) { return json({ error: String(e) }, 500); }
