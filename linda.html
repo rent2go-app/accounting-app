@@ -282,7 +282,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
   <img src="assets/linda.png" alt="Linda" class="heroimg">
   <div class="herotext">
     <div class="heroeyebrow">🤖 Your Billing Agent</div>
-    <h1 id="greeting">Hello 👋</h1>
+    <h1 id="greeting">Hello</h1>
     <p class="herosub">I'm Linda. Here's what needs your attention today.</p>
     <div id="heroBubble"></div>
     <div class="dryrun">✅ Email live from billing@rentaride2go.com · late fees are emailed to pay, never auto-charged. Nothing goes to a customer until you 📧 Send or 📋 Copy.</div>
@@ -306,7 +306,7 @@ details.acct[open] .accttl::before{transform:rotate(90deg)}
 <div id="lpaid"></div>
 <h2 style="margin-top:22px">📁 Contract ended — cancelled subscriptions</h2>
 <div id="lended"></div>
-<h2 style="margin-top:22px">🧠 Linda's Learning Loop</h2>
+<h2 style="margin-top:22px">Linda's Learning Loop</h2>
 <div id="llearn"></div>
 </main></div>
 
@@ -509,10 +509,10 @@ function render(){
   document.getElementById('lsum').innerHTML=
     card(CIC.car,'Active rentals',CUSTS.filter(c=>c.state!=='ended').length,'across <b>'+nAccts+'</b> owner account'+(nAccts==1?'':'s'),'')+
     card(CIC.pay,'Paid today',pt.length+'<small> · '+fmt(paidAmt)+'</small>',pt.length?('across <b>'+payAccts+'</b> account'+(payAccts==1?'':'s')):'none logged yet','pos')+card(CIC.cash,'Paid yesterday',fmt(pyAmt),py.length?(py.length+' payment'+(py.length==1?'':'s')+' · '+pyAccts+' account'+(pyAccts==1?'':'s')):'none','pos')+'<div class="card" style="cursor:pointer" onclick="gotoMsgs()" title="Open the incoming messages inbox"><div class="ctop"><span style="font-size:32px;line-height:1">💬</span><div class="v '+(msgGrace?'red':'')+'">'+msgOpen+'</div></div><div class="l">Messages</div><div class="cd">'+(msgGrace?('<b>'+msgGrace+'</b> grace request'+(msgGrace==1?'':'s')):(msgOpen?'incoming texts':'inbox clear 🎉'))+'</div></div>'+
-    card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase 🎉','')+
+    card(CIC.bell,'Reminders to send',(tot-sentN),tot?('<b>'+sentN+'</b> of '+tot+' sent today'):'nothing to chase','')+
     card(CIC.power,'Disconnections',disc,disc?nm3(CUSTS.filter(c=>c.flag==='disconnect').map(c=>c.name)):'none','red')+
     card(CIC.warn,'Recovery',rec,rec?nm3(CUSTS.filter(c=>c.flag==='recovery').map(c=>c.name)):'none','red')+
-    card(CIC.cash,'Outstanding',fmt(out),topAcct?('biggest: <b>'+esc(topAcct)+'</b> '+fmt(byAcctOut[topAcct])):'all clear 🎉','')+
+    card(CIC.cash,'Outstanding',fmt(out),topAcct?('biggest: <b>'+esc(topAcct)+'</b> '+fmt(byAcctOut[topAcct])):'all clear','')+
     card(CIC.fee,'$10 invoices to raise',feeCount+'<small> · '+fmt(feeTotal)+'</small>',feeCusts?('for <b>'+feeCusts+'</b> customer'+(feeCusts==1?'':'s')):'none','')+
     card(CIC.flag,'Red flags',flags,flags?nm3(CUSTS.filter(c=>c.flag&&c.flag!=='none').map(c=>c.name)):'none',flags?'red':'');
   GPSROWS=[];
@@ -539,7 +539,7 @@ function render(){
     +'<div class="briefpills">'
     +'<span class="pill'+(tot&&sentN>=tot?' alldone':'')+'">✅ Sent <b>'+sentN+' / '+tot+'</b></span>'
     +'<span class="pill'+(tot&&revN>=tot?' alldone':'')+'">👁 Reviewed <b>'+revN+' / '+tot+'</b></span>'
-    +(tot?(sentN>=tot?'<span class="pill alldone">🎉 All today’s notices sent</span>':'<span class="pill warn">'+(tot-sentN)+' still to send</span>'):'<span class="pill alldone">🎉 Nothing to chase today</span>')
+    +(tot?(sentN>=tot?'<span class="pill alldone">All notices sent</span>':'<span class="pill warn">'+(tot-sentN)+' still to send</span>'):'<span class="pill alldone">Nothing to chase today</span>')
     +(pt.length?'<span class="pill done">💰 Paid today <b>'+pt.length+' · '+fmt(paidAmt)+'</b></span>':'')
     +(recPend?'<span class="pill red">⚠ '+recPend+' recovery to action</span>':'')
       +(function(){var o=CUSTS.filter(function(c){return recOverdue(discRec(c));}).length,
@@ -565,10 +565,10 @@ function render(){
     // AND as their full notice below — so we DON'T repeat them here. Keep only recovery flags (no notice of their own).
     var afRec=af.filter(function(c){return c.flag==='recovery';});
     var flagsH=afRec.length?afRec.map(function(c){return '<div class="draft recovery"><div class="dhead"><span class="kind recovery">RECOVERY</span><span class="dname">'+esc(c.name)+'</span><span class="dmail">'+esc(c.email||'no email')+'</span><span class="amt">'+c.pastdue_count+' past-due · '+fmt(c.outstanding)+'</span></div></div>';}).join(''):'';
-    var draftsH=ad.length?ad.map(draftCard).join(''):'<p class="hint">No past-due notices for this account. 🎉</p>';
+    var draftsH=ad.length?ad.map(draftCard).join(''):'<p class="hint">No past-due notices for this account.</p>';
     var pills=ad.length?('<span class="apill">'+ad.length+' notice'+(ad.length==1?'':'s')+'</span>'
         +(toSend?'<span class="apill warn">'+toSend+' to send</span>':'<span class="apill done">all sent ✓</span>'))
-      :'<span class="apill done">all current 🎉</span>';
+      :'<span class="apill done">all current</span>';
     if(discN)pills+='<span class="apill red">'+discN+' disconnect</span>';
     if(af.length)pills+='<span class="apill red">'+af.length+' red flag'+(af.length==1?'':'s')+'</span>';
     if(acctOut)pills+='<span class="apill">'+fmt(acctOut)+' outstanding</span>';
@@ -588,8 +588,8 @@ function renderLearnings(){
   if(!LEARN.length){el.innerHTML='<p class="hint">No learnings recorded yet.</p>';return;}
   var rules=LEARN.filter(x=>x.kind==='rule'),mis=LEARN.filter(x=>x.kind==='mistake');
   function li(x){return '<li><b>'+esc(x.title)+'</b> — '+esc(x.detail)+(x.day?' <span class="hint">('+esc(x.day)+')</span>':'')+'</li>';}
-  el.innerHTML='<details class="learnwrap" open><summary>📏 Rules Linda follows ('+rules.length+')</summary><ul class="learnlist">'+rules.map(li).join('')+'</ul></details>'
-    +'<details class="learnwrap"><summary>🩹 Mistakes logged &amp; fixed ('+mis.length+')</summary><ul class="learnlist">'+mis.map(li).join('')+'</ul></details>'
+  el.innerHTML='<details class="learnwrap" open><summary>Rules Linda follows ('+rules.length+')</summary><ul class="learnlist">'+rules.map(li).join('')+'</ul></details>'
+    +'<details class="learnwrap"><summary>Mistakes logged &amp; fixed ('+mis.length+')</summary><ul class="learnlist">'+mis.map(li).join('')+'</ul></details>'
     +'<p class="hint">Full detail lives in LINDA-LEARNING.md. Every new mistake is logged here so Linda never repeats it.</p>';
 }
 function renderSkipped(){
@@ -728,7 +728,7 @@ async function sendTestNotice(btn){
   var d=DRAFTS.find(function(x){return x.status!=='skipped';});
   var subj,bhtml,btext;
   if(d){subj='[TEST] '+d.subject;var b=dynBody(d);bhtml=bodyToClean(b);btext=bodyToPlain(b);}
-  else{var s='Good day 👋\n\nThis is a test of the Rent 2 Go billing notice system. If you received this, email delivery from billing@rentaride2go.com is working.\n\n💳 Manage & pay anytime in your [Customer Portal](https://rentaride2go.com) — sign in with your email on file.\n\nThank you,\nRent 2 Go';subj='[TEST] Rent 2 Go notice';bhtml=bodyToClean(s);btext=bodyToPlain(s);}
+  else{var s='Good day,\n\nThis is a test of the Rent 2 Go billing notice system. If you received this, email delivery from billing@rentaride2go.com is working.\n\n💳 Manage & pay anytime in your [Customer Portal](https://rentaride2go.com) — sign in with your email on file.\n\nThank you,\nRent 2 Go';subj='[TEST] Rent 2 Go notice';bhtml=bodyToClean(s);btext=bodyToPlain(s);}
   var o=btn.textContent;btn.disabled=true;btn.textContent='Sending test…';
   try{
     var html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.55"><p style="background:#fff3cd;border:1px solid #e6c458;padding:8px 10px;border-radius:6px;font-size:12px">🧪 TEST — sample notice'+(d?' for '+esc(d.customer_name):'')+', NOT sent to any customer.</p>'+bhtml+'</div>';
@@ -1143,7 +1143,7 @@ function renderFeeLedger(){
   var dismToday=DISM.filter(function(f){return etDate(f.dismissed_at)===todayET();});
   // active fees: proposed (current) + raised/sent from today — they STAY until you mark Done
   var active=FEES.filter(function(f){return f.status==='proposed'||etDate(f.raised_at)===todayET();});
-  if(!active.length&&!dismToday.length){el.innerHTML='<p class="hint">No $10 late fees pending. 🎉</p>';return;}
+  if(!active.length&&!dismToday.length){el.innerHTML='<p class="hint">No $10 late fees pending.</p>';return;}
   var toRaise=active.filter(function(f){return f.status==='proposed';}).length;
   var inProg=active.length-toRaise;
   var byAcc={};active.forEach(function(f){(byAcc[f.account_label]=byAcc[f.account_label]||[]).push(f);});
@@ -1225,7 +1225,7 @@ function renderOutstanding(){
   // the register (they move to the Ended-contracts section) — they're no longer active customers.
   var owing=CUSTS.filter(function(c){return (+c.outstanding||0)>0 && c.state!=='ended' && c.sub_status!=='canceled' && c.sub_status!=='no_subscription';}).sort(function(a,b){return (+b.outstanding||0)-(+a.outstanding||0);});
   var tot=owing.reduce(function(s,c){return s+(+c.outstanding||0);},0);
-  if(!owing.length){el.innerHTML='<p class="hint">Nothing outstanding — everyone\'s paid up! 🎉</p>';return;}
+  if(!owing.length){el.innerHTML='<p class="hint">Nothing outstanding — all accounts are settled.</p>';return;}
   var rows=owing.map(function(c){
     var badge=c.flag==='disconnect'?'<span class="ostag disc">disconnect</span>':c.flag==='recovery'?'<span class="ostag rec">recovery</span>':(c.pastdue_count>=2?'<span class="ostag warn">'+c.pastdue_count+' days</span>':'');
     var paidT=paidToday().some(function(p){return p.customer_id===c.customer_id&&p.account_label===c.account_label;});
@@ -1294,7 +1294,7 @@ function markSent(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{status
 function toggleReviewed(id){var d=DRAFTS.find(x=>x.id==id);if(!d)return;upd(id,{reviewed_at:d.reviewed_at?null:new Date().toISOString()});}
 function unsend(id){upd(id,{status:'draft',sent_at:null,sent_via:null});}
 function niceName(email){email=(email||'').toLowerCase();if(NAMES[email])return NAMES[email];var lp=email.split('@')[0].replace(/[0-9._-]+/g,' ').trim();return lp?lp.charAt(0).toUpperCase()+lp.slice(1):'there';}
-function setGreeting(email){var el=document.getElementById('greeting');if(el)el.textContent=greetWord()+', '+niceName(email)+' 👋';}
+function setGreeting(email){var el=document.getElementById('greeting');if(el)el.textContent=greetWord()+', '+niceName(email);}
 function renderSuggestions(){
   var s=[];
   var draftN=DRAFTS.filter(x=>x.status==='draft').length;
@@ -1308,7 +1308,7 @@ function renderSuggestions(){
   near.forEach(c=>s.push({c:'warn',t:esc(c.name)+' has 2 past-due rentals — a current/new rental (3 open) triggers disconnection.'}));
   if(proposedN)s.push({c:'',t:IC_FEE+proposedN+' × $10 late fee(s) ready to invoice ('+fmt(proposedAmt)+') — open the $10 ledger and tap 🧾 Create invoice.'});
   if(draftN)s.push({c:'',t:draftN+' notice(s) awaiting review — 📧 Send email or 📋 Copy for WhatsApp/SMS, then ✅ Mark sent.'});
-  if(!draftN&&!disc&&!rec&&!proposedN)s=[{c:'ok',t:'All active rentals are current — nothing to chase right now. 🎉'}];
+  if(!draftN&&!disc&&!rec&&!proposedN)s=[{c:'ok',t:'All active rentals are current. Nothing to chase at present.'}];
   var el=document.getElementById('heroBubble');
   el.innerHTML='<h3>💡 Linda suggests</h3><ul>'+s.map(x=>'<li class="'+x.c+'">'+x.t+'</li>').join('')+'</ul>';
 }

@@ -19,11 +19,24 @@ function yesterdayUTC() {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
+    // Auth: either the shared x-sync-token OR a service-role bearer (lets the admin trigger it directly).
     const token = req.headers.get("x-sync-token") || "";
-    if (!token || token !== (Deno.env.get("SYNC_TOKEN") || "__unset__")) return json({ error: "unauthorized" }, 401);
+    const bearer = (req.headers.get("Authorization") || "").replace("Bearer ", "");
+    const okToken = !!token && token === (Deno.env.get("SYNC_TOKEN") || "__unset__");
+    const okSR = !!bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!okToken && !okSR) return json({ error: "unauthorized" }, 401);
 
+    // Accounts come from STRIPE_ACCOUNTS plus an additive STRIPE_ACCOUNTS_EXTRA (so new accounts can be
+    // onboarded without touching — or needing to read — the main secret). Merge by label; EXTRA wins.
     let accounts: Array<{ label: string; key: string }> = [];
     try { accounts = JSON.parse(Deno.env.get("STRIPE_ACCOUNTS") || "[]"); } catch (_) { return json({ error: "STRIPE_ACCOUNTS is not valid JSON" }, 500); }
+    let extra: Array<{ label: string; key: string }> = [];
+    try { extra = JSON.parse(Deno.env.get("STRIPE_ACCOUNTS_EXTRA") || "[]"); } catch (_) { return json({ error: "STRIPE_ACCOUNTS_EXTRA is not valid JSON" }, 500); }
+    if (extra.length) {
+      const byLabel: Record<string, { label: string; key: string }> = {};
+      for (const a of [...accounts, ...extra]) { if (a && a.label && a.key) byLabel[a.label] = a; }
+      accounts = Object.values(byLabel);
+    }
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch (_) { /* no body */ }
