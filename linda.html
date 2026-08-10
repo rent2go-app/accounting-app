@@ -321,8 +321,8 @@ const IC_DOC='<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx=
 function bodyToHtml(t,br){
   function lk(s){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(s))){out+=esc(s.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" target="_blank" rel="noopener" style="color:#0f8a4d;font-weight:700;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(s.slice(last));return out;}
   var lines=t.split('\n').map(function(ln){var h=lk(ln),tr=ln.trim();
-    if(tr.indexOf('✅')===0)return '<span style="background:#e6f4ea;color:#0a7d44;font-weight:600;display:inline-block;padding:1px 4px;border-radius:4px">'+h+'</span>';
-    if(tr.indexOf('❌')===0)return '<span style="background:#fdecea;color:#c22a2a;font-weight:600;display:inline-block;padding:1px 4px;border-radius:4px">'+h+'</span>';
+    if(tr.indexOf('✅')===0||tr.indexOf('🟢')===0)return '<span style="background:#e6f4ea;color:#0a7d44;font-weight:600;display:inline-block;padding:1px 4px;border-radius:4px">'+h+'</span>';
+    if(tr.indexOf('❌')===0||tr.indexOf('🔴')===0)return '<span style="background:#fdecea;color:#c22a2a;font-weight:600;display:inline-block;padding:1px 4px;border-radius:4px">'+h+'</span>';
     if(tr.indexOf('💰')===0)return '<b>'+h+'</b>';
     return h;});
   return br?lines.join('<br>'):lines.join('\n');
@@ -334,7 +334,10 @@ function softenMarkers(t){return t.replace(/^([ \t]*)❌\s+/gm,'$1🔴 ').replac
 function bodyToClean(t){
   t=softenMarkers(t);
   function lk(s){var out='',re=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,last=0,mm;while((mm=re.exec(s))){out+=esc(s.slice(last,mm.index));out+='<a href="'+mm[2].replace(/"/g,'%22')+'" style="color:#0a7d44;font-weight:bold;text-decoration:underline">'+esc(mm[1])+'</a>';last=re.lastIndex;}out+=esc(s.slice(last));return out;}
-  return t.split('\n').map(function(ln){var h=lk(ln);return ln.trim().indexOf('💰')===0?'<b>'+h+'</b>':h;}).join('<br>');
+  return t.split('\n').map(function(ln){var h=lk(ln);var tr=ln.trim();
+    if(tr.indexOf('🟢')===0)return '<span style="background:#e6f4ea;color:#0a7d44;font-weight:600;display:inline-block;padding:1px 5px;border-radius:4px">'+h+'</span>';
+    if(tr.indexOf('🔴')===0)return '<span style="background:#fdecea;color:#c22a2a;font-weight:600;display:inline-block;padding:1px 5px;border-radius:4px">'+h+'</span>';
+    return tr.indexOf('💰')===0?'<b>'+h+'</b>':h;}).join('<br>');
 }
 // Plain-text version: spell out links as "Text: URL" so SMS/plain paste stays usable.
 function bodyToPlain(t){return softenMarkers(t).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,function(m,tx,u){return tx+': '+u;});}
