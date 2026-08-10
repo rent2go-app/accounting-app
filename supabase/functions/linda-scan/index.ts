@@ -67,10 +67,10 @@ async function scanAccount(acc: any) {
   // Read EVERY customer's plan flag for this account so the sweep carries it FORWARD verbatim.
   // on_plan/plan_terms are set by the admin (dashboard toggle) and must survive every upsert —
   // we re-write them with their existing values so the badge can never flip off on a scan.
-  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null; plan_behind_days: number; plan_last_behind_day: string | null; email_override: string | null }> = {};
+  const planExisting: Record<string, { on_plan: boolean; plan_terms: string | null; plan_behind_days: number; plan_last_behind_day: string | null; email_override: string | null; grace_until: string | null; grace_note: string | null }> = {};
   const planmap: Record<string, string> = {};
-  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms,plan_behind_days,plan_last_behind_day,email_override&${aL}`)).forEach((r: any) => {
-    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null, plan_behind_days: r.plan_behind_days || 0, plan_last_behind_day: r.plan_last_behind_day || null, email_override: r.email_override || null };
+  (await sbGet(`linda_customers?select=customer_id,on_plan,plan_terms,plan_behind_days,plan_last_behind_day,email_override,grace_until,grace_note&${aL}`)).forEach((r: any) => {
+    planExisting[r.customer_id] = { on_plan: !!r.on_plan, plan_terms: r.plan_terms || null, plan_behind_days: r.plan_behind_days || 0, plan_last_behind_day: r.plan_last_behind_day || null, email_override: r.email_override || null, grace_until: r.grace_until || null, grace_note: r.grace_note || null };
     if (r.on_plan) planmap[r.customer_id] = r.plan_terms || "2 rental invoices and 2 late fees per day";
   });
 
@@ -85,21 +85,8 @@ async function scanAccount(acc: any) {
   // chase the historical open-invoice backlog (old/canceled renters with lingering unpaid invoices).
   const targets = new Map<string, { customer: any; sub_status: string }>();
   for (const s of active) { const c = s.customer || {}; if (c.id) targets.set(c.id, { customer: c, sub_status: s.status }); }
-  // TEMPORARY EXCEPTION (JJM only, today): ONE specific renter — Penny Mitchell — switched cars into
-  // JJM and already has standalone invoices, but her subscription starts tomorrow. Include ONLY her,
-  // by customer id / email — NOT every standalone customer (that wrongly pulled in ended-subscription
-  // renters like Cordell). Remove this whole block once Penny's subscription goes live.
-  if (LABEL === "RENT 2 GO JJMusa") {
-    const PENNY_ID = "cus_UxzNqzVmRub6bS", PENNY_EMAIL = "mitchellpenny746@gmail.com";
-    const openInvAll = await stripeAll(`https://api.stripe.com/v1/invoices?status=open&limit=100&expand[]=data.customer`, SKEY);
-    for (const i of openInvAll) {
-      const co = i.customer;
-      const id = typeof co === "string" ? co : (co && co.id);
-      const em = (co && typeof co === "object") ? (co.email || "") : "";
-      const isPenny = id === PENNY_ID || (em && em.toLowerCase() === PENNY_EMAIL);
-      if (isPenny && id && !targets.has(id)) targets.set(id, { customer: (co && typeof co === "object") ? co : { id }, sub_status: "no_subscription" });
-    }
-  }
+  // NOTE: we scan ONLY active-subscription customers. Cancelled/terminated renters (e.g. Penny Mitchell)
+  // are intentionally excluded — no notices, no billing once a subscription is cancelled.
 
   await Promise.all(Array.from(targets.values()).map(async (t: any) => {
     const c = t.customer || {}, cid = c.id, nm = c.name || "(no name)", ph = c.phone || "", substatus = t.sub_status;
@@ -120,7 +107,12 @@ async function scanAccount(acc: any) {
     // We do NOT back-bill older missed days; only the most recent past-due rental gets a fee.
     const latestPd = rental_pd.slice().sort((a: any, b: any) => ((b.due_date || b.created || 0) - (a.due_date || a.created || 0)))[0];
     const subActive = substatus !== "canceled" && substatus !== "no_subscription";   // terminated subs accrue NO new late fees
-    if (latestPd && subActive) {
+    // GRACE — admin granted this customer an extension (e.g. after an incident). While grace_until is in
+    // the future: no new late fee, no disconnection, and the notice says so. Set/cleared from the dashboard.
+    const graceUntil = (planExisting[cid] && planExisting[cid].grace_until) ? Date.parse(planExisting[cid].grace_until as string) : 0;
+    const onGrace = graceUntil > now * 1000;
+    const graceNote = (planExisting[cid] && planExisting[cid].grace_note) || "";
+    if (latestPd && subActive && !onGrace) {
       const i = latestPd;
       const dd = i.due_date || i.created || now;
       // a rental's late fee is raised the DAY AFTER it goes past due, so an existing fee lands on due+1 (allow +2 slack)
@@ -261,7 +253,21 @@ async function scanAccount(acc: any) {
     // (grace) still gets told "a $10 late fee has been applied", which is false.
     const feeInPlay = unpaid_latefees > 0 || fees.some((f: any) => f.customer_id === cid);
     if (rental_pd.length > 0 && kind !== "disconnect" && !onPlan && feeInPlay) closing = closing + " " + LATEFEE_NOTE;
-    const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you so much for your urgent attention to this matter.\n\nRent 2 Go" + FOOTER;
+    // ACCUMULATION WARNING — additive, not mutually exclusive. Anyone carrying 3+ unpaid late fees gets the
+    // accumulation warning EVEN IF they also have a past-due rental (they'd otherwise miss it, as Terrence did
+    // with 5 fees). Skipped for disconnect (stronger language already), plan, and grace customers.
+    if (latefee_open.length >= 3 && kind !== "disconnect" && !onPlan && !onGrace)
+      closing = closing + ` We are also concerned about the accumulation of late fees on your account — there are now ${latefee_open.length} unpaid, totalling ${m(unpaid_latefees)}. Please clear these as soon as possible so they do not contribute to a scheduled disconnection.`;
+    // GRACE override — replaces the whole message when an extension is active: acknowledge it, no fee
+    // language, no disconnection, ask only that the balance be settled by the granted time.
+    if (onGrace) {
+      const gl = new Date(graceUntil).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "long", hour: "numeric", minute: "2-digit" });
+      kind = "reminder"; state = "grace"; flag = "none"; dnote = null;
+      subj = "Your Rent 2 Go account — extension granted until " + gl;
+      intro = `Good morning ${nm},\n\nAs agreed, we have extended your account until ${gl}${graceNote ? " — " + graceNote : ""}. No late fee applies in the meantime and your rental remains active. Your current balance is shown below for reference.`;
+      closing = `Please have the balance settled by ${gl}, as agreed. If anything changes before then, let us know.`;
+    }
+    const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you.\n\nRent 2 Go" + FOOTER;
     if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
     custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: onPlan, plan_terms: onPlan ? (planExisting[cid] && planExisting[cid].plan_terms) : null, plan_paid_rentals: planPaidR, plan_paid_latefees: planPaidLF, plan_behind_days: behindDays, plan_last_behind_day: lastBehindDay, updated_at: nowISO });
   }));

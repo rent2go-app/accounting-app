@@ -33,9 +33,16 @@ Deno.serve(async (req) => {
     // so the notice is reconciled against what was actually said on both sides (e.g. the customer states an
     // invoice is already paid, or we replied agreeing to waive a fee). Without our side, the notice can
     // contradict a promise we already made in writing.
+    // ONLY consider very recent conversation — messages within the last 12 hours. An older text (e.g.
+    // "paying today" sent days ago) must NOT be quoted into today's notice as if it were current.
+    const since = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
     let texts: any[] = [];
-    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&order=received_at.desc&limit=10&select=body,received_at,direction,is_grace_request`); } catch (_) { /* */ } }
+    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&received_at=gte.${since}&order=received_at.desc&limit=10&select=body,received_at,direction,is_grace_request`); } catch (_) { /* */ } }
     const textBlock = (texts && texts.length) ? "\n\nRECENT CONVERSATION with this customer (most recent first) — read BOTH sides. Reconcile the notice against it: if the customer states (credibly) that a listed invoice has already been paid, do NOT present it as currently owed and NEVER attach a late fee to it — instead note it as \"you have indicated this is paid; we are confirming on our end\". If they asked for more time / grace until a specific day, confirm it has been noted. Do not contradict anything we ourselves already told them:\n" + texts.map((t: any) => `${t.direction === "out" ? "US → them" : "THEM → us"}: "${(t.body || "").slice(0, 220)}"${t.is_grace_request ? " (grace request)" : ""}`).join("\n") : "";
+    // STANDING RULES — durable, admin-editable rules in linda_rules (seeded from real feedback). Injected
+    // into every prompt so lessons learned persist and the admin can add new rules without a code change.
+    let rulesBlock = "";
+    try { const rs = await sbGet(`linda_rules?active=eq.true&order=id.asc&select=rule`); if (rs && rs.length) rulesBlock = "\n\nSTANDING RULES (learned from admin feedback — follow ALL of them):\n" + rs.map((r: any, i: number) => `${i + 1}. ${r.rule}`).join("\n"); } catch (_) { /* */ }
     const hasBody = !!b.current_body;
     const system = hasBody
       ? "You are Linda, the billing assistant for Rent 2 Go LLC (a US car-rental business). Your register is that of a professional accounts department: courteous, measured and businesslike — never chatty or effusive, with no exclamation marks and no decorative emoji — BUT you MUST keep the 🔴 (past-due) and 🟢 (current/coming-due) status markers on the invoice lines exactly as they appear, since they colour-code the balance and are essential. " +
@@ -44,7 +51,10 @@ Deno.serve(async (req) => {
         "every 'Pay now:' URL, subtotals/total, and the customer portal link that appear in the current notice. " +
         "Do NOT remove, summarise, reorder, or alter any figure or link — the payment links and amounts are the " +
         "whole point of the notice. Only improve the greeting, the sentences around the items, and the closing. " +
-        "COHERENCE IS MANDATORY — the notice must read as one consistent message, never contradict itself. If you acknowledge a grace request (e.g. 'until tomorrow'), you must NOT in the same notice demand payment 'today' or state the vehicle is 'scheduled for disconnection today' — soften the demand to match the grace you just granted (e.g. 'we ask that this be resolved by tomorrow as agreed'). If the customer credibly states an invoice is already paid, do not list it as owed and never attach a late fee to it. Every late-fee line and invoice line that legitimately remains owed MUST stay in the notice — do not drop any line item; only late fees tied to an invoice the customer has shown is paid should be removed. " +
+        "NEVER copy, quote, or prepend our OWN previous messages (e.g. an SMS auto-reply that begins with a 📩 icon, or any 'US → them' line) into this notice — use the conversation only to understand context. The notice must be a single fresh message, not a transcript. " +
+        "MATCH TONE TO THE BALANCE — if the balance is small or nearly cleared (e.g. only a single remaining late fee) or the customer has clearly been paying, OPEN by thanking them for their recent payments and warmly ask that they clear the small remaining amount soon. Do NOT use heavy, urgent, or disconnection language for a minor balance. Reserve firm language for genuinely large or long-overdue balances. " +
+        "BE CONCISE — this is a short daily notice, not a letter. No meandering, no repetition, no restating the same point twice, no filler pleasantries. A brief greeting, one or two sentences of context, the itemised balance, one clear next step, sign-off. If the customer has told us something (a payment, a grace request), acknowledge it in ONE line and move on. " +
+        "COHERENCE IS MANDATORY — the notice must read as one consistent message, never contradict itself. If you acknowledge a grace request (e.g. 'until tomorrow' or 'until 3pm'), you must NOT in the same notice demand payment 'today' or state the vehicle is 'scheduled for disconnection today' — soften the demand to match the grace granted. If the customer states they have paid specific items, LEAD with that acknowledgement and treat those items as settled/pending-confirmation — do not lecture them that the items are 'separate' or 'still open regardless'. Every line item that legitimately remains owed MUST stay in the notice — do not drop any line; only items the customer has shown are paid should be dropped. " +
         "Sign off 'Rent 2 Go LLC'. Return ONLY the full rewritten notice body — same information and links, better wording, internally consistent."
       : "You are Linda, the billing assistant for Rent 2 Go LLC (a US car-rental business). Your register is that of a professional accounts department: courteous, measured and businesslike — never chatty or effusive, with no exclamation marks and no decorative emoji — BUT you MUST keep the 🔴 (past-due) and 🟢 (current/coming-due) status markers on the invoice lines exactly as they appear, since they colour-code the balance and are essential. " +
         "Write a SHORT daily account notice based on the situation. State the amounts and what is past due precisely, " +
@@ -56,7 +66,7 @@ Deno.serve(async (req) => {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": AK, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2400, system, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 2400, system: system + rulesBlock, messages: [{ role: "user", content: user }] }),
     });
     const d = await r.json();
     if (d.error) return json({ error: d.error.message || JSON.stringify(d.error) }, 502);
