@@ -56,7 +56,9 @@ Deno.serve(async (req) => {
     });
     const d = await r.json();
     if (d.error) return json({ error: d.error.message || JSON.stringify(d.error) }, 502);
-    const text = (d.content || []).map((c: any) => c.text || "").join("").trim();
+    let text = (d.content || []).map((c: any) => c.text || "").join("").trim();
+    // Strip any LLM preamble ("Here is the rewritten notice:") and stray --- fences so only the notice remains.
+    text = text.replace(/^\s*here(?:'|’|`)?s?\s+(?:is\s+)?[^\n]*:?\s*\n+/i, "").replace(/^\s*-{2,}\s*\n+/, "").replace(/\n+\s*-{2,}\s*$/, "").trim();
     return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
