@@ -87,6 +87,15 @@ Deno.serve(async (req) => {
       .replace(/\[\s*Pay now\s*\]\((https?:\/\/[^\s)]+)\)/gi, "Pay now: $1")   // [Pay now](url) -> Pay now: url
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1: $2")                // any other [text](url) -> text: url
       .trim();
+    // Deterministically GUARANTEE the 3+-late-fee accumulation warning survives. The model repeatedly
+    // softens it to a vague "avoid further fees" line; if the template we sent carried the specific
+    // accumulation warning and the rewrite dropped it, re-insert the original sentence before the sign-off.
+    if (hasBody) {
+      const am = (b.current_body || "").match(/We are (?:also )?concerned about the accumulation[\s\S]*?disconnection\./i);
+      if (am && !/concerned about the accumulation/i.test(text)) {
+        text = /\n\n\s*Rent 2 Go/i.test(text) ? text.replace(/\n\n\s*(Rent 2 Go)/i, "\n\n" + am[0] + "\n\n$1") : text + "\n\n" + am[0];
+      }
+    }
     return json({ ok: true, draft: text, model: MODEL, examples_used: (ex || []).length, stop_reason: d.stop_reason || null });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
