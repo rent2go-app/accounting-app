@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
       const jcar = jInv.length ? cleanlbl((jInv[0].lines?.data || [{}])[0]?.description || jInv[0].description || "") : "";
       const lcar = lInv.length ? cleanlbl((lInv.find((i: any) => !isLateFee(i))?.lines?.data || [{}])[0]?.description || "") : "";
       const P: string[] = [];
-      P.push("Good morning Penny 👋\n\nHere's a combined summary of everything outstanding on your Rent 2 Go rentals, with a pay link on each item.");
+      P.push("Good morning Penny,\n\nHere is a combined summary of everything outstanding on your Rent 2 Go rentals, with a pay link on each item.");
       P.push("① Your current car" + (jcar ? " — " + jcar : "") + ":");
       if (jPast.length) P.push("Past due:\n\n" + jPast.map((i: any) => invline(i, "❌")).join("\n\n") + "\n\nPast-due subtotal: " + m(jPastAmt));
       if (jCurr.length) P.push("Coming due (not yet late):\n\n" + jCurr.map((i: any) => invline(i, "✅")).join("\n\n") + "\n\nCurrent subtotal: " + m(jCurrAmt));
