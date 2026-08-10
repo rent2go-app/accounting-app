@@ -46,9 +46,9 @@ function isPastDue(i: any) {
 function cleanlbl(s: string) { s = (s || "Rental").trim(); if (s.includes("×")) s = s.split("×")[1].trim(); const p = s.indexOf("(at "); if (p > 0) s = s.slice(0, p).trim(); return s; }
 function invline(i: any, icon: string) { const lbl = isLateFee(i) ? "Late fee" : cleanlbl((i.lines?.data || [{}])[0]?.description || i.description || "Rental"); const gen = i.created ? etMD(i.created) : "—"; const url = i.hosted_invoice_url || ""; return `${icon} ${gen} · ${lbl.slice(0, 34)} · ${m((i.amount_remaining || 0) / 100)}${url ? ` · [Pay now](${url})` : ""}`; }
 function footer(portal: string) { return portal ? `\n\n💳 Manage & pay anytime in your [Customer Portal](${portal}) — sign in with your email on file.` : `\n\nManage & pay from your customer portal — sign in with your email on file.`; }
-const APPREC_PAID = "Thank you so much for your recent payment — we truly appreciate you keeping up with your account. ";
-const APPREC_GEN = "Thank you for being a valued Rent 2 Go customer — we really appreciate your efforts to stay on top of your account. ";
-const LATEFEE_NOTE = "Please note that a $10 late fee has been applied to your past-due balance. We strongly recommend settling your account as soon as possible to avoid further penalties or a service interruption.";
+const APPREC_PAID = "Thank you for your recent payment; we appreciate you keeping your account up to date. ";
+const APPREC_GEN = "Thank you for renting with Rent 2 Go. ";
+const LATEFEE_NOTE = "Please note that a $10 late fee has been applied to your past-due balance. Please settle your account promptly to avoid further charges or an interruption to your rental.";
 
 async function scanAccount(acc: any) {
   const LABEL = acc.label, SKEY = acc.key, FOOTER = footer(acc.portal || "");
@@ -130,7 +130,7 @@ async function scanAccount(acc: any) {
         const veh = cleanlbl(ln.description || i.description || "your rental");
         const num = i.number || i.id;
         const fdate = i.created ? etMDY(i.created) : "—";
-        const memo = `One-time $10 late fee for your ${veh} rental — invoice ${num} (${fdate}) was not settled by its due date. This applies once per past-due rental. Please clear your balance to keep your rental in good standing. Thank you — Rent 2 Go LLC`;
+        const memo = `One-time $10 late fee for your ${veh} rental — invoice ${num} (${fdate}) was not settled by its due date. This applies once per past-due rental. Please clear your balance to keep your rental in good standing. Thank you. — Rent 2 Go LLC`;
         fees.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, fee: 10, status: "proposed", invoice_number: num, rental_desc: veh.slice(0, 90), for_date: fdate, memo });
       }
     }
@@ -204,7 +204,7 @@ async function scanAccount(acc: any) {
       const isDaily = /per day/i.test(terms);
       const paidLine = `Recently you've paid ${planPaidR} rental payment${planPaidR === 1 ? "" : "s"} and ${planPaidLF} late-fee payment${planPaidLF === 1 ? "" : "s"}${isDaily ? " (your plan asks for 2 of each per day)" : ""}.`;
       subj = "Thank you — your Rent 2 Go payment plan is on track";
-      intro = `Good morning ${nm} 👋\n\nThank you for keeping up your commitment to your account — you're on track with your payment plan. ${paidLine} Today’s step is again: ${terms}.`;
+      intro = `Good morning ${nm},\n\nThank you for keeping to your payment plan; your account is on track. ${paidLine} Today’s step is again: ${terms}.`;
       closing = "Tap Pay now above to make today’s plan payments. Staying on plan steadily clears your balance and keeps you on the road — thank you.";
       kind = "reminder"; state = "plan"; flag = "none"; dnote = null;
     } else if (disc) {
@@ -231,26 +231,26 @@ async function scanAccount(acc: any) {
       closing = "If you intend to continue the rental with us today, it is imperative that you catch up your account as soon as possible — to avoid service interruption as well as vehicle recovery. Please tap Pay now on any invoice above to settle without delay.";
     } else if (rental_pd.length >= 2) {
       subj = "Your Rent 2 Go account is past due — " + m(pd_total);
-      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} days${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}). Please cure your balance as soon as possible, or reach out so we can discuss a way forward.`;
+      intro = `Good morning ${nm},\n\nYour Rent 2 Go rental is ${m(pd_total)} past due (${rental_pd.length} days${unpaid_latefees > 0 ? ", plus " + m(unpaid_latefees) + " in late fees" : ""}). Please settle this balance as soon as possible. If you are unable to, contact us today so we can agree a payment arrangement.`;
       closing = "Tap Pay now on any invoice above to settle. If you can't clear it today, reach out right away to arrange payments or discuss a plan of action.";
     } else if (rental_pd.length > 0) {
       subj = "A reminder about your Rent 2 Go balance — " + m(pd_total) + " past due";
-      intro = `Good morning ${nm} 👋\n\nJust a quick reminder that ${m(pd_total)} is now past due on your rental. Settling it today keeps everything active and in good standing.`;
+      intro = `Good morning ${nm},\n\nThis is a reminder that ${m(pd_total)} is now past due on your rental. Settling it today will keep your account in good standing.`;
       closing = "Whenever you're ready, simply tap Pay now on any invoice above. If you have any questions, we're always happy to help.";
     } else if (unpaid_latefees >= 70) {
       // $70+ in fees but no past-due rental (only current) — NOT a disconnection yet, but warn it's imminent:
       // the moment a rental falls past due alongside these fees, the account is scheduled for disconnection.
       subj = "⚠ Important — your Rent 2 Go late fees have reached " + m(unpaid_latefees);
-      intro = `Good morning ${nm},\n\nYour unpaid late fees have now built up to ${m(unpaid_latefees)} — past the $70 mark. Right now your rentals are current, so your account is still active. But please be aware: the moment a rental falls past due while these fees remain unpaid, your Rent 2 Go rental will be scheduled for disconnection. Clearing these fees now protects your account.`;
+      intro = `Good morning ${nm},\n\nYour unpaid late fees have now built up to ${m(unpaid_latefees)} — past the $70 mark. Your rentals are current, so your account remains active. Please be aware that if a rental falls past due while these fees are outstanding, your rental will be scheduled for disconnection. Clearing the fees now avoids that.`;
       closing = "Please tap Pay now above to clear your late fees and avoid an imminent service interruption. If anything has changed, reach out right away to arrange payments or discuss a plan of action.";
     } else if (latefee_open.length >= 3) {
       // 3+ unpaid late fees building up — flag the accumulation before it contributes to a disconnection.
       subj = "Please clear your Rent 2 Go late fees — " + m(unpaid_latefees) + " building up";
-      intro = `Good morning ${nm},\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}We're a little concerned about the accumulation of late fees on your account — there are now ${latefee_open.length} unpaid late fees totalling ${m(unpaid_latefees)}. Please clear these as soon as possible so they don't keep building up and contribute to a disconnection ahead.`;
+      intro = `Good morning ${nm},\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Late fees are accumulating on your account. There are now ${latefee_open.length} unpaid late fees totalling ${m(unpaid_latefees)}. Please clear these promptly to prevent further charges and a scheduled disconnection.`;
       closing = "Tap Pay now above to clear your late fees. If anything has changed, reach out and we'll gladly help you get back on track.";
     } else {
       subj = "A gentle reminder about your Rent 2 Go account — " + m(pd_total) + " in late fees";
-      intro = `Good morning ${nm} 👋\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Just a gentle reminder that there's ${m(pd_total)} in late fees on your account whenever you have a moment to take care of it.`;
+      intro = `Good morning ${nm},\n\n${paidrecent ? APPREC_PAID : APPREC_GEN}Please note that ${m(pd_total)} in late fees is outstanding on your account. We would ask you to settle this at your earliest convenience.`;
       closing = "Whenever you're ready, simply tap Pay now above. Please reach out anytime if we can help.";
     }
     // Whenever there are past-due RENTALS, remind them a $10 late fee applies and to settle ASAP to
