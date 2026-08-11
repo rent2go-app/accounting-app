@@ -23,7 +23,8 @@ Deno.serve(async (req) => {
     const token = req.headers.get("x-sync-token") || "";
     const bearer = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const okToken = !!token && token === (Deno.env.get("SYNC_TOKEN") || "__unset__");
-    const okSR = !!bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    let okSR = !!bearer && bearer === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!okSR && bearer) { try { const p = JSON.parse(atob(bearer.split(".")[1])); if (p.role === "service_role") okSR = true; } catch (_) { /* not a jwt */ } }
     if (!okToken && !okSR) return json({ error: "unauthorized" }, 401);
 
     // Accounts come from STRIPE_ACCOUNTS plus an additive STRIPE_ACCOUNTS_EXTRA (so new accounts can be
