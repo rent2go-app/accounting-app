@@ -33,12 +33,12 @@ Deno.serve(async (req) => {
     // so the notice is reconciled against what was actually said on both sides (e.g. the customer states an
     // invoice is already paid, or we replied agreeing to waive a fee). Without our side, the notice can
     // contradict a promise we already made in writing.
-    // ONLY consider very recent conversation — messages within the last 12 hours. An older text (e.g.
-    // "paying today" sent days ago) must NOT be quoted into today's notice as if it were current.
-    const since = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
+    // Consider the last 16 hours of conversation — wide enough that an EVENING/overnight extension request
+    // is still caught by the MORNING reminder, but not so wide that days-old texts get quoted as current.
+    const since = new Date(Date.now() - 16 * 3600 * 1000).toISOString();
     let texts: any[] = [];
-    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&received_at=gte.${since}&order=received_at.desc&limit=10&select=body,received_at,direction,is_grace_request`); } catch (_) { /* */ } }
-    const textBlock = (texts && texts.length) ? "\n\nRECENT CONVERSATION with this customer (most recent first) — read BOTH sides. Reconcile the notice against it: if the customer states (credibly) that a listed invoice has already been paid, do NOT present it as currently owed and NEVER attach a late fee to it — instead note it as \"you have indicated this is paid; we are confirming on our end\". If they asked for more time / grace until a specific day, confirm it has been noted. Do not contradict anything we ourselves already told them:\n" + texts.map((t: any) => `${t.direction === "out" ? "US → them" : "THEM → us"}: "${(t.body || "").slice(0, 220)}"${t.is_grace_request ? " (grace request)" : ""}`).join("\n") : "";
+    if (b.customer_id) { try { texts = await sbGet(`messages?customer_id=eq.${encodeURIComponent(b.customer_id)}&received_at=gte.${since}&order=received_at.desc&limit=12&select=body,received_at,direction,is_grace_request`); } catch (_) { /* */ } }
+    const textBlock = (texts && texts.length) ? "\n\nRECENT CONVERSATION with this customer (most recent first) — read BOTH sides. Reconcile the notice against it: (1) if the customer states (credibly) that a listed invoice has already been paid, do NOT present it as currently owed and NEVER attach a late fee to it — instead note it as \"you have indicated this is paid; we are confirming on our end\". (2) Treat ANY message expressing intent to pay later or asking for more time as an EXTENSION REQUEST — even informal phrasing like 'when I get off', 'in the morning', 'tonight', 'throughout the day', 'bear with me', 'on payday', 'as soon as I can' — acknowledge it in one line and reflect the timing they gave. (3) Do not contradict anything we ourselves already told them. Never restate or echo our own previous messages:\n" + texts.map((t: any) => `${t.direction === "out" ? "US → them" : "THEM → us"}: "${(t.body || "").slice(0, 220)}"${t.is_grace_request ? " (extension request)" : ""}`).join("\n") : "";
     // STANDING RULES — durable, admin-editable rules in linda_rules (seeded from real feedback). Injected
     // into every prompt so lessons learned persist and the admin can add new rules without a code change.
     let rulesBlock = "";
