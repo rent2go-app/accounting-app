@@ -54,6 +54,11 @@ table.bud th.mtd{color:#fff;background:var(--band)}
 table.bud td.num{text-align:right}
 table.bud input.c{width:88px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;text-align:right;font-family:inherit;font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
 table.bud input.c:hover{border-color:var(--line)}table.bud input.c:focus{border-color:var(--brand);background:var(--surface);outline:none}
+table.bud td.num{position:relative}
+.cdot{position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;border:1px solid var(--line-strong);padding:0;cursor:pointer;opacity:.4;transition:opacity .12s}
+table.bud td.num:hover .cdot,.cdot:hover{opacity:1}
+table.bud td.num.tinted .cdot{opacity:.95}
+body.readonly .cdot{display:none!important}
 table.bud input.c.p{color:var(--in)}
 table.bud td.linkedcell{text-align:right;font-weight:700;color:var(--in);background:color-mix(in srgb,var(--in) 7%,var(--surface))}
 .linknote{font-size:10px;font-weight:700;text-transform:none;letter-spacing:0;color:#cfe9d8;margin-left:8px}
@@ -125,6 +130,8 @@ const SA_HOME=['House Rent','Rent Savings','Lawyers fees','Wood','Trackers for R
 const HOME_CATS=['Owner Draw','SA Salaries','School & Education','Rent & Housing','Groceries & Household','Allowances','Utilities','Home & Personal','Savings & Moving'];
 
 let DATA={sa:{},uae:{}},SIDE='sa',YM='',SAVET=null;
+// Per-cell colour palette (first entry = no colour). Click a cell's dot to cycle through these.
+const PAL=['','#e2483d','#eab54e','#0a7d44','#2f6fed','#8b5cf6','#5c6a7a'];
 let CFG={zar:18.3,aed:3.6725},CATSEG={},WEEKLY={};
 
 function setStatus(s){var el=document.getElementById('savestate');if(el)el.textContent=s==='saving'?'Saving…':s==='saved'?'Saved ✓':s==='error'?'Save error':'';}
@@ -164,7 +171,9 @@ function ensureMonth(){
   M.weeks=Math.max(1,Math.min(6,+M.weeks||4));
   if(!M.weekStart)M.weekStart=firstFriday(YM);
   // normalise vals length to weeks
-  M.sections.forEach(function(sec){sec.items.forEach(function(it){it.vals=(it.vals||[]).map(function(v){return (v&&typeof v==='object')?(+v.b||+v.p||0):(+v||0);});while(it.vals.length<M.weeks)it.vals.push(0);it.vals.length=M.weeks;});});
+  M.sections.forEach(function(sec){sec.items.forEach(function(it){it.vals=(it.vals||[]).map(function(v){return (v&&typeof v==='object')?(+v.b||+v.p||0):(+v||0);});while(it.vals.length<M.weeks)it.vals.push(0);it.vals.length=M.weeks;
+    // cols[] = a per-week colour tag for each expense cell (kept the same length as vals)
+    it.cols=(it.cols||[]).map(function(c){return c||'';});while(it.cols.length<M.weeks)it.cols.push('');it.cols.length=M.weeks;});});
   return M;
 }
 function cur(){return DATA[SIDE][YM];}
@@ -244,8 +253,8 @@ function render(){
       var linkedInc=sec.income&&M._linked;
       body+='<tr><td class="ln iname">'+(sec.income?'<span class="datechip">'+esc(it.name)+'</span>':'<input class="nm" data-nm="'+si+'|'+ii+'" value="'+esc(it.name)+'">')+'</td>';
       var rt=0;
-      for(var w=0;w<W;w++){var v=+it.vals[w]||0;rt+=v;
-        body+=linkedInc?'<td class="num linkedcell tnum">'+(v?fmtC(v):'—')+'</td>':'<td class="num"><input class="c" data-c="'+si+'|'+ii+'|'+w+'" value="'+v+'"></td>';}
+      for(var w=0;w<W;w++){var v=+it.vals[w]||0;rt+=v;var cc=(it.cols&&it.cols[w])||'';
+        body+=linkedInc?'<td class="num linkedcell tnum">'+(v?fmtC(v):'—')+'</td>':'<td class="num'+(cc?' tinted':'')+'"'+(cc?' style="background:color-mix(in srgb,'+cc+' 20%,var(--surface))"':'')+'><input class="c" data-c="'+si+'|'+ii+'|'+w+'" value="'+v+'"><button class="cdot" data-cc="'+si+'|'+ii+'|'+w+'" style="background:'+(cc||'transparent')+'" title="Colour-tag this week’s cell (click to cycle)"></button></td>';}
       body+='<td class="mtdcell">'+fmtC(rt)+'</td>';
       body+='<td class="ln" style="min-width:34px">'+((sec.income)?'':'<button class="delrow" data-delrow="'+si+'|'+ii+'" title="Remove line">×</button>')+'</td></tr>';
     });
@@ -267,6 +276,7 @@ function sumRow(cls,label,arr,mtd,W){
 function wire(){
   var M=cur();
   document.querySelectorAll('input.c').forEach(el=>el.onchange=()=>{var p=el.dataset.c.split('|');M.sections[+p[0]].items[+p[1]].vals[+p[2]]=r2(el.value);scheduleSave();render();});
+  document.querySelectorAll('.cdot').forEach(el=>el.onclick=()=>{var p=el.dataset.cc.split('|');var it=M.sections[+p[0]].items[+p[1]];var w=+p[2];it.cols=it.cols||[];while(it.cols.length<=w)it.cols.push('');var ni=(PAL.indexOf(it.cols[w]||'')+1)%PAL.length;it.cols[w]=PAL[ni];scheduleSave();render();});
   document.querySelectorAll('input.nm').forEach(el=>el.onchange=()=>{var p=el.dataset.nm.split('|');M.sections[+p[0]].items[+p[1]].name=el.value;scheduleSave();});
   document.querySelectorAll('[data-addi]').forEach(el=>el.onclick=()=>{var si=+el.dataset.addi;M.sections[si].items.push({id:uid('e_'),name:'',vals:newVals(M.weeks)});scheduleSave();render();});
   document.querySelectorAll('[data-delrow]').forEach(el=>el.onclick=()=>{var p=el.dataset.delrow.split('|');if(!confirm('Remove this line?'))return;M.sections[+p[0]].items.splice(+p[1],1);scheduleSave();render();});
