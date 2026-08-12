@@ -1186,20 +1186,11 @@ function dynBody(d){
   if(dr&&graceActive(dr)){
     if(d.kind==='disconnect')b=graceRewrite(b,dr);
     else b=insertAfterGreeting(b,'📅 As requested, your payment deadline has been extended to '+fullET(dr.grace_until)+'. Please settle by then to keep your vehicle active.');
-  } else {
-    // Only a grace request from the LAST 12 HOURS counts as a current extension ask — otherwise an old
-    // message keeps leading the notice for days. Older than 12h → treat as no new request.
-    var req=MSGS.find(function(m){return !m.handled&&m.is_grace_request&&m.account_label===d.account_label&&m.customer_id===d.customer_id&&(Date.now()-new Date(m.received_at).getTime())<=12*3600*1000;});
-    if(req){
-      // Don't ask for a date/time if they've already acted: paid since asking (kept the promise), or
-      // they're no longer behind (nothing to grant an extension on). Avoids a stale grace ask that
-      // contradicts a "thank you for your payment" on the same notice.
-      var c=CUSTS.find(function(x){return x.account_label===d.account_label&&x.customer_id===d.customer_id;});
-      var paidSince=PAY.some(function(p){return p.account_label===d.account_label&&p.customer_id===d.customer_id&&new Date(p.paid_at)>new Date(req.received_at);});
-      var behind=c&&(c.state==='disconnect'||(+c.pastdue_count||0)>0);
-      if(!paidSince&&behind)b=insertAfterGreeting(b,'📩 We received your message about needing more time. Our rentals are now managed by an automated system, so please reply with an exact date and time and we will apply the extension to your account. If you need more time beyond that, you can reach out for management approval.');
-    }
   }
+  // NOTE: we no longer inject a generic "reply with an exact date/time" auto-reply block when a customer has an
+  // outstanding grace request. Linda's AI drafter reads the actual message and confirms the real timing
+  // (e.g. "noted — by 3–6pm today"), so the canned ask was redundant and read incongruently. If you want to
+  // formally grant an extension, set it via the grace control — the 📅 line above then confirms it.
   return b;
 }
 function graceRewrite(b,dr){
