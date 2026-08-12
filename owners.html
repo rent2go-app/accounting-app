@@ -379,8 +379,11 @@ function renderSnapshot(){
   var r2gRows=rows.map(function(r){
     return '<tr><td>'+esc(r.name)+'</td><td class="n">'+fmt(r.gross)+'</td><td class="n brand"><b>'+fmt(r.pf)+'</b></td></tr>';
   }).join('');
+  // Default COLLAPSED — the snapshot opens folded and you expand it only when you need it. We remember
+  // your last manual toggle (localStorage) so re-renders don't keep slamming it shut once you've opened it.
+  var snapOpen=false;try{snapOpen=localStorage.getItem('r2g_snap_open')==='1';}catch(e){}
   el.innerHTML=
-   '<details class="snapwrap" open><summary>📊 Monthly owner snapshot — '+fmtYM(YM)+'</summary>'
+   '<details class="snapwrap"'+(snapOpen?' open':'')+'><summary>📊 Monthly owner snapshot — '+fmtYM(YM)+'</summary>'
    +'<div class="snapsub">How each owner performed in '+fmtYM(YM)+'. Owner view = what they earned and kept; R2G view = what Rent 2 Go made — keep that one private.'
    +(YM===curYM()?' <b>⏳ This month is still in progress</b> — gross is still coming in while the platform fee reflects the whole month, so profit reads low until month-end. Pick a completed month for a settled view.':'')
    +'</div>'
@@ -391,6 +394,7 @@ function renderSnapshot(){
    +'<tr class="tot"><td>Total R2G revenue</td><td class="n">'+fmt(r2(T.gross))+'</td><td class="n brand"><b>'+fmt(r2(T.pf))+'</b></td></tr></tbody></table></div>'
    +'<div class="hint" style="margin-top:6px">Maintenance is billed through to owners, so R2G revenue here is the platform fee earned per owner. If you want R2G-borne costs netted out to a true margin, tell me which costs to attribute.</div></div>'
    +'</details>';
+  var _dt=el.querySelector('.snapwrap');if(_dt)_dt.addEventListener('toggle',function(){try{localStorage.setItem('r2g_snap_open',this.open?'1':'0');}catch(e){}});
 }
 // ── FLEET FINANCIALS (per-car daily payment, bill-driven from Stripe via Linda) ──
 function todayET(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
