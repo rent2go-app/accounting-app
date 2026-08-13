@@ -254,7 +254,7 @@ function render(){
       body+='<tr><td class="ln iname">'+(sec.income?'<span class="datechip">'+esc(it.name)+'</span>':'<input class="nm" data-nm="'+si+'|'+ii+'" value="'+esc(it.name)+'">')+'</td>';
       var rt=0;
       for(var w=0;w<W;w++){var v=+it.vals[w]||0;rt+=v;var cc=(it.cols&&it.cols[w])||'';
-        body+=linkedInc?'<td class="num linkedcell tnum">'+(v?fmtC(v):'—')+'</td>':'<td class="num'+(cc?' tinted':'')+'"'+(cc?' style="background:color-mix(in srgb,'+cc+' 20%,var(--surface))"':'')+'><input class="c" data-c="'+si+'|'+ii+'|'+w+'" value="'+v+'"><button class="cdot" data-cc="'+si+'|'+ii+'|'+w+'" style="background:'+(cc||'transparent')+'" title="Colour-tag this week’s cell (click to cycle)"></button></td>';}
+        body+=linkedInc?'<td class="num linkedcell tnum'+(cc?' tinted':'')+'"'+(cc?' style="background:color-mix(in srgb,'+cc+' 20%,var(--surface))"':'')+'>'+(v?fmtC(v):'—')+'<button class="cdot" data-cc="'+si+'|'+ii+'|'+w+'" style="background:'+(cc||'transparent')+'" title="Colour-tag — match this income to the same-colour expenses this week (click to cycle)"></button></td>':'<td class="num'+(cc?' tinted':'')+'"'+(cc?' style="background:color-mix(in srgb,'+cc+' 20%,var(--surface))"':'')+'><input class="c" data-c="'+si+'|'+ii+'|'+w+'" value="'+v+'"><button class="cdot" data-cc="'+si+'|'+ii+'|'+w+'" style="background:'+(cc||'transparent')+'" title="Colour-tag this week’s cell (click to cycle)"></button></td>';}
       body+='<td class="mtdcell">'+fmtC(rt)+'</td>';
       body+='<td class="ln" style="min-width:34px">'+((sec.income)?'':'<button class="delrow" data-delrow="'+si+'|'+ii+'" title="Remove line">×</button>')+'</td></tr>';
     });
