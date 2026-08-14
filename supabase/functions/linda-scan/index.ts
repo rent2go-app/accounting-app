@@ -6,6 +6,9 @@
 const SB = Deno.env.get("SUPABASE_URL")!;
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ACCTS = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]"); // [{label,key,portal}]
+// Per-account customer-portal login links, keyed by account_label. Additive override so a portal can be
+// set/corrected without needing to read/rewrite the whole LINDA_ACCOUNTS secret. Wins over acc.portal.
+const PORTAL_OVERRIDES: Record<string, string> = (() => { try { return JSON.parse(Deno.env.get("PORTAL_OVERRIDES") || "{}"); } catch (_) { return {}; } })();
 const ADMINS = ["gorentaride@gmail.com", "thurstonrdavis@gmail.com", "thandobnkala@gmail.com"];
 const TZ = "America/New_York";
 
@@ -51,7 +54,7 @@ const APPREC_GEN = "Thank you for renting with Rent 2 Go. ";
 const LATEFEE_NOTE = "Please note that a $10 late fee has been applied to your past-due balance. Please settle your account promptly to avoid further charges or an interruption to your rental.";
 
 async function scanAccount(acc: any) {
-  const LABEL = acc.label, SKEY = acc.key, FOOTER = footer(acc.portal || "");
+  const LABEL = acc.label, SKEY = acc.key, FOOTER = footer(PORTAL_OVERRIDES[acc.label] || acc.portal || "");
   const aL = "account_label=eq." + enc(LABEL);
   const MID = enc(midnightISO);
   // DAILY RESET (each day starts fresh; TODAY's sent/reviewed are preserved, skipped left to the 3-day snooze):
