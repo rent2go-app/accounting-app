@@ -5,7 +5,11 @@
 
 const SB = Deno.env.get("SUPABASE_URL")!;
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ACCTS = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]"); // [{label,key,portal}]
+// Billing accounts = LINDA_ACCOUNTS plus an additive LINDA_ACCOUNTS_EXTRA (merged by label) so a newly
+// onboarded account can be swept daily — late fees + notices — without rewriting the main secret.
+const _ACCTS_BASE = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]"); // [{label,key,portal}]
+const _ACCTS_EXTRA = (() => { try { return JSON.parse(Deno.env.get("LINDA_ACCOUNTS_EXTRA") || "[]"); } catch (_) { return []; } })();
+const ACCTS = (() => { const byLabel: Record<string, any> = {}; for (const a of [..._ACCTS_BASE, ..._ACCTS_EXTRA]) { if (a && a.label && a.key) byLabel[a.label] = a; } return Object.values(byLabel); })();
 // Per-account customer-portal login links, keyed by account_label. Additive override so a portal can be
 // set/corrected without needing to read/rewrite the whole LINDA_ACCOUNTS secret. Wins over acc.portal.
 const PORTAL_OVERRIDES: Record<string, string> = (() => { try { return JSON.parse(Deno.env.get("PORTAL_OVERRIDES") || "{}"); } catch (_) { return {}; } })();
