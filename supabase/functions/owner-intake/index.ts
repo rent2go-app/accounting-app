@@ -4,7 +4,7 @@
 // Auth: verify_jwt=false — guarded by the shared RENTER_INTAKE_TOKEN. owners.html then reviews/approves them.
 const SB = Deno.env.get("SUPABASE_URL")!;
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ACCTS = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]");
+const ACCTS=(()=>{const _b=JSON.parse(Deno.env.get("LINDA_ACCOUNTS")||"[]");let _e=[];try{_e=JSON.parse(Deno.env.get("LINDA_ACCOUNTS_EXTRA")||"[]");}catch(_){}const _m={};for(const a of [..._b,..._e]){if(a&&a.label&&a.key)_m[a.label]=a;}return Object.values(_m);})(); // LINDA_ACCOUNTS + additive EXTRA
 const INTAKE_TOKEN = Deno.env.get("RENTER_INTAKE_TOKEN") || "";
 const DEFAULT_ACCT = "RENT 2 GO - 1.0";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-intake-token", "Access-Control-Allow-Methods": "POST, OPTIONS" };

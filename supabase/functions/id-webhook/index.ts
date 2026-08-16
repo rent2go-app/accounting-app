@@ -13,7 +13,7 @@
 const SB = Deno.env.get("SUPABASE_URL")!;
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WHSEC = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
-const ACCTS = JSON.parse(Deno.env.get("LINDA_ACCOUNTS") || "[]");
+const ACCTS=(()=>{const _b=JSON.parse(Deno.env.get("LINDA_ACCOUNTS")||"[]");let _e=[];try{_e=JSON.parse(Deno.env.get("LINDA_ACCOUNTS_EXTRA")||"[]");}catch(_){}const _m={};for(const a of [..._b,..._e]){if(a&&a.label&&a.key)_m[a.label]=a;}return Object.values(_m);})(); // LINDA_ACCOUNTS + additive EXTRA
 const DEFAULT_ACCT = "RENT 2 GO - 1.0";
 const ADMIN_NOTIFY = Deno.env.get("ADMIN_NOTIFY") || "gorentaride@gmail.com";
 const enc = encodeURIComponent;
