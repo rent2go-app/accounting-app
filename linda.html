@@ -377,14 +377,19 @@ async function load(){
 }
 // Refresh just the invoice/fee ledger data (re-pull from DB) and re-stamp the "last refreshed" time.
 async function refreshLedger(btn){
-  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='🔄 Re-pulling from Stripe… (~30–60s)';
+  var o=btn.innerHTML;btn.disabled=true;btn.innerHTML='🔄 Sweeping ALL accounts… (up to a few min)';
   try{
-    var r=await sb.functions.invoke('linda-scan');   // re-audit all accounts so account changes are picked up
+    var r=await sb.functions.invoke('linda-scan');   // re-audit all accounts so payments/changes are picked up
     if(r.error)throw r.error;
     await load();
-    toast('Ledger re-audited & refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');
+    toast('All accounts re-audited & refreshed ✓ '+shortET(LEDGER_REFRESHED)+' ET');
   }
-  catch(e){alert('Refresh failed: '+(e.message||e));}
+  catch(e){
+    // Sweeping every account can take longer than the browser will wait — the scan usually still finishes
+    // server-side. Reload what we have and tell the user to re-tap shortly if a fresh payment is missing.
+    try{await load();}catch(_){}
+    toast('Sweep still finishing — showing latest. If a recent payment is missing, tap again in ~1 min. (Tip: use a fleet’s 🔄 Audit Sweep for an instant single-account refresh.)');
+  }
   finally{btn.disabled=false;btn.innerHTML=o;}
 }
 // ---------- Payment Trends report (is Linda working?) ----------

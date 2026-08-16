@@ -70,7 +70,13 @@ async function scanAccount(acc: any) {
   await sbDel(`linda_drafts?${aL}&status=eq.skipped&skipped_at=lt.${enc(cutoffISO)}`);
   await sbDel(`linda_drafts?${aL}&status=eq.skipped&skipped_at=is.null`);
   const skipset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&status=eq.skipped`)).map((r: any) => r.customer_id));
-  const keepset = new Set((await sbGet(`linda_drafts?select=customer_id&${aL}&or=(sent_at.gte.${enc(midnightISO)},reviewed_at.gte.${enc(midnightISO)})`)).map((r: any) => r.customer_id));
+  // keepMap: customer_id -> epoch(ms) of the latest sent/reviewed notice TODAY. We keep those notices as-is
+  // (don't regenerate) UNLESS the customer has since made a payment — see paidAfterKept below.
+  const keepMap: Record<string, number> = {};
+  (await sbGet(`linda_drafts?select=customer_id,sent_at,reviewed_at&${aL}&or=(sent_at.gte.${enc(midnightISO)},reviewed_at.gte.${enc(midnightISO)})`)).forEach((r: any) => {
+    const t = Math.max(Date.parse(r.sent_at || "") || 0, Date.parse(r.reviewed_at || "") || 0);
+    if (r.customer_id) keepMap[r.customer_id] = Math.max(keepMap[r.customer_id] || 0, t);
+  });
   // Read EVERY customer's plan flag for this account so the sweep carries it FORWARD verbatim.
   // on_plan/plan_terms are set by the admin (dashboard toggle) and must survive every upsert —
   // we re-write them with their existing values so the badge can never flip off on a scan.
@@ -101,6 +107,12 @@ async function scanAccount(acc: any) {
     const em = (planExisting[cid] && planExisting[cid].email_override) || c.email || "";
     const allinv = await stripeAll(`https://api.stripe.com/v1/invoices?customer=${cid}&limit=100`, SKEY);
     for (const i of allinv) { if (i.status === "paid") { const pat = i.status_transitions?.paid_at || 0; if (pat && etYMD(pat) === todaystr) payments.push({ invoice_id: i.id, account_label: LABEL, customer_id: cid, customer_name: nm, amount: Math.round((i.amount_paid || 0) / 100 * 100) / 100, paid_at: etISO(pat), invoice_number: i.number || i.id, kind: isLateFee(i) ? "latefee" : "rental", updated_at: nowISO }); } }
+    // If this customer PAID after we sent/reviewed today's notice, that notice is stale — delete it so the
+    // sweep regenerates a fresh one (paid invoices fall off). Fixes "I paid but the old past-due line won't
+    // clear on a re-sweep". paidAfterKept also lets the draft.push below regenerate despite the keep.
+    const keptTs = keepMap[cid] || 0;
+    const paidAfterKept = keptTs > 0 && payments.some((p: any) => p.customer_id === cid && (Date.parse(p.paid_at) || 0) > keptTs);
+    if (paidAfterKept) await sbDel(`linda_drafts?${aL}&customer_id=eq.${enc(cid)}&created_at=gte.${MID}`);
     const inv = allinv.filter((i: any) => i.status === "open" && (i.amount_remaining || 0) > 0);
     const paidrecent = allinv.some((i: any) => i.status === "paid" && ((i.status_transitions?.paid_at || 0) > (now - 7 * 86400)));
     const existing_fee_dates = new Set(allinv.filter((i: any) => isLateFee(i) && i.created).map((i: any) => etYMD(i.created)));
@@ -275,7 +287,7 @@ async function scanAccount(acc: any) {
       closing = `Please have the balance settled by ${gl}, as agreed. If anything changes before then, let us know.`;
     }
     const body = intro + "\n\n" + pd_lines + "\n\n" + closing + "\n\nThank you.\n\nRent 2 Go" + FOOTER;
-    if (!skipset.has(cid) && !keepset.has(cid)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
+    if (!skipset.has(cid) && (!keptTs || paidAfterKept)) drafts.push({ account_label: LABEL, customer_id: cid, customer_name: nm, email: em, phone: ph, kind, channel: "email", subject: subj, body, amount: Math.round(pd_total * 100) / 100, status: "draft" });
     custs.push({ account_label: LABEL, customer_id: cid, name: nm, email: em, phone: ph, sub_status: substatus, open_count: inv.length, pastdue_count: rental_pd.length, outstanding: Math.round(pd_total * 100) / 100, state, flag, disconnect_notice_at: dnote, on_plan: onPlan, plan_terms: onPlan ? (planExisting[cid] && planExisting[cid].plan_terms) : null, plan_paid_rentals: planPaidR, plan_paid_latefees: planPaidLF, plan_behind_days: behindDays, plan_last_behind_day: lastBehindDay, updated_at: nowISO });
   }));
 
