@@ -300,8 +300,10 @@ function undo(){if(!HIST.length)return;STATE=JSON.parse(HIST.pop());scheduleSave
 function updateUndo(){var b=document.getElementById('undoBtn');if(b)b.disabled=!HIST.length;}
 function stripeFor(label){var g=0,f=0,n=0,p=0,fi=0,fo=0;if(label)STRIPEROWS.forEach(function(r){if(r.label===label&&String(r.day).slice(0,7)===YM){g+=+r.gross||0;f+=+r.fee||0;n+=+r.net||0;p+=+r.payout||0;fi+=+r.fin_in||0;fo+=+r.fin_out||0;}});return {g:r2(g),f:r2(f),n:r2(n),p:r2(p),fi:r2(fi),fo:r2(fo),pn:r2(p-fi)};}
 function stripeStrip(o){var sl=o.stripeLabel||'';var s=stripeFor(sl);var oi=STATE.indexOf(o);var labels=[];STRIPEROWS.forEach(function(r){if(labels.indexOf(r.label)<0)labels.push(r.label);});labels.sort();var opts='<option value="">— link Stripe account —</option>'+labels.map(function(L){return '<option value="'+esc(L)+'"'+(L===sl?' selected':'')+'>'+esc(L)+'</option>';}).join('');if(sl&&labels.indexOf(sl)<0)opts+='<option value="'+esc(sl)+'" selected>'+esc(sl)+' (no data)</option>';return '<div class="ostripe"><span class="pill">🔗 Stripe</span><select class="slabel" data-slabel="'+oi+'">'+opts+'</select><div class="sgrid"><div class="sfig"><div class="l">Gross · '+fmtYM(YM)+'</div><div class="v tnum">'+fmt(s.g)+'</div></div><div class="sfig"><div class="l">Stripe fees</div><div class="v tnum neg">'+fmt(s.f)+'</div></div><div class="sfig"><div class="l">Net earnings</div><div class="v tnum pos">'+fmt(s.n)+'</div></div><div class="sfig"><div class="l">Paid out'+(s.fi>0?' (excl. loan)':' (payouts)')+'</div><div class="v tnum">'+fmt(s.pn)+'</div></div>'+(s.fi>0?'<div class="sfig"><div class="l">Stripe Capital loan</div><div class="v tnum neg">'+fmt(s.fi)+'</div></div>':'')+'</div></div>';}
-const MAINT_CATS=['Service / Inspection','Oil Change','Tires','Wheels / Alignment','Brakes','Lights','Battery','Engine','Transmission','Suspension','Body Work','Windshield / Glass','Electrical','A/C & Cooling','Exhaust','Fluids / Filters','Cleaning / Detailing','Registration / Licensing','Insurance','Towing / Roadside','Accident Repair','Major Repair','Parts','Labour','Other'];
-function maintCatOpts(sel){return '<option value="">— type —</option>'+MAINT_CATS.map(function(c){return '<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(c)+'</option>';}).join('');}
+// Shared with the ledger sheet: the FIRST group mirrors the ledger's vehicle/operating categories so the
+// "type" here matches exactly what you tag once in the ledger (no double-tagging). The rest are extra detail.
+const MAINT_CATS=['Maintenance & Repairs','Fuel & Oil','Tyres & Brakes','Servicing','Licensing & Compliance','Subscriptions & Software','Service / Inspection','Oil Change','Tires','Wheels / Alignment','Brakes','Lights','Battery','Engine','Transmission','Suspension','Body Work','Windshield / Glass','Electrical','A/C & Cooling','Exhaust','Fluids / Filters','Cleaning / Detailing','Registration / Licensing','Insurance','Towing / Roadside','Accident Repair','Major Repair','Parts','Labour','Other'];
+function maintCatOpts(sel){return '<option value="">— type —</option>'+MAINT_CATS.map(function(c){return '<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(c)+'</option>';}).join('')+((sel&&MAINT_CATS.indexOf(sel)<0)?'<option value="'+esc(sel)+'" selected>'+esc(sel)+'</option>':'');}
 function maintYM(o){return r2((o.maint||[]).reduce(function(s,x){return s+((String(x.date||'').slice(0,7)===YM)?(+x.cost||0):0);},0));}
 function maintTotal(o){return r2((o.maint||[]).reduce(function(s,x){return s+(+x.cost||0);},0));}
 function maintChips(obj){var ks=Object.keys(obj);if(!ks.length)return '<span class="hint">none in '+fmtYM(YM)+'</span>';return ks.sort(function(a,b){return obj[b]-obj[a];}).map(function(k){return '<span class="mchip">'+esc(k)+' <b>'+fmt(r2(obj[k]))+'</b></span>';}).join('');}
@@ -315,7 +317,7 @@ async function importLedgerMaint(){
   var toD=new Date();var to=toD.toISOString().slice(0,10);var fd=new Date();fd.setDate(fd.getDate()-45);var from=fd.toISOString().slice(0,10);
   var res=await sb.from('day_blocks').select('day,expenses').gte('day',from).lte('day',to).order('day',{ascending:false});
   if(res.error){alert('Could not load ledger: '+res.error.message);return;}
-  var items=[];(res.data||[]).forEach(function(r){(r.expenses||[]).forEach(function(e){var cat=(e&&e[2])||'';if(/mainten|repair/i.test(cat)){items.push({day:r.day,desc:e[0]||'',amount:r2(+e[1]||0),carId:(e&&e[5])||''});}});});
+  var items=[];(res.data||[]).forEach(function(r){(r.expenses||[]).forEach(function(e){var cat=(e&&e[2])||'';var _cid=(e&&e[5])||'';if(_cid||/mainten|repair/i.test(cat)){items.push({day:r.day,desc:e[0]||'',amount:r2(+e[1]||0),carId:_cid,cat:cat});}});});
   var CARMAP={};STATE.forEach(function(o,oi){(o.cars||[]).forEach(function(c){if(c.id)CARMAP[c.id]={oi:oi};});});
   var matchedN=items.filter(function(it){return it.carId&&CARMAP[it.carId];}).length;
   if(!items.length){alert('No maintenance items found in the ledger for the last 45 days.');return;}
@@ -331,7 +333,7 @@ async function importLedgerMaint(){
   IMPITEMS=items;
   document.querySelectorAll('[data-impown]').forEach(function(sel){sel.onchange=function(){var i=sel.dataset.impown;var carSel=document.querySelector('[data-impcar="'+i+'"]');if(sel.value===''){carSel.innerHTML='<option value="">— car —</option>';return;}var o=STATE[+sel.value];carSel.innerHTML='<option value="">— car —</option>'+(o.cars||[]).map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name||c.plate||'car')+'</option>';}).join('');};});
   document.getElementById('impCancel').onclick=function(){document.getElementById('modalHost').innerHTML='';};
-  document.getElementById('impDo').onclick=function(){snap();var count=0;document.querySelectorAll('[data-impown]').forEach(function(sel){if(sel.value==='')return;var i=+sel.dataset.impown;var o=STATE[+sel.value];var carSel=document.querySelector('[data-impcar="'+i+'"]');var carId=carSel?carSel.value:'';var it=IMPITEMS[i];o.maint=o.maint||[];var dup=o.maint.some(function(m){return m.fromLedger&&m.date===it.day&&r2(+m.cost||0)===it.amount&&(m.desc||'')===(it.desc||'');});if(dup)return;o.maint.push({id:uid('m_'),date:it.day,carId:carId,cat:'Maintenance & Repairs',desc:it.desc,mileage:null,cost:it.amount,fromLedger:true});count++;});scheduleSave();render();document.getElementById('modalHost').innerHTML='';toast('Imported '+count+' maintenance item(s) to owner cards ✓');};
+  document.getElementById('impDo').onclick=function(){snap();var count=0;document.querySelectorAll('[data-impown]').forEach(function(sel){if(sel.value==='')return;var i=+sel.dataset.impown;var o=STATE[+sel.value];var carSel=document.querySelector('[data-impcar="'+i+'"]');var carId=carSel?carSel.value:'';var it=IMPITEMS[i];o.maint=o.maint||[];var dup=o.maint.some(function(m){return m.fromLedger&&m.date===it.day&&r2(+m.cost||0)===it.amount&&(m.desc||'')===(it.desc||'');});if(dup)return;o.maint.push({id:uid('m_'),date:it.day,carId:carId,cat:it.cat||'Maintenance & Repairs',desc:it.desc,mileage:null,cost:it.amount,fromLedger:true});count++;});scheduleSave();render();document.getElementById('modalHost').innerHTML='';toast('Imported '+count+' maintenance item(s) to owner cards ✓');};
 }
 var IMPITEMS=[];
 // AUTO-LINK ledger maintenance → owners. Runs on load: any ledger expense tagged as maintenance/repair AND
@@ -349,7 +351,7 @@ async function autoIngestLedgerMaint(){
     var CARMAP={};STATE.forEach(function(o,oi){(o.cars||[]).forEach(function(c){if(c.id)CARMAP[c.id]=oi;});});
     var added=0,changed=false;
     res.data.forEach(function(r){(r.expenses||[]).forEach(function(e){
-      var cat=(e&&e[2])||'';if(!/mainten|repair/i.test(cat))return;
+      var cat=(e&&e[2])||'';   // the ledger CATEGORY becomes the owner maintenance "type" — no re-tagging
       var carId=(e&&e[5])||'';if(!carId)return;
       var oi=CARMAP[carId];if(oi===undefined||oi===null)return;
       var amt=r2(+e[1]||0);if(amt<=0)return;
@@ -362,7 +364,7 @@ async function autoIngestLedgerMaint(){
       var dup=o.maint.some(function(m){return m.date===r.day&&r2(+m.cost||0)===amt&&(m.desc||'')===desc&&(m.carId||'')===carId;});
       o.ledgerSeen.push(key);changed=true;
       if(dup)return;                                          // an earlier import already has it
-      o.maint.push({id:uid('m_'),date:r.day,carId:carId,cat:'Maintenance & Repairs',desc:desc,mileage:null,cost:amt,fromLedger:true});
+      o.maint.push({id:uid('m_'),date:r.day,carId:carId,cat:cat||'Maintenance & Repairs',desc:desc,mileage:null,cost:amt,fromLedger:true});
       added++;
     });});
     if(changed)scheduleSave();
