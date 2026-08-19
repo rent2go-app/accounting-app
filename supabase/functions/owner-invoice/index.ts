@@ -11,6 +11,7 @@ const DEFAULT_ACCT = "RENT 2 GO LLC 2.0";
 function keyFor(label: string) { const a = ACCTS.find((x: any) => x.label === label); return a ? a.key : null; }
 async function stripeGET(url: string, key: string) { const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
 async function stripeForm(url: string, form: URLSearchParams, key: string) { const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form }); return await r.json(); }
+async function stripeDELETE(url: string, key: string) { const r = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${key}` } }); return await r.json(); }
 function json(o: any, status = 200) { return new Response(JSON.stringify(o), { status, headers: { ...CORS, "Content-Type": "application/json" } }); }
 
 Deno.serve(async (req) => {
@@ -40,6 +41,32 @@ Deno.serve(async (req) => {
       return json({ ok: true, invoices: out });
     }
 
+    // VOID / REVERSE / DELETE — reverse an owner invoice in Stripe (so deleting here deletes there too).
+    // draft -> delete · open/uncollectible -> void · paid -> refund the payment. Returns the resulting state.
+    if (body.action === "void") {
+      const skey = keyFor(label); if (!skey) return json({ error: "no Stripe key for account " + label });
+      const id = body.invoice_id; if (!id) return json({ error: "invoice_id required" });
+      const iv = await stripeGET(`https://api.stripe.com/v1/invoices/${id}`, skey);
+      if (iv.error || !iv.id) return json({ error: "invoice not found in Stripe: " + (iv.error?.message || id) });
+      if (iv.status === "draft") {
+        const d = await stripeDELETE(`https://api.stripe.com/v1/invoices/${id}`, skey);
+        if (d.error) return json({ error: "delete draft: " + d.error.message });
+        return json({ ok: true, invoice_id: id, result: "deleted", status: "deleted" });
+      }
+      if (iv.status === "open" || iv.status === "uncollectible") {
+        const v = await stripeForm(`https://api.stripe.com/v1/invoices/${id}/void`, new URLSearchParams({}), skey);
+        if (v.error) return json({ error: "void: " + v.error.message });
+        return json({ ok: true, invoice_id: id, result: "voided", status: v.status });
+      }
+      if (iv.status === "paid") {
+        const pi = iv.payment_intent; if (!pi) return json({ error: "paid invoice has no linked payment to refund" });
+        const rf = await stripeForm(`https://api.stripe.com/v1/refunds`, new URLSearchParams({ payment_intent: String(pi) }), skey);
+        if (rf.error) return json({ error: "refund: " + rf.error.message });
+        return json({ ok: true, invoice_id: id, result: "refunded", status: "refunded", refund_id: rf.id, amount: (rf.amount || 0) / 100 });
+      }
+      return json({ error: "cannot reverse an invoice in status: " + iv.status });
+    }
+
     const key = keyFor(label);
     if (!key) return json({ error: "no Stripe key for account " + label });
     const email = String(body.owner?.email || "").trim();
@@ -59,7 +86,10 @@ Deno.serve(async (req) => {
     const inv = await stripeForm("https://api.stripe.com/v1/invoices", new URLSearchParams({
       customer: customer.id, collection_method: "send_invoice", days_until_due: days, auto_advance: "false",
       pending_invoice_items_behavior: "exclude", description: body.memo || "Fleet maintenance — Rent 2 Go",
-      "metadata[r2g_owner_maint]": "true",
+      // Tags so the payment is recognised as OWNERS INCOME when it lands, and booked to the ledger's
+      // Income-lines side (not the Stripe deposits / car-payments side).
+      "metadata[r2g_owner_maint]": "true", "metadata[r2g_income_type]": "owners_income",
+      footer: "Owners Income — Rent 2 Go",
     }), key);
     if (inv.error) return json({ error: "create invoice: " + (inv.error.message || JSON.stringify(inv.error)) });
 
