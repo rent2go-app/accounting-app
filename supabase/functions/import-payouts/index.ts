@@ -32,6 +32,27 @@ async function stripeAll(base: string, key: string) {
   }
   return out;
 }
+// OWNERS INCOME by ledger-day — sum the NET of every charge (in the window) whose invoice is tagged
+// r2g_income_type=owners_income. Filtering balance-transactions by DATE works for instant payouts (filtering
+// by payout does not). Returns { "YYYY-MM-DD": ownerNet }. Used to move owner income to the Income-lines side.
+async function ownerIncomeByDay(key: string, from: number) {
+  const byDay: Record<string, number> = {};
+  let sa: string | null = null, guard = 0;
+  while (guard++ < 40) {
+    const url = `https://api.stripe.com/v1/invoices?status=paid&limit=100&created%5Bgte%5D=${from}` + (sa ? `&starting_after=${sa}` : "");
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${key}`, "User-Agent": "import-payouts" } });
+    const d = await r.json(); const rows = d.data || [];
+    for (const inv of rows) {
+      if (inv.metadata && (inv.metadata.r2g_income_type === "owners_income" || inv.metadata.r2g_owner_maint === "true")) {
+        const pat = inv.status_transitions && inv.status_transitions.paid_at;
+        if (pat) { const day = etYMD(pat); byDay[day] = (byDay[day] || 0) + (inv.amount_paid || 0) / 100; }   // gross owner payment
+      }
+    }
+    if (d.has_more && rows.length) sa = rows[rows.length - 1].id; else break;
+  }
+  for (const k in byDay) byDay[k] = Math.round(byDay[k] * 100) / 100;
+  return byDay;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -64,25 +85,40 @@ Deno.serve(async (req) => {
       }
     }
 
-    const days = Object.keys(byDay).sort();
+    // OWNERS INCOME per ledger-day, from the 2.0 account's tagged charges (works for instant payouts).
+    const ownerByDay: Record<string, number> = {};
+    const acc20: any = ACCTS.find((a: any) => a.label === "RENT 2 GO LLC 2.0");
+    if (acc20 && acc20.key) { try { Object.assign(ownerByDay, await ownerIncomeByDay(acc20.key, from)); } catch (_) { /* leave empty */ } }
+
+    const days = Array.from(new Set([...Object.keys(byDay), ...Object.keys(ownerByDay)])).sort();
     let added = 0, skipped = 0;
-    const perDay: Record<string, { added: number; total: number }> = {};
+    const perDay: Record<string, { added: number; total: number; owner: number }> = {};
     for (const day of days) {
       const rows = await sbGet(`day_blocks?day=eq.${day}&select=day,deposits,income,expenses`);
       const row = rows[0] || { day, deposits: [], income: [], expenses: [] };
-      const deposits = (row.deposits || []).slice();          // green "Daily deposits" section (Stripe transfers)
-      const have = new Set(deposits.filter((x: any) => x && typeof x === "object" && x.ref).map((x: any) => x.ref));
+      let deposits = (row.deposits || []).slice();            // "Daily deposits" — CAR payments (per transfer)
+      let income = (row.income || []).slice();                // Income-lines side — Owners Income lands here
+      const haveDep = new Set(deposits.filter((x: any) => x && typeof x === "object" && x.ref).map((x: any) => x.ref));
       let dAdded = 0, dTot = 0;
-      for (const pay of byDay[day]) {
-        const ref = "sp:" + pay.id;
-        dTot += pay.amount;
-        if (have.has(ref)) { skipped++; continue; }            // already imported — never duplicate
-        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });   // object = auto-imported, marked ⚡ + stamp in UI
-        have.add(ref); added++; dAdded++;
+      for (const pay of (byDay[day] || [])) {
+        const ref = "sp:" + pay.id; dTot += pay.amount;
+        if (haveDep.has(ref)) { skipped++; continue; }         // already imported — never duplicate
+        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });   // full payout (car)
+        haveDep.add(ref); added++; dAdded++;
       }
-      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100 };
-      await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits, income: row.income || [], expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
+      // Book OWNERS INCOME as an Income line, and net the SAME amount out of the deposits (a single
+      // reclass line) so the deposits side reads as car payments only. Recomputed each run so it stays
+      // correct as more owner payments land the same day.
+      const O = ownerByDay[day] || 0;
+      income = income.filter((l: any) => !(Array.isArray(l) && l[4] === "oi:" + day));
+      deposits = deposits.filter((x: any) => !(x && x.ref === "oir:" + day));
+      if (O > 0.005) {
+        income.push(["Owners Income — Stripe 2.0", O, "Owners Income", "", "oi:" + day]);
+        deposits.push({ a: -O, ref: "oir:" + day, lbl: "less: Owners Income → Income lines", ts: "", src: "stripe" });
+      }
+      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100, owner: O };
+      await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits, income, expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
     }
-    return json({ ok: true, from, days, added, skipped, perDay, perAcct });
+    return json({ ok: true, from, days, added, skipped, perDay, perAcct, ownerByDay });
   } catch (e) { return json({ error: String(e) }, 500); }
 });

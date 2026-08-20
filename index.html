@@ -409,7 +409,7 @@ const KNOWN=new Set(ECATS);
 let CATSEG={};let OWNERSAL=12000;
 function segOf(c){if(CATSEG[c])return CATSEG[c];var s=SEGS.find(function(x){return x.cats.indexOf(c)>=0;});return s?s.k:'other';}
 function allCats(){var set={};ECATS.forEach(function(c){set[c]=1;});Object.keys(CATSEG).forEach(function(c){set[c]=1;});DK.forEach(function(d){(MD[d].e||[]).forEach(function(l){if(l[2]&&l[2]!=='Adjustment')set[l[2]]=1;});});return Object.keys(set).sort();}
-const ICATS=['Stripe Income','John Payment','Telco','Vehicle Sale','Capital / Loan','Other Income'];
+const ICATS=['Stripe Income','Owners Income','John Payment','Telco','Vehicle Sale','Capital / Loan','Other Income'];
 const CATCOL={'Staff & Payroll':'#2563eb','Owner Payouts':'#7c3aed','Maintenance & Repairs':'#0891b2','Fuel & Oil':'#0ea5b7','Tyres & Brakes':'#0e7490','Servicing':'#0369a1','Licensing & Compliance':'#1d4ed8','Insurance':'#0d9488','Subscriptions & Software':'#4f46e5','Owner Draw':'#db2777','SA Salaries':'#be185d','School & Education':'#9d174d','Rent & Housing':'#e11d48','Groceries & Household':'#f43f5e','Allowances':'#fb7185','Utilities':'#c026d3','Home & Personal':'#d97706','Savings & Moving':'#ec4899','MMF Foundation':'#52616f','Financing & Fees':'#dc2626','Other':'#0ea5e9','New':'#38bdf8','Draws & Transfers':'#0891b2'};
 const PAL=['','#ef4444','#f59e0b','#eab308','#22c55e','#3b82f6','#a855f7','#64748b'];
 const fmt=a=>{const n=(+a||0);return (n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})};
