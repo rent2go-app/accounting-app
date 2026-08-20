@@ -85,14 +85,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // OWNERS INCOME per ledger-day, from the 2.0 account's tagged charges (works for instant payouts).
-    const ownerByDay: Record<string, number> = {};
-    const acc20: any = ACCTS.find((a: any) => a.label === "RENT 2 GO LLC 2.0");
-    if (acc20 && acc20.key) { try { Object.assign(ownerByDay, await ownerIncomeByDay(acc20.key, from)); } catch (_) { /* leave empty */ } }
-
-    const days = Array.from(new Set([...Object.keys(byDay), ...Object.keys(ownerByDay)])).sort();
+    // Owner-income reclass RETIRED (2026-08-20): the import brings in ACTUAL CASH payouts only, never the
+    // invoiced owner amount. Owner cash already arrives as a normal Stripe payout transfer, so booking it
+    // again as an "Owners Income" line + a negative reconciler triple-counted and confused the ledger
+    // (invoiced gross also never matched the net cash). ownerIncomeByDay() above is now unused.
+    const days = Array.from(new Set(Object.keys(byDay))).sort();
     let added = 0, skipped = 0;
-    const perDay: Record<string, { added: number; total: number; owner: number }> = {};
+    const perDay: Record<string, { added: number; total: number }> = {};
     for (const day of days) {
       const rows = await sbGet(`day_blocks?day=eq.${day}&select=day,deposits,income,expenses`);
       const row = rows[0] || { day, deposits: [], income: [], expenses: [] };
@@ -106,19 +105,13 @@ Deno.serve(async (req) => {
         deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });   // full payout (car)
         haveDep.add(ref); added++; dAdded++;
       }
-      // Book OWNERS INCOME as an Income line, and net the SAME amount out of the deposits (a single
-      // reclass line) so the deposits side reads as car payments only. Recomputed each run so it stays
-      // correct as more owner payments land the same day.
-      const O = ownerByDay[day] || 0;
-      income = income.filter((l: any) => !(Array.isArray(l) && l[4] === "oi:" + day));
-      deposits = deposits.filter((x: any) => !(x && x.ref === "oir:" + day));
-      if (O > 0.005) {
-        income.push(["Owners Income — Stripe 2.0", O, "Owners Income", "", "oi:" + day]);
-        deposits.push({ a: -O, ref: "oir:" + day, lbl: "less: Owners Income → Income lines", ts: "", src: "stripe" });
-      }
-      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100, owner: O };
+      // Self-heal: strip any legacy owner-income line + its negative reconciler left by the old reclass,
+      // so every re-imported day cleans itself. No owner booking is ever re-added — cash payouts only.
+      income = income.filter((l: any) => !(Array.isArray(l) && typeof l[4] === "string" && l[4].startsWith("oi:")));
+      deposits = deposits.filter((x: any) => !(x && typeof x.ref === "string" && x.ref.startsWith("oir:")));
+      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100 };
       await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits, income, expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
     }
-    return json({ ok: true, from, days, added, skipped, perDay, perAcct, ownerByDay });
+    return json({ ok: true, from, days, added, skipped, perDay, perAcct });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
