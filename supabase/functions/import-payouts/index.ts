@@ -32,11 +32,14 @@ async function stripeAll(base: string, key: string) {
   }
   return out;
 }
-// OWNERS INCOME by ledger-day — sum the NET of every charge (in the window) whose invoice is tagged
-// r2g_income_type=owners_income. Filtering balance-transactions by DATE works for instant payouts (filtering
-// by payout does not). Returns { "YYYY-MM-DD": ownerNet }. Used to move owner income to the Income-lines side.
-async function ownerIncomeByDay(key: string, from: number) {
-  const byDay: Record<string, number> = {};
+// OWNER PAYMENTS by ledger-day — the gross amount of every paid invoice (in the window) tagged
+// r2g_income_type=owners_income (or r2g_owner_maint), returned as a per-day ARRAY (a consumable pool).
+// We use these to recognise which Stripe PAYOUTS are owner payments (by amount) so those payouts book as
+// Owners Income on the Income-lines side instead of as car deposits. Matching is by amount within a fee
+// tolerance because the payout is net of Stripe + instant-payout fees. Filtering by DATE works for instant
+// payouts (filtering balance-transactions by payout does not — that only works for automatic transfers).
+async function ownerAmountsByDay(key: string, from: number) {
+  const byDay: Record<string, number[]> = {};
   let sa: string | null = null, guard = 0;
   while (guard++ < 40) {
     const url = `https://api.stripe.com/v1/invoices?status=paid&limit=100&created%5Bgte%5D=${from}` + (sa ? `&starting_after=${sa}` : "");
@@ -45,12 +48,14 @@ async function ownerIncomeByDay(key: string, from: number) {
     for (const inv of rows) {
       if (inv.metadata && (inv.metadata.r2g_income_type === "owners_income" || inv.metadata.r2g_owner_maint === "true")) {
         const pat = inv.status_transitions && inv.status_transitions.paid_at;
-        if (pat) { const day = etYMD(pat); byDay[day] = (byDay[day] || 0) + (inv.amount_paid || 0) / 100; }   // gross owner payment
+        if (!pat) continue;
+        const day = etYMD(pat);
+        const gross = (inv.amount_paid || 0) / 100;
+        if (gross > 0) (byDay[day] = byDay[day] || []).push(gross);
       }
     }
     if (d.has_more && rows.length) sa = rows[rows.length - 1].id; else break;
   }
-  for (const k in byDay) byDay[k] = Math.round(byDay[k] * 100) / 100;
   return byDay;
 }
 
@@ -85,33 +90,54 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Owner-income reclass RETIRED (2026-08-20): the import brings in ACTUAL CASH payouts only, never the
-    // invoiced owner amount. Owner cash already arrives as a normal Stripe payout transfer, so booking it
-    // again as an "Owners Income" line + a negative reconciler triple-counted and confused the ledger
-    // (invoiced gross also never matched the net cash). ownerIncomeByDay() above is now unused.
-    const days = Array.from(new Set(Object.keys(byDay))).sort();
-    let added = 0, skipped = 0;
-    const perDay: Record<string, { added: number; total: number }> = {};
+    // OWNERS INCOME per ledger-day (NET cash), from the 2.0 account's owner-tagged invoices. The 2.0
+    // account carries BOTH car payouts and owner payments; this moves only the owner-tagged NET cash to
+    // the Income-lines side so the deposits/right side reads as car payments.
+    const ownerAmtsByDay: Record<string, number[]> = {};
+    const acc20: any = ACCTS.find((a: any) => a.label === "RENT 2 GO LLC 2.0");
+    if (acc20 && acc20.key) { try { Object.assign(ownerAmtsByDay, await ownerAmountsByDay(acc20.key, from)); } catch (_) { /* leave empty */ } }
+
+    const days = Object.keys(byDay).sort();
+    let added = 0, skipped = 0, ownerBooked = 0;
+    const perDay: Record<string, { added: number; total: number; owner: number }> = {};
     for (const day of days) {
       const rows = await sbGet(`day_blocks?day=eq.${day}&select=day,deposits,income,expenses`);
       const row = rows[0] || { day, deposits: [], income: [], expenses: [] };
       let deposits = (row.deposits || []).slice();            // "Daily deposits" — CAR payments (per transfer)
       let income = (row.income || []).slice();                // Income-lines side — Owners Income lands here
-      const haveDep = new Set(deposits.filter((x: any) => x && typeof x === "object" && x.ref).map((x: any) => x.ref));
-      let dAdded = 0, dTot = 0;
+      // Strip legacy owner reclass from earlier approaches (exact refs — so oip: owner lines are preserved).
+      income = income.filter((l: any) => !(Array.isArray(l) && l[4] === "oi:" + day));
+      deposits = deposits.filter((x: any) => !(x && x.ref === "oir:" + day));
+      const ownerPool = (ownerAmtsByDay[day] || []).slice();   // consumable — each owner invoice matches one payout
+      let dAdded = 0, dTot = 0, ownerAmt = 0;
       for (const pay of (byDay[day] || [])) {
-        const ref = "sp:" + pay.id; dTot += pay.amount;
-        if (haveDep.has(ref)) { skipped++; continue; }         // already imported — never duplicate
-        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });   // full payout (car)
-        haveDep.add(ref); added++; dAdded++;
+        const ref = "sp:" + pay.id, iref = "oip:" + pay.id;
+        // OWNER PAYOUT? — a Rent 2 Go 2.0 payout whose amount matches an owner-tagged invoice for the day
+        // (within 8% to absorb Stripe + instant-payout fees). It's an owner payment, not a car rental, so it
+        // books on the LEFT as Owners Income and is NEVER added to the car deposits on the right.
+        let ownerIdx = -1;
+        if (pay.lbl === "Rent 2 Go 2.0" && ownerPool.length) {
+          ownerIdx = ownerPool.findIndex((o) => o > 0 && Math.abs(pay.amount - o) / o <= 0.08);
+        }
+        if (ownerIdx >= 0) {
+          ownerPool.splice(ownerIdx, 1);
+          deposits = deposits.filter((x: any) => !(x && x.ref === ref));   // pull it off the right if it was booked as a car deposit before
+          if (!income.some((l: any) => Array.isArray(l) && l[4] === iref)) {
+            income.push(["Owners Income — Stripe 2.0", pay.amount, "Owners Income", "", iref]);   // actual cash paid out
+            ownerBooked++;
+          }
+          ownerAmt += pay.amount;
+          continue;
+        }
+        // CAR PAYOUT → deposits (right).
+        dTot += pay.amount;
+        if (deposits.some((x: any) => x && x.ref === ref)) { skipped++; continue; }   // already imported — never duplicate
+        deposits.push({ a: pay.amount, ref, lbl: pay.lbl, ts: pay.ts, src: "stripe" });
+        added++; dAdded++;
       }
-      // Self-heal: strip any legacy owner-income line + its negative reconciler left by the old reclass,
-      // so every re-imported day cleans itself. No owner booking is ever re-added — cash payouts only.
-      income = income.filter((l: any) => !(Array.isArray(l) && typeof l[4] === "string" && l[4].startsWith("oi:")));
-      deposits = deposits.filter((x: any) => !(x && typeof x.ref === "string" && x.ref.startsWith("oir:")));
-      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100 };
+      perDay[day] = { added: dAdded, total: Math.round(dTot * 100) / 100, owner: Math.round(ownerAmt * 100) / 100 };
       await sbPost(`day_blocks?on_conflict=day`, [{ day, deposits, income, expenses: row.expenses || [], updated_at: new Date().toISOString() }], "resolution=merge-duplicates,return=minimal");
     }
-    return json({ ok: true, from, days, added, skipped, perDay, perAcct });
+    return json({ ok: true, from, days, added, skipped, ownerBooked, perDay, perAcct, ownerAmtsByDay });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
