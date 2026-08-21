@@ -95,7 +95,13 @@
 const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL,window.R2G_CONFIG.SUPABASE_ANON_KEY);   // default storage key — shared with every other admin page
 const ADMINS=['gorentaride@gmail.com','thurstonrdavis@gmail.com','thandobnkala@gmail.com'];
 const TYPES=['Sedan','SUV','Hatchback','Van','Truck','Luxury','Electric'];
-const STATUSES=['live','pending','maintenance','retired'];
+const STATUSES=['live','pending','maintenance','accident','retired'];
+// Fleet taxonomy: live = ACTIVE (bookable). maintenance = INACTIVE (down for repairs, still a viable
+// fleet car). pending = onboarding. accident + retired = WRITTEN OFF (removed from fleet, archived — was
+// once a fleet car): accident = written off in an accident, retired = retired from service.
+const WRITEOFF=['accident','retired'];
+function fleetCounts(){var c={total:0,active:0,inactive:0,pending:0,writeoff:0,accident:0,retired:0};(CARS||[]).forEach(function(v){var s=(v.status||'').toLowerCase();if(s==='accident'){c.accident++;c.writeoff++;}else if(s==='retired'){c.retired++;c.writeoff++;}else{c.total++;if(s==='maintenance')c.inactive++;else if(s==='pending')c.pending++;else c.active++;}});return c;}
+const STATUS_LABEL={live:'Active',maintenance:'Inactive · repairs',pending:'Onboarding',accident:'Written off · accident',retired:'Retired from service'};
 let CARS=[],OWNERS=[],HEALTH={},FILTER='',SHOW='all';
 
 const $=id=>document.getElementById(id);
@@ -132,17 +138,19 @@ function render(){
   if(SHOW==='nophoto')  list=list.filter(v=>!(v.images||[]).length);
   if(SHOW==='nodocs')   list=list.filter(v=>!(v.docs&&v.docs.reg)||!(v.docs&&v.docs.ins));
   if(SHOW==='placeholder')list=list.filter(v=>v.rate_source==='placeholder');
-  if(SHOW==='live')     list=list.filter(v=>v.status==='live');
+  if(SHOW==='live'||SHOW==='active')  list=list.filter(v=>v.status==='live');
+  if(SHOW==='inactive') list=list.filter(v=>v.status==='maintenance');
+  if(SHOW==='writeoff') list=list.filter(v=>WRITEOFF.indexOf(v.status)>=0);
 
   $('main').innerHTML=
    '<div class="ctl">'
    +'<input id="q" placeholder="Search make, model, plate…" value="'+esc(FILTER)+'" style="flex:1;min-width:200px">'
-   +'<select id="show">'+[['all','All cars'],['live','Live only'],['nophoto','Missing photos'],['nodocs','Missing documents'],['placeholder','Placeholder prices']]
+   +'<select id="show">'+[['all','All cars'],['active','Active (live)'],['inactive','Inactive (repairs)'],['writeoff','Written off'],['nophoto','Missing photos'],['nodocs','Missing documents'],['placeholder','Placeholder prices']]
        .map(o=>'<option value="'+o[0]+'"'+(SHOW===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'
    +'<span class="spacer"></span><button class="btn" id="refresh">↻ Refresh</button>'
    +'<button class="btn pri" id="addcar">+ Add car</button></div>'
    +'<div class="health">'
-     +hc('Total fleet',HEALTH.total,'')+hc('Live',HEALTH.live,'ok')
+     +(function(){var f=fleetCounts();return hc('Fleet total',f.total,'')+hc('Active',f.active,'ok')+hc('Inactive · repairs',f.inactive,f.inactive?'warn':'ok')+hc('Written off',f.writeoff,'')+hc('· accident',f.accident,f.accident?'bad':'')+hc('· retired',f.retired,'');})()
      +hc('No photo',HEALTH.no_photos,HEALTH.no_photos?'bad':'ok')
      +hc('Placeholder price',HEALTH.placeholder_price,HEALTH.placeholder_price?'warn':'ok')
      +hc('No registration',HEALTH.no_registration,HEALTH.no_registration?'bad':'ok')
@@ -156,7 +164,7 @@ const hc=(l,v,c)=>'<div class="hc '+(c||'')+'"><div class="l">'+l+'</div><div cl
 
 function card(v){
   const img=(v.images||[])[0];
-  const pill=v.status!=='live'?'<span class="pill off">'+esc(v.status)+'</span>'
+  const pill=v.status!=='live'?'<span class="pill off">'+esc(STATUS_LABEL[v.status]||v.status)+'</span>'
             :(v.available?'<span class="pill live">available</span>':'<span class="pill out">rented</span>');
   return '<div class="car">'
    +'<div class="ph"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'>'+(img?'':'no photo')+pill+'</div>'
