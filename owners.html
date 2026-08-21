@@ -576,7 +576,7 @@ function render(){
     var hdr='<div class="chdr"><span>Car / plate</span><span>Discount / pays</span><span>Days</span><span></span><span style="text-align:right">Fee</span><span></span></div>';
     var open=OPEN.has(o.id);var s=stripeFor(o.stripeLabel||'');var nc=(o.cars||[]).length;var mm=maintYM(o);var netAfter=r2(s.n-mm);
     var summary='<div class="otot"><div class="l">Platform fees /mo</div><div class="v tnum">'+fmt(ot)+'</div><div class="osnap"><span class="chip earn"><span class="cl">Earned '+fmtYM(YM)+'</span><span class="cv">'+fmt(s.n)+'</span></span><span class="chip paid"><span class="cl">Paid out'+(s.fi>0?' *':'')+'</span><span class="cv">'+fmt(s.pn)+'</span></span>'+(mm?'<span class="chip net"><span class="cl">Net −maint</span><span class="cv">'+fmt(netAfter)+'</span></span>':'')+'</div><div class="l" style="margin-top:4px;text-transform:none">'+nc+' car'+(nc===1?'':'s')+(mm?' · maint −'+fmt(mm)+' this mo':'')+'</div></div>';
-    var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Income category tag on the ledger">';
+    var controls=cadSeg+whenCtl+'<span class="pill">Tag</span><input type="text" data-otag="'+oi+'" value="'+esc(o.tag||'Owners Programme')+'" style="width:150px" title="Ledger account tag for this owner. Left as \'Owners Programme\' it auto-tags the pushed line with this owner’s name; set a custom value to use your own account tag.">';
     var body='<div class="obody">'+odetails(o)+stripeStrip(o)
       +'<div class="cars">'+(nc?'<div class="rowscroll">'+hdr+carsHTML+'</div>':'<div class="hint" style="padding:10px 6px">'+(weekly?'No fleet entries yet.':'No cars in this owner\'s fleet yet.')+'</div>')+'</div>'
       +fleetHTML(o)
@@ -639,7 +639,11 @@ function wire(){
 
 // ---- push to ledger (per owner) ----
 function buildOwnerLines(o,ym){
-  var dm=dim(ym),lines=[],tag=o.tag||'Owners Programme',oid=o.id,n=(o.cars||[]).length;
+  var dm=dim(ym),lines=[],oid=o.id,n=(o.cars||[]).length;
+  // Tag each pushed line with the OWNER account so the ledger attributes it to the right account instead of
+  // a generic "Owners Programme" lump. Respect a custom tag if the owner set one; otherwise use their name.
+  var base=(o.tag||'').trim();
+  var tag=(base&&base!=='Owners Programme')?base:('Owners Programme — '+((o.name||o.bizName||'Owner').trim()));
   if(o.cadence==='weekly'){
     var total=weeklyMonthly(o,ym);if(total<=0)return lines;
     var wd=(o.weekday!=null)?+o.weekday:5;var occ=occ4(ym,wd);var parts=weeklySplit(total);
