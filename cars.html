@@ -101,7 +101,7 @@ const STATUSES=['live','pending','maintenance','accident','retired'];
 // once a fleet car): accident = written off in an accident, retired = retired from service.
 const WRITEOFF=['accident','retired'];
 function fleetCounts(){var c={total:0,active:0,inactive:0,pending:0,writeoff:0,accident:0,retired:0};(CARS||[]).forEach(function(v){var s=(v.status||'').toLowerCase();if(s==='accident'){c.accident++;c.writeoff++;}else if(s==='retired'){c.retired++;c.writeoff++;}else{c.total++;if(s==='maintenance')c.inactive++;else if(s==='pending')c.pending++;else c.active++;}});return c;}
-const STATUS_LABEL={live:'Active',maintenance:'Inactive · repairs',pending:'Onboarding',accident:'Written off · accident',retired:'Retired from service'};
+const STATUS_LABEL={live:'Active',maintenance:'Inactive · down for repairs',pending:'Coming soon',accident:'Written off · accident',retired:'Retired from service'};
 let CARS=[],OWNERS=[],HEALTH={},FILTER='',SHOW='all';
 
 const $=id=>document.getElementById(id);
@@ -150,7 +150,7 @@ function render(){
    +'<span class="spacer"></span><button class="btn" id="refresh">↻ Refresh</button>'
    +'<button class="btn pri" id="addcar">+ Add car</button></div>'
    +'<div class="health">'
-     +(function(){var f=fleetCounts();return hc('Fleet total',f.total,'')+hc('Active',f.active,'ok')+hc('Inactive · repairs',f.inactive,f.inactive?'warn':'ok')+hc('Written off',f.writeoff,'')+hc('· accident',f.accident,f.accident?'bad':'')+hc('· retired',f.retired,'');})()
+     +(function(){var f=fleetCounts();return hc('Fleet total',f.total,'')+hc('Active',f.active,'ok')+hc('Inactive · repairs',f.inactive,f.inactive?'warn':'ok')+hc('Coming soon',f.pending,'')+hc('Written off',f.writeoff,'')+hc('· accident',f.accident,f.accident?'bad':'')+hc('· retired',f.retired,'');})()
      +hc('No photo',HEALTH.no_photos,HEALTH.no_photos?'bad':'ok')
      +hc('Placeholder price',HEALTH.placeholder_price,HEALTH.placeholder_price?'warn':'ok')
      +hc('No registration',HEALTH.no_registration,HEALTH.no_registration?'bad':'ok')
@@ -172,7 +172,12 @@ function card(v){
    +'<div class="m">'+esc(v.color||'—')+' · '+esc(v.type||'—')+' · '+esc(v.plate||'no plate')+'</div>'
    +'<div class="m"><b>'+(v.daily_rate?money(v.daily_rate)+'/day':'not priced')+'</b>'
      +(v.rate_source==='billing'?' <span class="flag ok">from billing</span>':'')+'</div>'
-   +'<div class="flags">'+flags(v)+'</div></div>'
+   +'<div class="flags">'+flags(v)+'</div>'
+   +'<div class="cstat" style="margin-top:9px;display:flex;align-items:center;gap:8px">'
+     +'<span style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">Status</span>'
+     +'<select class="statsel" data-statusfor="'+v.id+'" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--line);font-weight:700">'
+       +STATUSES.map(function(s){return '<option value="'+s+'"'+(v.status===s?' selected':'')+'>'+esc(STATUS_LABEL[s]||s)+'</option>';}).join('')
+     +'</select></div></div>'
    +'<div class="cf"><button class="btn sm" data-edit="'+v.id+'" style="flex:1">Edit</button>'
    +(v.status==='live'?'<button class="btn sm" data-godown="'+v.id+'" title="Take off the platform — down for repairs/maintenance" style="color:#c22a2a;border-color:#c22a2a">🔧 Down</button>':'<button class="btn sm" data-golive="'+v.id+'" title="Put live on the platform" style="color:#0a7d44;border-color:#0a7d44">✅ Live</button>')
    +'<button class="btn sm" data-photos="'+v.id+'">📷</button>'
@@ -229,13 +234,15 @@ async function saveCar(id){
   if(r.error){alert(r.error.message);return;}
   $('ovCar').classList.remove('open');toast('Saved');await load();render();
 }
-async function setCarStatus(id,st){
+async function setCarStatus(id,st,skip){
   const v=CARS.find(x=>x.id===id);const nm=v?([v.year,v.make,v.model].filter(Boolean).join(' ')||v.name||'this car'):'this car';
   const live=st==='live';
-  if(!confirm(live?('Put '+nm+' LIVE on the platform? It becomes bookable.'):('Take '+nm+' DOWN for repairs/maintenance?\n\nIt will be marked down and not bookable.')))return;
+  const MSG={live:'Put '+nm+' LIVE on the platform? It becomes bookable.',maintenance:'Take '+nm+' DOWN for repairs/maintenance?\n\nIt stays in the fleet but is not bookable.',pending:'Mark '+nm+' as COMING SOON — arriving to the fleet, not yet live?',accident:'WRITE OFF '+nm+' (accident) and archive it from the fleet?\n\nIt was once a fleet car.',retired:'RETIRE '+nm+' from service and archive it from the fleet?'};
+  if(!skip && !confirm(MSG[st]||('Change status of '+nm+' to '+st+'?')))return;
   const r=await sb.from('vehicles').update({status:st,available:live,updated_at:new Date().toISOString()}).eq('id',id);
   if(r.error){alert(r.error.message);return;}
-  toast(live?'Now LIVE ✓':'Down for maintenance 🔧');await load();render();
+  const T={live:'Now LIVE ✓',maintenance:'Down for repairs 🔧',pending:'Coming soon 🕓',accident:'Written off · accident 🗄',retired:'Retired from service 🗄'};
+  toast(T[st]||'Status updated ✓');await load();render();
 }
 async function delCar(id,v){
   if(!confirm('Delete '+(v.name||'this car')+'? Bookings referencing it will keep their record but lose the link.'))return;
@@ -350,6 +357,7 @@ function wire(){
   document.querySelectorAll('[data-docs]').forEach(b=>b.onclick=()=>openDocs(b.dataset.docs));
   document.querySelectorAll('[data-golive]').forEach(b=>b.onclick=()=>setCarStatus(b.dataset.golive,'live'));
   document.querySelectorAll('[data-godown]').forEach(b=>b.onclick=()=>setCarStatus(b.dataset.godown,'maintenance'));
+  document.querySelectorAll('[data-statusfor]').forEach(sel=>sel.onchange=()=>setCarStatus(sel.dataset.statusfor,sel.value,true));
 }
 document.getElementById('ovCar').onclick=e=>{if(e.target.id==='ovCar')e.target.classList.remove('open');};
 
