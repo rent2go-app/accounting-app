@@ -48,6 +48,10 @@ MONEY
   until the day after those paid days run out - so 4 days paid up front means
   daily billing starts on day 5. The days paid for are credited to the account of
   the owner whose car it is.
+- Near the end of a block of prepaid days, offer the choice: they can get in
+  touch to buy another block of days, or do nothing and daily billing simply
+  continues from the stated date. Buying another block is arranged by us, not
+  self-service, so tell them to message or call.
 - 7 days or more booked up front gets 7% off the rental. The discount is on the
   rental only, never on the deposit - the deposit is the renter's own money being
   held and is returned.
