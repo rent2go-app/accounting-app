@@ -27,6 +27,30 @@ try { SECRETS = JSON.parse(Deno.env.get("STRIPE_WEBHOOK_SECRETS") || "{}"); } ca
 const money = (c: number | null | undefined) => (c || 0) / 100;
 const iso = (s: number | null | undefined) => (s ? new Date(s * 1000).toISOString() : null);
 
+
+/* What a charge actually is, taken from the words on it. The old test was
+   "amount is $10.00", which caught the standard late fee and nothing else - a
+   $554 accumulated late-fee invoice read as an ordinary daily rental, tolls and
+   penalties were unlabelled, and rentals billed by hand rather than through a
+   subscription showed as "other".
+
+   This mirrors public.r2g_charge_kind exactly. If you change one, change both -
+   a row written by the webhook must be classified the same as one written by a
+   sync. Order matters: fee wording is tested before the subscription and
+   model-year rules, so a penalty that names the car is still a penalty. */
+function chargeKind(desc: string, amountDue: number, sub: string | null): string {
+  const d = String(desc || "");
+  if (/late\s*(fee|pym|payment)|past\s*due|^\s*late\b/i.test(d)) return "late_fee";
+  if (/deposit/i.test(d)) return "deposit";
+  if (/toll/i.test(d)) return "toll";
+  if (/fine|penalt|smok|mileage|replacement|out of state|travel fee|cleaning|damage/i.test(d)) return "fee";
+  if (/^[0-9]+\s*(x|\u00d7)\s/i.test(d)) return "rental";
+  if (sub) return "rental";
+  if (/(19|20)[0-9]{2}/.test(d)) return "rental";
+  if (amountDue === 10) return "late_fee";
+  return "other";
+}
+
 async function sbGet(path: string) {
   const r = await fetch(`${SB}/rest/v1/${path}`, { headers: { apikey: SR, Authorization: `Bearer ${SR}` } });
   return r.ok ? await r.json().catch(() => []) : [];
@@ -104,7 +128,9 @@ Deno.serve(async (req) => {
         number: obj.number || null,
         description: (obj.lines?.data || [])[0]?.description || obj.description || null,
         amount_due: money(obj.amount_due), amount_paid: money(obj.amount_paid),
-        status: obj.status, is_late_fee: (obj.amount_due || 0) === 1000,
+        status: obj.status,
+        charge_kind: chargeKind((obj.lines?.data || [])[0]?.description || obj.description || "", money(obj.amount_due), obj.subscription || null),
+        is_late_fee: chargeKind((obj.lines?.data || [])[0]?.description || obj.description || "", money(obj.amount_due), obj.subscription || null) === "late_fee",
         due_date: obj.due_date ? new Date(obj.due_date * 1000).toISOString().slice(0, 10) : null,
         issued_at: iso(obj.created), paid_at: iso(obj.status_transitions?.paid_at),
         hosted_invoice_url: obj.hosted_invoice_url || null,

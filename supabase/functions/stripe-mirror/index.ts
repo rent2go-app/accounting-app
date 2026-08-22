@@ -73,6 +73,30 @@ async function stripeAll(url: string, key: string) {
   return out;
 }
 const iso = (s: number | null | undefined) => (s ? new Date(s * 1000).toISOString() : null);
+
+/* What a charge actually is, taken from the words on it. The old test was
+   "amount is $10.00", which caught the standard late fee and nothing else - a
+   $554 accumulated late-fee invoice read as an ordinary daily rental, tolls and
+   penalties were unlabelled, and rentals billed by hand rather than through a
+   subscription showed as "other".
+
+   This mirrors public.r2g_charge_kind exactly. If you change one, change both -
+   a row written by the webhook must be classified the same as one written by a
+   sync. Order matters: fee wording is tested before the subscription and
+   model-year rules, so a penalty that names the car is still a penalty. */
+function chargeKind(desc: string, amountDue: number, sub: string | null): string {
+  const d = String(desc || "");
+  if (/late\s*(fee|pym|payment)|past\s*due|^\s*late\b/i.test(d)) return "late_fee";
+  if (/deposit/i.test(d)) return "deposit";
+  if (/toll/i.test(d)) return "toll";
+  if (/fine|penalt|smok|mileage|replacement|out of state|travel fee|cleaning|damage/i.test(d)) return "fee";
+  if (/^[0-9]+\s*(x|\u00d7)\s/i.test(d)) return "rental";
+  if (sub) return "rental";
+  if (/(19|20)[0-9]{2}/.test(d)) return "rental";
+  if (amountDue === 10) return "late_fee";
+  return "other";
+}
+
 const money = (c: number | null | undefined) => Math.round((c || 0)) / 100;
 
 Deno.serve(async (req) => {
@@ -364,8 +388,15 @@ Deno.serve(async (req) => {
 
         // invoices — last 90 days is plenty for a daily-billing dashboard
         if (skipInvoices) { accountsDone++; continue; }
-        const since = Math.floor(Date.now() / 1000) - 90 * 86400;
-        const invs = await stripeAll(`https://api.stripe.com/v1/invoices?limit=100&created[gte]=${since}`, a.key);
+        /* 90 days used to be "plenty for a daily-billing dashboard". It is not:
+           a renter who started in March opened their portal in August and saw
+           two months of their own history missing, including the late fees. The
+           window is now the full history by default, and still capped so one
+           account cannot run past the function's timeout. */
+        const sinceDays = Number(body.since_days ?? 3650);
+        const q = sinceDays > 0
+          ? `&created[gte]=${Math.floor(Date.now() / 1000) - sinceDays * 86400}` : "";
+        const invs = await stripeAll(`https://api.stripe.com/v1/invoices?limit=100${q}`, a.key);
         for (const i of invs) {
           const email = String(i.customer_email || "").trim().toLowerCase();
           const renter = email ? byEmail[email] : null;
@@ -375,7 +406,9 @@ Deno.serve(async (req) => {
             number: i.number || null,
             description: (i.lines?.data || [])[0]?.description || i.description || null,
             amount_due: money(i.amount_due), amount_paid: money(i.amount_paid),
-            status: i.status, is_late_fee: (i.amount_due || 0) === 1000,
+            status: i.status,
+            charge_kind: chargeKind((i.lines?.data || [])[0]?.description || i.description || "", money(i.amount_due), i.subscription || null),
+            is_late_fee: chargeKind((i.lines?.data || [])[0]?.description || i.description || "", money(i.amount_due), i.subscription || null) === "late_fee",
             due_date: i.due_date ? new Date(i.due_date * 1000).toISOString().slice(0, 10) : null,
             issued_at: iso(i.created), paid_at: iso(i.status_transitions?.paid_at),
             hosted_invoice_url: i.hosted_invoice_url || null,
