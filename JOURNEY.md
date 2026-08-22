@@ -107,11 +107,22 @@ between accounts. That does not matter here: this fleet bills by invoice — 2,2
 is `collection_method=send_invoice` and the renter pays each day exactly as they
 already do.
 
-### Why `trial_end` and not a start date
+### Why a subscription schedule
 
-`trial_end` set to the first billing day is how Stripe expresses "scheduled": the
-subscription appears in the owner's account **immediately**, visible and auditable,
-and raises its first invoice on the day daily billing actually begins.
+Stripe offers three ways to delay a first charge and only one is right here.
+
+A **trial** is wrong twice over: those days were not free, they were paid for in
+the collection account, so the owner's account would show a "free trial" on a
+rental paid in full — and a `trialing` subscription appears under neither Active
+nor Scheduled in the dashboard, which makes it effectively invisible.
+
+A **billing_cycle_anchor** is refused outright: on a daily price Stripe will not
+accept an anchor later than the next natural billing date, which is tomorrow.
+
+So a **subscription schedule**, which is what Stripe built for "start this on a
+future date". It shows under Scheduled, claims nothing is free, and on the start
+date releases into an ordinary subscription. This is also what the fleet has
+always used — there are 50 of them in the 1.0 account already.
 
 ---
 

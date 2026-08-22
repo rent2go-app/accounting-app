@@ -281,10 +281,22 @@ Deno.serve(async (req) => {
           date and a hosted pay link. So the subscription is created with
           collection_method=send_invoice and the renter pays each day's invoice.
 
-       2. Billing must not start until the days already paid for have run out. A
-          trial_end set to that date is how Stripe expresses "scheduled": the
-          subscription exists in the owner's account straight away and raises its
-          first invoice on the day daily billing actually begins. */
+       2. Billing must not start until the days already paid for have run out, and
+          Stripe gives exactly one correct way to do that here.
+
+          Not a trial: those days were not free, they were paid for in the
+          collection account, so the owner's account would show a "free trial" on
+          a rental that had been paid in full - and a trialing subscription
+          appears under neither Active nor Scheduled in the dashboard, which made
+          it effectively invisible.
+
+          Not a billing_cycle_anchor either: on a DAILY price Stripe refuses an
+          anchor beyond the next natural billing date, which is tomorrow.
+
+          So a subscription schedule, which is what Stripe built for "start this
+          on a future date". It shows under Scheduled, it claims nothing is free,
+          and on the start date it becomes an ordinary subscription like every
+          other one in the fleet. */
     if (body.action === "create_daily_subscription") {
       const bookingId = String(body.booking_id || "");
       if (!bookingId) return json({ error: "booking_id required" }, 400);
@@ -357,40 +369,154 @@ Deno.serve(async (req) => {
       // 3. the subscription itself, scheduled to begin when the paid days end
       const sf = new URLSearchParams();
       sf.set("customer", cust.id);
-      sf.set("items[0][price]", price.id);
-      sf.set("collection_method", "send_invoice");
-      sf.set("days_until_due", "0");                 // due the same day, by 11:59 PM
-      sf.set("trial_end", String(anchor));
-      sf.set("proration_behavior", "none");
+      sf.set("start_date", String(anchor));
+      sf.set("end_behavior", "release");          // after the phase it carries on as a normal subscription
+      sf.set("phases[0][items][0][price]", price.id);
+      sf.set("default_settings[collection_method]", "send_invoice");
+      sf.set("default_settings[invoice_settings][days_until_due]", "0");
       sf.set("metadata[booking_id]", bookingId);
       sf.set("metadata[renter_id]", String(bk.renter_id));
       sf.set("metadata[vehicle_id]", String(veh.id));
-      sf.set("description", `${carName} - daily rental`);
-      const sub = await post("https://api.stripe.com/v1/subscriptions", sf);
-      if (sub.error) return json({ error: "subscription: " + sub.error.message }, 400);
+      const sched = await post("https://api.stripe.com/v1/subscription_schedules", sf);
+      if (sched.error) return json({ error: "schedule: " + sched.error.message }, 400);
+      const sub = { id: sched.subscription || sched.id, status: sched.status, schedule_id: sched.id };
 
       // 4. write it down on our side so the dashboard and the sync agree
       await sbUpsert("stripe_product_map", [{
         account_label: label, product_id: productId, product_name: carName,
         vehicle_id: veh.id, confidence: "confirmed",
       }], "account_label,product_id");
-      await sbUpsert("renter_subscriptions", [{
-        id: sub.id, account_label: label, customer_id: cust.id,
-        customer_email: renter.email, customer_name: renter.name || null,
-        status: sub.status, product_id: productId, product_name: carName,
-        daily_amount: rate, current_period_end: iso(sub.trial_end ?? sub.current_period_end),
-        started_at: iso(sub.start_date), renter_id: bk.renter_id, vehicle_id: veh.id,
-        updated_at: new Date().toISOString(),
-      }], "id");
-      await sbPatch(`bookings?id=eq.${enc(bookingId)}`, { subscription_id: sub.id });
+      /* No renter_subscriptions row yet on purpose: a schedule that has not
+         started has no subscription to mirror, and inventing one would have the
+         sync delete it on the next sweep. The row appears the moment Stripe
+         creates the real subscription, via the webhook or the next sync. */
+      await sbPatch(`bookings?id=eq.${enc(bookingId)}`, { subscription_id: sub.schedule_id });
       await note("subscription", `daily billing scheduled from ${first.toISOString().slice(0,10)} for ${renter.email}`,
-                 { account_label: label, subscription_id: sub.id, renter_id: bk.renter_id, vehicle_id: veh.id });
+                 { account_label: label, subscription_id: sub.schedule_id, renter_id: bk.renter_id, vehicle_id: veh.id });
 
-      return json({ ok: true, account: label, subscription_id: sub.id, status: sub.status,
+      return json({ ok: true, account: label, schedule_id: sub.schedule_id, status: sub.status,
                     customer_id: cust.id, product_id: productId, price_id: price.id,
                     daily_amount: rate, paid_days: bk.days,
                     rental_starts: bk.start_date,
                     first_billing_date: first.toISOString().slice(0, 10) });
+    }
+
+    /* Replace a webhook endpoint to get a fresh signing secret.
+       Stripe reveals a signing secret only when the endpoint is created, so a
+       secret that has drifted out of step cannot be read back - the endpoint has
+       to be made again. Deletes any endpoint already on that URL first, so we do
+       not end up with a live one beside a dead one both firing. */
+    if (body.action === "recreate_webhook") {
+      const url = String(body.url || "");
+      const events: string[] = body.events || [];
+      if (!url || !events.length) return json({ error: "url and events required" }, 400);
+      const only = body.account_label ? String(body.account_label) : null;
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        if (only && a.label !== only) continue;
+        try {
+          const have = await (await fetch("https://api.stripe.com/v1/webhook_endpoints?limit=100",
+            { headers: { Authorization: `Bearer ${a.key}` } })).json();
+          for (const w of (have.data || [])) {
+            if (w.url === url) {
+              await fetch(`https://api.stripe.com/v1/webhook_endpoints/${w.id}`,
+                { method: "DELETE", headers: { Authorization: `Bearer ${a.key}` } });
+              out.push({ label: a.label, removed: w.id });
+            }
+          }
+          const f = new URLSearchParams();
+          f.set("url", url);
+          f.set("description", "Rent 2 Go");
+          events.forEach((e, i) => f.set(`enabled_events[${i}]`, e));
+          const r = await (await fetch("https://api.stripe.com/v1/webhook_endpoints", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${a.key}`, "Content-Type": "application/x-www-form-urlencoded" },
+            body: f.toString(),
+          })).json();
+          if (r.error) { out.push({ label: a.label, error: r.error.message }); continue; }
+          out.push({ label: a.label, created: r.id, secret: r.secret });
+        } catch (e) { out.push({ label: a.label, error: String(e).slice(0, 140) }); }
+      }
+      return json({ ok: true, url, results: out });
+    }
+
+    /* Read one subscription straight from Stripe, so "is it really there?" is
+       answered by Stripe rather than by our copy of it. */
+    if (body.action === "read_subscription") {
+      const id = String(body.subscription_id || "");
+      const label = String(body.account_label || "");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!id || !acct?.key) return json({ error: "subscription_id and a known account_label required" }, 400);
+      const r = await (await fetch(
+        `https://api.stripe.com/v1/subscriptions/${id}?expand[]=customer&expand[]=schedule`,
+        { headers: { Authorization: `Bearer ${acct.key}` } })).json();
+      if (r.error) return json({ error: r.error.message }, 400);
+      return json({ ok: true, id: r.id, status: r.status, livemode: r.livemode,
+        trial_end: r.trial_end, current_period_end: r.current_period_end,
+        collection_method: r.collection_method, schedule: r.schedule ? r.schedule.id : null,
+        customer_id: r.customer?.id, customer_email: r.customer?.email,
+        customer_address: r.customer?.address,
+        items: (r.items?.data || []).map((i: any) => ({
+          price: i.price?.id, amount: i.price?.unit_amount, interval: i.price?.recurring?.interval,
+          product: i.price?.product })) });
+    }
+
+    /* Which Stripe account each of our labels actually is. Our label and the
+       business name in the dashboard are not the same string, and looking in the
+       wrong account is indistinguishable from a thing not existing. */
+    if (body.action === "whoami") {
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        if (body.account_label && a.label !== body.account_label) continue;
+        try {
+          const r = await (await fetch("https://api.stripe.com/v1/account",
+            { headers: { Authorization: `Bearer ${a.key}` } })).json();
+          out.push({ label: a.label, account_id: r.id,
+                     key_prefix: String(a.key).slice(0, 8),
+                     livemode: !String(a.key).includes("_test_"),
+                     business: r.business_profile?.name || r.settings?.dashboard?.display_name || null,
+                     email: r.email || null });
+        } catch (e) { out.push({ label: a.label, error: String(e).slice(0, 100) }); }
+      }
+      return json({ ok: true, accounts: out });
+    }
+
+    /* Everything Stripe holds for one account or one customer, exactly as the
+       API returns it - so "where is it" is answered by looking, not by reasoning
+       about which dashboard tab shows which status. */
+    if (body.action === "list_subscriptions") {
+      const label = String(body.account_label || "");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!acct?.key) return json({ error: "unknown account_label" }, 400);
+      const q = new URLSearchParams();
+      q.set("limit", "100");
+      q.set("status", String(body.status || "all"));
+      if (body.customer) q.set("customer", String(body.customer));
+      q.append("expand[]", "data.customer");
+      const r = await (await fetch(`https://api.stripe.com/v1/subscriptions?${q}`,
+        { headers: { Authorization: `Bearer ${acct.key}` } })).json();
+      if (r.error) return json({ error: r.error.message }, 400);
+      return json({ ok: true, account: label, account_id: acct.label, count: (r.data || []).length,
+        subscriptions: (r.data || []).map((s: any) => ({
+          id: s.id, status: s.status, livemode: s.livemode,
+          created: s.created, trial_end: s.trial_end,
+          customer: s.customer?.id, email: s.customer?.email,
+          amount: (s.items?.data || [])[0]?.price?.unit_amount,
+          interval: (s.items?.data || [])[0]?.price?.recurring?.interval })) });
+    }
+
+    if (body.action === "list_schedules") {
+      const acct = ACCTS.find((a: any) => a.label === String(body.account_label || ""));
+      if (!acct?.key) return json({ error: "unknown account_label" }, 400);
+      const r = await (await fetch("https://api.stripe.com/v1/subscription_schedules?limit=50&expand[]=data.customer",
+        { headers: { Authorization: `Bearer ${acct.key}` } })).json();
+      if (r.error) return json({ error: r.error.message }, 400);
+      return json({ ok: true, count: (r.data || []).length, schedules: (r.data || []).map((x: any) => ({
+        id: x.id, status: x.status, livemode: x.livemode, start: x.phases?.[0]?.start_date,
+        customer: x.customer?.id, email: x.customer?.email,
+        subscription: x.subscription })) });
     }
 
     if (body.action === "list_webhooks") {
