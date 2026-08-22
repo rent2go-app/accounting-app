@@ -258,7 +258,7 @@ table.prev td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:7
   <button class="btn" id="expandAll">Expand all</button>
   <button class="btn" id="collapseAll">Collapse all</button>
   <span class="pill">Fees: $500 / car · Preferred $350 / $300 / $250</span>
-  <div class="grand"><div class="l">Platform fees · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div></div>
+  <div class="grand"><div class="l">Total platform fees · all statuses · <span id="ymlbl">—</span></div><div class="v tnum" id="grand">$0.00</div><div class="l" style="font-weight:600;text-transform:none;opacity:.75">active + coming soon + down for repairs</div></div>
 </div>
 <div class="odash" id="odash"></div>
 <div class="mbreak" id="omaintbreak"></div>
@@ -306,6 +306,20 @@ function vehById(id){return (VEHICLES||[]).find(function(v){return v.id===id;});
 // Home fleet = R2G's own accounts (RENT 2 GO LLC 2.0 / 1.0). Everything else is owner-programme fleet.
 function isHomeOwner(o){var n=(((o&&o.name)||'')+' '+((o&&o.bizName)||'')).toUpperCase();return n.indexOf('RENT 2 GO')>=0 && /(2\.0|1\.0)/.test(n);}
 function fleetStatus(){var c={total:0,active:0,inactive:0,pending:0,writeoff:0,accident:0,retired:0,uncat:0,owner:0,home:0};STATE.forEach(function(o){var home=isHomeOwner(o);(o.cars||[]).forEach(function(car){var v=vehById(car.id);var s=v?((v.status||'').toLowerCase()):'';if(s==='accident'){c.accident++;c.writeoff++;}else if(s==='retired'){c.retired++;c.writeoff++;}else{c.total++;if(home)c.home++;else c.owner++;if(s==='maintenance')c.inactive++;else if(s==='pending')c.pending++;else{c.active++;if(!s)c.uncat++;}}});});return c;}
+// SINGLE source of truth for the platform-fee split, so the top total and the dashboard cards always agree.
+// Each fee-bearing car lands in exactly one bucket by status. total = active + coming + inactive (the fleet
+// that earns or will earn). Written-off cars are OFF the fleet — excluded from total, reported separately.
+function platBuckets(){
+  var b={active:0,coming:0,inactive:0,writeoff:0,cA:0,cC:0,cI:0,cW:0};
+  STATE.forEach(function(o){(o.cars||[]).forEach(function(c){var f=carFee(c,YM);if(f<=0.005)return;var v=vehById(c.id);var s=v?((v.status||'').toLowerCase()):'';
+    if(s==='accident'||s==='retired'){b.writeoff=r2(b.writeoff+f);b.cW++;}
+    else if(s==='pending'){b.coming=r2(b.coming+f);b.cC++;}
+    else if(s==='maintenance'){b.inactive=r2(b.inactive+f);b.cI++;}
+    else{b.active=r2(b.active+f);b.cA++;}
+  });});
+  b.total=r2(b.active+b.coming+b.inactive);
+  return b;
+}
 var OWN_STATUSES=[['live','🟢 Active'],['maintenance','🟡 Down for repairs'],['pending','🕓 Coming soon'],['accident','🗄 Written off · accident'],['retired','🗄 Retired']];
 var STAT_DOT={live:'#2ea36a',maintenance:'#eab308',pending:'#6366f1',accident:'#8b5cf6',retired:'#94a3b8'};
 function carStatusSelect(c,o){var v=vehById(c.id);var st=v?((v.status||'live').toLowerCase()):'live';var dot=STAT_DOT[st]||'#94a3b8';return '<div class="cstatwrap" style="margin-top:6px;display:flex;align-items:center;gap:6px"><span title="Fleet status" style="width:9px;height:9px;border-radius:50%;background:'+dot+';flex:0 0 auto"></span><select class="cstatus" data-cstatus="'+esc(c.id)+'" data-csown="'+esc(o.id||'')+'" data-csnm="'+esc(c.name||'')+'" title="Is this car active / down for repairs / written off?" style="font-size:12px;padding:4px 7px;border-radius:7px;border:1px solid var(--line);font-weight:700">'+OWN_STATUSES.map(function(s){return '<option value="'+s[0]+'"'+(st===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+'</select>'+(v?'':'<span class="hint" style="font-size:10px">+ catalogue on save</span>')+'</div>';}
@@ -417,14 +431,12 @@ function odetails(o){var oi=STATE.indexOf(o);function f(field,label,ph,type){ret
 function renderDash(){var yr=YM.slice(0,4);var ytdG=0,ytdN=0,ytdP=0,ytdFi=0,ytdFo=0,mG=0,mN=0,mP=0,mFi=0;STRIPEROWS.forEach(function(r){var d=String(r.day);if(d.slice(0,4)===yr){ytdG+=+r.gross||0;ytdN+=+r.net||0;ytdP+=+r.payout||0;ytdFi+=+r.fin_in||0;ytdFo+=+r.fin_out||0;}if(d.slice(0,7)===YM){mG+=+r.gross||0;mN+=+r.net||0;mP+=+r.payout||0;mFi+=+r.fin_in||0;}});var plat=STATE.reduce(function(s,o){return s+ownerMonthTotal(o,YM);},0);var ytdPn=r2(ytdP-ytdFi);var mPn=r2(mP-mFi);
   var mMaint=0,ytdMaint=0,catAgg={};STATE.forEach(function(o){(o.maint||[]).forEach(function(x){var d=String(x.date||'');var c=+x.cost||0;if(d.slice(0,4)===yr)ytdMaint+=c;if(d.slice(0,7)===YM){mMaint+=c;var k=x.cat||'Uncategorised';catAgg[k]=(catAgg[k]||0)+c;}});});
   var FS=fleetStatus();
-  // Split the platform fee by car status: ACTIVE/inactive cars earn now (current), COMING-SOON cars are
-  // projected future revenue "to look forward to". Written-off cars earn nothing.
-  var platCur=0,platInact=0,platComing=0,carsCur=0,carsInact=0,carsComing=0;
-  STATE.forEach(function(o){(o.cars||[]).forEach(function(c){var f=carFee(c,YM);if(f<=0.005)return;var v=vehById(c.id);var s=v?((v.status||'').toLowerCase()):'';if(s==='accident'||s==='retired')return;if(s==='pending'){platComing=r2(platComing+f);carsComing++;}else if(s==='maintenance'){platInact=r2(platInact+f);carsInact++;}else{platCur=r2(platCur+f);carsCur++;}});});
+  // Shared split — these three (+ written-off) always reconcile to the top total (PB.total = A+C+I).
+  var PB=platBuckets();
   var el=document.getElementById('odash');if(!el)return;
   function card(l,v,sub,cls){return '<div class="dcard"><div class="dl">'+l+'</div><div class="dv tnum '+(cls||'')+'">'+fmt(v)+'</div><div class="ds">'+sub+'</div></div>';}
   function ncard(l,v,sub,cls){return '<div class="dcard"><div class="dl">'+l+'</div><div class="dv tnum '+(cls||'')+'">'+(v==null?'—':v)+'</div><div class="ds">'+sub+'</div></div>';}
-  el.innerHTML=ncard('Fleet total',FS.total,'owner + home'+(FS.uncat?' · '+FS.uncat+' not in catalogue':''),'')+ncard('Owner fleet',FS.owner,'owner-programme cars','')+ncard('Home fleet',FS.home,'R2G LLC 2.0 / 1.0','')+ncard('Active',FS.active,'live &amp; bookable','pos')+ncard('Inactive',FS.inactive,'down for repairs · still fleet','warn')+ncard('Coming soon',FS.pending,'arriving to the fleet','')+ncard('Written off',FS.writeoff,FS.accident+' accident · '+FS.retired+' retired','neg')+card('YTD gross earnings (GMV)',r2(ytdG),yr+' · all accounts','')+card('YTD net earnings',r2(ytdN),yr+' · after Stripe fees','pos')+card('YTD paid out to owners',ytdPn,yr+(ytdFi>0?' · excl. Capital loan':' · payouts'),'pos')+(ytdFi>0?card('Stripe Capital loan',r2(ytdFi),fmt(ytdFo)+' repaid · liability, not income','neg'):'')+card('GMV · '+fmtYM(YM),r2(mG),'gross this month','')+card('Net earnings · '+fmtYM(YM),r2(mN),'after Stripe','pos')+card('Owner payouts · '+fmtYM(YM),mPn,'distributions'+(mFi>0?' · excl. loan':' paid out'),'pos')+card('Platform fees · '+fmtYM(YM),platCur,'<b>'+carsCur+' active car'+(carsCur===1?'':'s')+'</b> · R2G revenue now','brand')+card('Coming soon (projected) · '+fmtYM(YM),platComing,'<b>'+carsComing+' car'+(carsComing===1?'':'s')+'</b> · future revenue to look forward to','pos')+card('Down for repairs · '+fmtYM(YM),platInact,'<b>'+carsInact+' car'+(carsInact===1?'':'s')+'</b> · off-road / inactive','warn')+card('Maintenance costs · '+fmtYM(YM),r2(mMaint),'YTD '+fmt(r2(ytdMaint))+' · fleet upkeep','neg');
+  el.innerHTML=ncard('Fleet total',FS.total,'owner + home'+(FS.uncat?' · '+FS.uncat+' not in catalogue':''),'')+ncard('Owner fleet',FS.owner,'owner-programme cars','')+ncard('Home fleet',FS.home,'R2G LLC 2.0 / 1.0','')+ncard('Active',FS.active,'live &amp; bookable','pos')+ncard('Inactive',FS.inactive,'down for repairs · still fleet','warn')+ncard('Coming soon',FS.pending,'arriving to the fleet','')+ncard('Written off',FS.writeoff,FS.accident+' accident · '+FS.retired+' retired','neg')+card('YTD gross earnings (GMV)',r2(ytdG),yr+' · all accounts','')+card('YTD net earnings',r2(ytdN),yr+' · after Stripe fees','pos')+card('YTD paid out to owners',ytdPn,yr+(ytdFi>0?' · excl. Capital loan':' · payouts'),'pos')+(ytdFi>0?card('Stripe Capital loan',r2(ytdFi),fmt(ytdFo)+' repaid · liability, not income','neg'):'')+card('GMV · '+fmtYM(YM),r2(mG),'gross this month','')+card('Net earnings · '+fmtYM(YM),r2(mN),'after Stripe','pos')+card('Owner payouts · '+fmtYM(YM),mPn,'distributions'+(mFi>0?' · excl. loan':' paid out'),'pos')+card('Active platform fees · '+fmtYM(YM),PB.active,'<b>'+PB.cA+' active car'+(PB.cA===1?'':'s')+'</b> · billing now','brand')+card('Coming soon (projected) · '+fmtYM(YM),PB.coming,'<b>'+PB.cC+' car'+(PB.cC===1?'':'s')+'</b> · future revenue to look forward to','pos')+card('Down for repairs · '+fmtYM(YM),PB.inactive,'<b>'+PB.cI+' car'+(PB.cI===1?'':'s')+'</b> · off-road / inactive','warn')+(PB.writeoff>0.005?card('Written off · '+fmtYM(YM),PB.writeoff,'<b>'+PB.cW+' car'+(PB.cW===1?'':'s')+'</b> · off fleet — NOT in total','neg'):'')+card('Maintenance costs · '+fmtYM(YM),r2(mMaint),'YTD '+fmt(r2(ytdMaint))+' · fleet upkeep','neg');
   var mb=document.getElementById('omaintbreak');if(mb){var ks=Object.keys(catAgg);mb.innerHTML=ks.length?'<div class="mbh">🔧 Maintenance by type · '+fmtYM(YM)+' <span class="mbt">'+fmt(r2(mMaint))+' total</span></div><div class="mbchips">'+ks.sort(function(a,b){return catAgg[b]-catAgg[a];}).map(function(k){return '<span class="mchip">'+esc(k)+' <b>'+fmt(r2(catAgg[k]))+'</b></span>';}).join('')+'</div>':'';}}
 // ── MONTHLY OWNER SNAPSHOT ── per-owner Gross → profit (owner view) + R2G margin (private) ──
 function ownerName(o){return o.name||o.ownerName||o.bizName||'Owner';}
@@ -598,7 +610,8 @@ function render(){
       +(open?body:'')
       +'</div>';
   }).join('');
-  document.getElementById('grand').textContent=fmt(r2(grand));
+  // Top total = the shared bucket total (active + coming soon + down), so it always equals the three cards.
+  document.getElementById('grand').textContent=fmt(platBuckets().total);
   wire();
 }
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
