@@ -92,6 +92,43 @@ Deno.serve(async (req) => {
   const dryRun = body.dry_run === true;
 
   try {
+    // ---- rename Stripe products to the house naming protocol ----
+    // MAKE MODEL - YEAR - COLOUR, capitals. The product name is what a renter
+    // reads on every invoice, so it has to match what the fleet calls the car.
+    if (body.action === "rename_products") {
+      const veh = await sbGet("vehicles?select=id,make,model,year,color&limit=500");
+      const vById: Record<string, any> = {};
+      for (const v of veh) vById[v.id] = v;
+      const maps = await sbGet("stripe_product_map?select=account_label,product_id,product_name,vehicle_id,confidence&limit=500");
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        for (const m of maps) {
+          if (m.account_label !== a.label || !m.vehicle_id) continue;
+          if (m.confidence !== "auto" && m.confidence !== "confirmed") continue;
+          const v = vById[m.vehicle_id];
+          if (!v || !v.make || !v.model) continue;
+          const want = [ [v.make, v.model].filter(Boolean).join(" "), v.year, v.color ]
+            .filter(Boolean).join(" - ").toUpperCase();
+          if (!want || want === (m.product_name || "").toUpperCase()) continue;
+          out.push({ account_label: a.label, product_id: m.product_id, from: m.product_name, to: want });
+          if (!body.dry_run) {
+            const f = new URLSearchParams(); f.set("name", want);
+            const r = await fetch(`https://api.stripe.com/v1/products/${m.product_id}`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${a.key}`, "Content-Type": "application/x-www-form-urlencoded" },
+              body: f,
+            });
+            const j = await r.json();
+            if (j.error) { out[out.length - 1].error = j.error.message; continue; }
+            await sbPatch(`stripe_product_map?account_label=eq.${enc(a.label)}&product_id=eq.${enc(m.product_id)}`,
+                          { product_name: want });
+          }
+        }
+      }
+      return json({ ok: true, dry_run: !!body.dry_run, renamed: out.length, changes: out });
+    }
+
     // ---- who we already know ----
     const renters = await sbGet("renters?select=id,email,name,auth_uid,current_vehicle_id&limit=1000");
     const byEmail: Record<string, any> = {};
