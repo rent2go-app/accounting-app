@@ -348,7 +348,11 @@ Deno.serve(async (req) => {
             customer_email: c.email || null, customer_name: c.name || null,
             status: s.status, product_id: pid, product_name: pid ? (productNames[a.label + "|" + pid] || null) : null,
             daily_amount: it.price ? money(it.price.unit_amount) : null,
-            current_period_end: iso(s.current_period_end), started_at: iso(s.start_date),
+            // Stripe moved current_period_end off the subscription and onto its
+            // items. Reading only the old place gives null, and the renter's
+            // dashboard then cannot say when the next charge lands.
+            current_period_end: iso(s.current_period_end ?? (s.items?.data || [])[0]?.current_period_end),
+            started_at: iso(s.start_date),
             canceled_at: iso(s.canceled_at),
             renter_id: renter ? renter.id : null,
             vehicle_id: pid ? (carFor[a.label + "|" + pid] || null) : null,

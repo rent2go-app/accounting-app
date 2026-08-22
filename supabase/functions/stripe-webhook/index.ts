@@ -129,7 +129,8 @@ Deno.serve(async (req) => {
                    Prefer: "return=minimal" },
         body: JSON.stringify({
           status: obj.status,
-          current_period_end: iso(obj.current_period_end),
+          // as above: Stripe now reports this per item, not per subscription
+          current_period_end: iso(obj.current_period_end ?? (obj.items?.data || [])[0]?.current_period_end),
           canceled_at: iso(obj.canceled_at),
           updated_at: new Date().toISOString(),
         }),
