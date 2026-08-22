@@ -117,3 +117,38 @@ label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted)
 .equiv strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+
+/* ---- mobile readiness ----
+   Measured at 390px across every page in this app. Kept at the end of the file
+   so it settles arguments with the rules above it. */
+
+/* iOS zooms the page in when you tap a field whose text is under 16px, and it
+   does not zoom back out. Every input here was 14px. */
+@media (max-width: 820px) {
+  input, select, textarea { font-size: 16px; }
+}
+
+/* A wide table is the one thing on these pages that can push the whole page
+   sideways once real data is in it - an owner name and a car name and a date and
+   three amounts do not fit in 390px. Let the table scroll inside itself rather
+   than dragging the page with it. */
+@media (max-width: 720px) {
+  table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { padding: 9px 10px; font-size: 13px; white-space: nowrap; }
+  th:first-child, td:first-child { position: sticky; left: 0; background: var(--surface); }
+  th:first-child { background: var(--surface-2); }
+}
+
+/* Thumbs, not cursors. */
+@media (hover: none), (max-width: 560px) {
+  .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn.sm { min-height: 34px; }
+  .seg button { min-height: 40px; }
+}
+
+/* Nothing should be able to drag the page sideways. */
+@media (max-width: 820px) {
+  html, body { overflow-x: clip; max-width: 100%; }
+  img, canvas, iframe { max-width: 100%; height: auto; }
+  pre, code { overflow-x: auto; word-break: break-word; }
+}
