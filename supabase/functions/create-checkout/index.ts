@@ -46,6 +46,50 @@ async function sbPatch(path: string, body: unknown) {
 }
 const money = (n: number) => Math.round(n * 100); // Stripe wants cents
 
+/* ---- the Stripe customer carries the renter's own address ----
+   Checkout was only handed customer_email, so Stripe created a customer with an
+   address and nothing else. Every invoice and every subscription raised against
+   that customer then printed with no address on it - which is no use to the
+   renter filing it, and no use to us if an invoice is ever questioned.
+
+   The address used is the one they typed into the form and that the proof-of-
+   address check verified against a real document, so what prints on the invoice
+   is the address we hold evidence for. */
+async function upsertCustomer(renter: any, key: string): Promise<string | null> {
+  const email = String(renter.email || "").trim();
+  if (!email) return null;
+  const f = new URLSearchParams();
+  f.set("email", email);
+  if (renter.name)  f.set("name", String(renter.name));
+  if (renter.phone) f.set("phone", String(renter.phone));
+  if (renter.home_address) {
+    f.set("address[line1]", String(renter.home_address));
+    if (renter.home_city)   f.set("address[city]", String(renter.home_city));
+    if (renter.home_state)  f.set("address[state]", String(renter.home_state));
+    if (renter.home_postal) f.set("address[postal_code]", String(renter.home_postal));
+    f.set("address[country]", "US");
+  }
+  try {
+    // reuse the customer they already have in this account rather than making a
+    // second one, which would split their invoice history in two
+    const found = await (await fetch(
+      `https://api.stripe.com/v1/customers?email=${encodeURIComponent(email)}&limit=1`,
+      { headers: { Authorization: `Bearer ${key}` } })).json();
+    const existing = (found?.data || [])[0];
+    const url = existing
+      ? `https://api.stripe.com/v1/customers/${existing.id}`
+      : "https://api.stripe.com/v1/customers";
+    const r = await (await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: f.toString(),
+    })).json();
+    return r?.id || existing?.id || null;
+  } catch (_) {
+    return null;   // never block a booking because the address could not be written
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -139,7 +183,27 @@ Deno.serve(async (req) => {
     f.set("mode", "payment");
     f.set("success_url", `${origin}#booked`);
     f.set("cancel_url", `${origin}#catalogue`);
-    if (renter.email) f.set("customer_email", String(renter.email));
+    // A customer record with their address on it, so the invoice and any
+    // subscription raised later both print it. Falls back to customer_email if
+    // the customer could not be written, which is better than failing the sale.
+    const label_account = String(v.account_label || renter.account_label || '');
+    const customerId = await upsertCustomer(renter, key);
+    if (customerId) {
+      /* Keep the link on our side too. It is the same record that carries their
+         verified name and address, so it is what ties this renter to their
+         invoices and their billing portal - and having it here means we do not
+         have to wait for a sync to know who they are in Stripe. */
+      if (renter.stripe_customer_id !== customerId) {
+        await sbPatch(`renters?id=eq.${enc(renter.id)}`, {
+          stripe_customer_id: customerId, stripe_customer_account: label_account,
+        });
+      }
+      f.set("customer", customerId);
+      f.set("customer_update[address]", "auto");
+      f.set("customer_update[name]", "auto");
+    } else if (renter.email) {
+      f.set("customer_email", String(renter.email));
+    }
     f.set("client_reference_id", booking.id);
     f.set("metadata[booking_id]", booking.id);
     f.set("metadata[renter_id]", renter.id);
