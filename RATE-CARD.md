@@ -19,8 +19,16 @@ Daily rate is set by the car's model year. Two exceptions.
 
 **Exceptions**
 
-- A **2015 Nissan Versa** is **$65.25**.
-- A **2022 SUV** is **$74.95**, not $73.95. Older SUVs take their year's rate.
+The Nissan Versa is priced below the year card:
+
+| Versa | Daily rate |
+|-------|-----------|
+| 2015 | $65.25 |
+| 2016 | $65.00 |
+| 2018 | $66.55 |
+| 2019 | $66.55 |
+
+A **2022 SUV** is **$74.95**, not $73.95. Older SUVs take their year's rate.
 
 **Applies to new rentals only.** Renters on a live Stripe subscription keep the
 rate they started on until that subscription ends — nobody's price moves
