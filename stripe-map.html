@@ -46,7 +46,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
   <p class="sub">A Stripe subscription names its car in the product — <b>“NISSAN SENTRA 2019 - BLACK”</b> — but that
   text is not reliable enough to match on every sync: colours disagree between the two systems, and two subscriptions
   can otherwise land on the same vehicle. So each product is resolved to a car <b>once, here</b>, and trusted from then on.
-  Once a product is mapped, cancelling its subscription releases the car and starting a new one claims it, automatically.<br><br>Only products <b>billing now or within the last 90 days</b> are listed — older ones are historic and need no car.</p>
+  Once a product is mapped, cancelling its subscription releases the car and starting a new one claims it, automatically.<br><br>Only products <b>billing now or within the last 90 days</b> are listed — older ones are historic and need no car. Cars still marked <b>coming soon</b> are not offered here until they go live.</p>
   <div class="bar">
     <button class="btn pri" id="sync">Run a sync now</button>
     <button class="btn" id="reload">Reload</button>
@@ -71,7 +71,9 @@ async function load(){
   const [m,s,v]=await Promise.all([
     sb.from('stripe_product_map').select('*').limit(500),
     sb.from('renter_subscriptions').select('account_label,product_id,status,customer_email,customer_name,daily_amount,canceled_at,current_period_end').limit(1000),
-    sb.from('vehicles').select('id,name,plate,year,color,status').limit(400)
+    // 'pending' cars are coming-soon placeholders — they must never be pulled
+    // into live billing. Maintenance cars are real and still rented, so they stay.
+    sb.from('vehicles').select('id,name,plate,year,color,status').neq('status','pending').limit(400)
   ]);
   if(m.error){document.getElementById('state').textContent='Sign in as an admin to use this page.';return;}
   MAP=m.data||[]; SUBS=s.data||[]; VEH=(v.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
