@@ -304,7 +304,7 @@ function vehById(id){return (VEHICLES||[]).find(function(v){return v.id===id;});
 // Count EVERY car across all owner accounts (owners_program), overlaying each car's status from the vehicles
 // catalogue (matched by shared car id). Cars not yet in the catalogue count as active but are flagged.
 // Home fleet = R2G's own accounts (RENT 2 GO LLC 2.0 / 1.0). Everything else is owner-programme fleet.
-function isHomeOwner(o){var n=(((o&&o.name)||'')+' '+((o&&o.bizName)||'')).toUpperCase();return n.indexOf('RENT 2 GO')>=0 && /(\b2\.0\b|\b1\.0\b|LLC)/.test(n);}
+function isHomeOwner(o){var n=(((o&&o.name)||'')+' '+((o&&o.bizName)||'')).toUpperCase();return n.indexOf('RENT 2 GO')>=0 && /(2\.0|1\.0)/.test(n);}
 function fleetStatus(){var c={total:0,active:0,inactive:0,pending:0,writeoff:0,accident:0,retired:0,uncat:0,owner:0,home:0};STATE.forEach(function(o){var home=isHomeOwner(o);(o.cars||[]).forEach(function(car){var v=vehById(car.id);var s=v?((v.status||'').toLowerCase()):'';if(s==='accident'){c.accident++;c.writeoff++;}else if(s==='retired'){c.retired++;c.writeoff++;}else{c.total++;if(home)c.home++;else c.owner++;if(s==='maintenance')c.inactive++;else if(s==='pending')c.pending++;else{c.active++;if(!s)c.uncat++;}}});});return c;}
 var OWN_STATUSES=[['live','🟢 Active'],['maintenance','🟡 Down for repairs'],['pending','🕓 Coming soon'],['accident','🗄 Written off · accident'],['retired','🗄 Retired']];
 var STAT_DOT={live:'#2ea36a',maintenance:'#eab308',pending:'#6366f1',accident:'#8b5cf6',retired:'#94a3b8'};
