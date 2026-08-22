@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="assets/linda-sm.png">
+<title>Renter Access — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#a86a00;--shadow:0 1px 3px rgba(16,24,40,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a640}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 14px 90px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px;line-height:1.55;max-width:760px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:9px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tab{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 16px;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card .v{font-size:22px;font-weight:800;margin-top:3px}
+.card.warn .v{color:var(--warn)}.card.ok .v{color:var(--in)}.card.bad .v{color:var(--out)}
+.fleet{margin:22px 0 8px;font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.fleet .n{font-weight:400;color:var(--muted);font-size:13px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.row.owing{border-left:4px solid var(--warn)}
+.row.late{border-left:4px solid var(--out)}
+.nm{font-weight:800;font-size:15px}
+.meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface-2);color:var(--muted);margin-left:6px}
+.pill.ok{background:#e7f6ec;color:#0a6b3a}
+.pill.no{background:#fdecea;color:#b3261e}
+.amt{font-weight:800;font-family:inherit;font-size:16px;white-space:nowrap;text-align:right}
+.amt small{display:block;font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px}
+.linkbox{grid-column:1/-1;margin-top:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12px;word-break:break-all}
+.linkbox b{display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ltoast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;z-index:60}
+.ltoast.show{opacity:1;transform:translateX(-50%)}
+.empty{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Renter Access</h1>
+  <p class="sub">Everyone currently renting, grouped by the owner fleet that bills them. Issue a sign-in link and the
+  renter can see their car, their daily invoices and pay through Stripe. One link works as an email and as a text —
+  no password to remember.</p>
+  <div class="tabs">
+    <button class="tab on" data-tab="ACTIVE">Active</button>
+    <button class="tab" data-tab="ARCHIVED">Archived</button>
+  </div>
+  <div class="bar">
+    <input class="search" id="q" placeholder="Search a name, email, fleet or car…">
+    <button class="btn pri" id="sendall">Send a login to everyone without one</button>
+    <button class="btn" id="reload">Reload</button>
+    <span id="state" class="pill"></span>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div id="out"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const money=n=>'$'+Number(n||0).toFixed(2);
+function toast(m){var t=document.createElement('div');t.className='ltoast';t.textContent=m;document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},3000);}
+let ROWS=[],TAB='ACTIVE',Q='',LINKS={};
+
+async function load(){
+  document.getElementById('state').textContent='loading…';
+  const r=await sb.from('v_admin_renters').select('*').order('fleet').order('name');
+  if(r.error){document.getElementById('state').textContent='sign in as an admin';return;}
+  ROWS=r.data||[]; document.getElementById('state').textContent='';
+  render();
+}
+
+function render(){
+  const q=Q.toLowerCase();
+  const all=ROWS.filter(x=>x.bucket===TAB);
+  const list=all.filter(x=>!q||[x.name,x.email,x.fleet,x.vehicle,x.owner_name].some(v=>String(v||'').toLowerCase().includes(q)));
+  const noLogin=all.filter(x=>!x.has_login);
+  const owing=all.filter(x=>Number(x.balance)>0);
+  const late=all.filter(x=>Number(x.late_fees)>0);
+  document.getElementById('cards').innerHTML=
+     '<div class="card"><div class="l">'+TAB.toLowerCase()+' renters</div><div class="v">'+all.length+'</div></div>'
+    +'<div class="card '+(noLogin.length?'warn':'ok')+'"><div class="l">Without a login</div><div class="v">'+noLogin.length+'</div></div>'
+    +'<div class="card '+(owing.length?'warn':'ok')+'"><div class="l">Owing</div><div class="v">'+owing.length+'</div></div>'
+    +'<div class="card '+(late.length?'bad':'ok')+'"><div class="l">With late fees</div><div class="v">'+late.length+'</div></div>'
+    +'<div class="card"><div class="l">Outstanding</div><div class="v">'+money(all.reduce((a,x)=>a+Number(x.balance||0),0))+'</div></div>';
+  document.getElementById('sendall').textContent=noLogin.length
+    ? 'Send a login to '+noLogin.length+' renter'+(noLogin.length===1?'':'s')
+    : 'Re-send a login to everyone';
+
+  const byFleet={};
+  list.forEach(x=>{const k=x.fleet||'No fleet assigned';(byFleet[k]=byFleet[k]||[]).push(x);});
+  const keys=Object.keys(byFleet).sort();
+  document.getElementById('out').innerHTML = keys.length ? keys.map(f=>{
+    const g=byFleet[f];
+    const owe=g.reduce((a,x)=>a+Number(x.balance||0),0);
+    const owner=(g.find(x=>x.owner_name)||{}).owner_name;
+    return '<div class="fleet">🏦 '+esc(f)+'<span class="n">'+g.length+' renter'+(g.length===1?'':'s')
+      +(owner?' · '+esc(owner):'')+(owe?' · '+money(owe)+' outstanding':'')+'</span></div>'
+      + g.map(rowHTML).join('');
+  }).join('') : '<p class="empty">Nobody here.</p>';
+
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send([b.dataset.send],b));
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+    const t=LINKS[b.dataset.copy]; if(!t)return;
+    navigator.clipboard.writeText(b.dataset.kind==='sms'?t.sms:t.link).then(()=>toast('Copied — paste into a text or WhatsApp'));
+  });
+}
+
+function rowHTML(x){
+  const bal=Number(x.balance||0), late=Number(x.late_fees||0), pd=Number(x.past_due_invoices||0);
+  const cls = late?'late' : (bal>0?'owing':'');
+  const l=LINKS[x.id];
+  return '<div class="row '+cls+'">'
+    +'<div><div class="nm">'+esc(x.name||x.email)
+      +(x.has_login?'<span class="pill ok">has login</span>':'<span class="pill no">no login</span>')
+      +(late?'<span class="pill no">'+late+' late fee'+(late===1?'':'s')+'</span>':'')+'</div>'
+    +'<div class="meta">'+esc(x.email||'no email')+(x.phone?' · '+esc(x.phone):'')
+      +(x.vehicle?' · '+esc(x.vehicle):' · no car linked')+'</div></div>'
+    +'<div><div class="amt">'+money(bal)+'<small>'+(pd?pd+' past due':(Number(x.open_invoices)||0)+' open')+'</small></div>'
+    +'<div class="acts">'
+      +'<button class="btn sm pri" data-send="'+esc(x.id)+'">'+(x.has_login?'Re-send login':'Send login')+'</button>'
+      +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Stripe portal</a>':'')
+    +'</div></div>'
+    +(l?('<div class="linkbox"><b>Link ready — paste into a text or WhatsApp</b>'+esc(l.sms)
+        +'<div class="acts"><button class="btn sm" data-copy="'+esc(x.id)+'" data-kind="sms">Copy message</button>'
+        +'<button class="btn sm" data-copy="'+esc(x.id)+'" data-kind="link">Copy link only</button></div></div>'):'')
+    +'</div>';
+}
+
+async function send(ids,btn){
+  const o=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Sending…';}
+  try{
+    const r=await sb.functions.invoke('renter-access',{body:{renter_ids:ids,send:true,force:true}});
+    if(r.error)throw r.error;
+    const d=r.data||{};
+    (d.results||[]).forEach(x=>{ if(x.link) LINKS[x.renter_id]={link:x.link,sms:x.sms}; });
+    const okN=(d.results||[]).filter(x=>x.emailed).length;
+    const bad=(d.results||[]).filter(x=>x.error||x.email_error);
+    toast(okN+' email'+(okN===1?'':'s')+' sent'+(bad.length?' · '+bad.length+' failed':''));
+    if(bad.length) console.warn('failures',bad);
+    await load();
+  }catch(e){ alert('Could not send: '+(e.message||e)); }
+  if(btn){btn.disabled=false;btn.textContent=o;}
+}
+
+document.getElementById('sendall').onclick=async function(){
+  const all=ROWS.filter(x=>x.bucket===TAB);
+  const targets=all.filter(x=>!x.has_login);
+  const list=targets.length?targets:all;
+  if(!confirm('Email a sign-in link to '+list.length+' renter'+(list.length===1?'':'s')+'?\n\nThey will each get a link that signs them straight in.'))return;
+  await send(list.map(x=>x.id),this);
+};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  TAB=t.dataset.tab;
+  document.querySelectorAll('.tab').forEach(z=>z.classList.toggle('on',z===t));
+  render();
+});
+document.getElementById('q').oninput=e=>{Q=e.target.value;render();};
+document.getElementById('reload').onclick=load;
+load();
+</script>
+<script defer src="assets/nav.js"></script>
+</body></html>
