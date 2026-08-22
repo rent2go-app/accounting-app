@@ -117,14 +117,24 @@ Read the attached document and answer as JSON only, no other text:
   "reason": "one sentence a customer could be shown"
 }
 
-What counts as a proof of address: a utility bill, bank or card statement, lease
-or tenancy agreement, insurance document, government or council letter, phone
-bill, or a pay stub - anything issued by an organisation showing the person's
-name and their residential address.
+What counts as a proof of address - anything real that carries the person's name
+and their residential address together:
+  - a utility bill (power, water, gas, phone, internet)
+  - a bank, credit card or building society statement
+  - a lease or tenancy agreement
+  - a medical bill, insurance document or government letter
+  - a pay stub showing the address
+  - a photograph of actual posted mail with the name and address on it
+  - a parcel or delivery label, including an Amazon package, where the name and
+    address can be read
 
-What does not: a photo of a person, a driving licence or passport, a screenshot
-of an app, a blank or unreadable page, a document with no address on it, or a
-receipt with no name.
+What does not:
+  - a driving licence, passport or any photo ID. These prove who somebody is, not
+    where they live, and are never accepted however clearly the address shows
+  - a photo of a person
+  - a screenshot of an app or a website
+  - a blank or unreadable page
+  - anything with no address, or with no name
 
 Matching is a judgement, not string equality. Treat as matching: middle names and
 initials, maiden or married surnames, common misspellings, "St" for "Street",

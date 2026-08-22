@@ -55,11 +55,19 @@ MONEY
 - 7 days or more booked up front gets 7% off the rental. The discount is on the
   rental only, never on the deposit - the deposit is the renter's own money being
   held and is returned.
-- Proof of address is checked automatically as soon as it is uploaded. It must
-  show the renter's own name and the address they entered: a utility bill, bank
-  statement, lease, insurance or government letter, phone bill or pay stub. A
-  photo, an ID card or a screenshot is not accepted and they will be asked to
-  upload something else.
+- Proof of address is checked automatically the moment it is uploaded, and it
+  must show the renter's own name and the address they entered, together on the
+  same document. Anything real counts: a utility bill (power, water, phone,
+  internet), a bank or credit card statement, a lease, a medical bill, an
+  insurance or government letter, a pay stub, a photo of actual mail, even a
+  parcel label such as an Amazon package - as long as the name and address can be
+  read. A phone photo is fine.
+- A driving licence is NOT accepted as proof of address, and this catches people
+  out. It proves who they are, not where they live. Nor is a passport, any photo
+  ID, a screenshot of an app, or a receipt with no name.
+- If the name or address does not match what they registered, it is rejected and
+  they must upload something else. Tell them to check the spelling of their
+  address on the form first - that is usually what is wrong, not the document.
 - Deposit is $150 if you are 25 or over and live in metro Charlotte.
 - $300 if your home address is outside metro Charlotte.
 - $350 if you are aged 21 to 24.
