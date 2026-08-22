@@ -49,7 +49,7 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
 
 .pv-back{position:fixed;inset:0;background:rgba(9,13,18,.6);display:none;z-index:70;padding:26px 14px;overflow:auto}
 .pv-back.on{display:block}
-.pv{max-width:620px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6)}
+.pv{max-width:980px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6)}
 @media(max-width:560px){.pv{padding:15px 14px;border-radius:13px}.pv-car img,.pv-noimg{width:84px;height:58px}.pv-i{grid-template-columns:1fr auto;row-gap:2px}.pv-i span:nth-child(2){grid-column:1}}
 .pv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
 .pv-sub{color:var(--muted);font-size:12.5px;margin-top:2px}
@@ -69,6 +69,10 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
 .pv-empty{color:var(--muted);font-size:13px;padding:6px 0}
 .pv-warn{background:#fff6e5;border:1px solid #f4d9a0;border-radius:10px;padding:10px 13px;font-size:13px;color:#8a5a00}
 .pv-warn ul{margin:6px 0 0;padding-left:18px}
+
+.pv-wbtns{display:flex;gap:6px;flex-wrap:wrap}
+.pv-frame{margin:12px auto 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.pv-frame iframe{display:block;width:100%;height:74vh;min-height:520px;border:0;background:#fff}
 .pv-load{padding:26px;text-align:center;color:var(--muted)}
 .pwchip{margin:6px 0 8px;padding:7px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--muted)}
 .pwchip b{display:inline;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;letter-spacing:.5px;color:var(--ok,#0f8a4d);text-transform:none;margin:0}
@@ -220,65 +224,82 @@ function rowHTML(x){
     +'</div>';
 }
 
-/* What the renter will actually see, assembled from the same rows their own
-   dashboard reads. Checked before a login goes out, so nobody is invited into a
-   dashboard with the wrong car or a balance that looks wrong. */
+/* What the renter will actually see - the live dashboard in an iframe, signed
+   into nothing, fed this renter's real rows. Rebuilding their dashboard here in
+   the admin would drift out of step with the real one the first time either
+   changed, and the whole point of checking an account before inviting someone is
+   that what you are looking at is what they get. */
+const SITE = 'https://rent2go-app.github.io/Rent2Go/index.html?r2gpreview=1';
+let PVWIDTH = 390;
+let PVROW = null;
+function setPvWidth(w){ PVWIDTH=w; if(PVROW) previewRenter(PVROW); }
 async function previewRenter(id){
   const x=ROWS.find(r=>r.id===id); if(!x) return;
+  PVROW=id;
   const back=document.getElementById('pvBack'), body=document.getElementById('pvBody');
-  body.innerHTML='<div class="pv-load">Loading what they will see…</div>';
+  body.innerHTML='<div class="pv-load">Loading what they will see\u2026</div>';
   back.classList.add('on');
-  const [carR,invR]=await Promise.all([
-    x.vehicle_id ? sb.from('vehicles').select('name,make,model,year,color,type,plate,images,daily_rate,account_label').eq('id',x.vehicle_id).limit(1) : Promise.resolve({data:[]}),
-    sb.from('v_renter_invoices').select('number,description,amount_due,pay_status,due_date,issued_at,is_late_fee').eq('renter_id',id).order('issued_at',{ascending:false}).limit(60)
+
+  const [carR,invR,subR]=await Promise.all([
+    x.vehicle_id ? sb.from('vehicles').select('id,name,make,model,year,color,type,plate,images,daily_rate')
+                     .eq('id',x.vehicle_id).limit(1) : Promise.resolve({data:[]}),
+    sb.from('v_renter_invoices').select('*').eq('renter_id',id)
+      .order('issued_at',{ascending:false}).limit(300),
+    sb.from('renter_subscriptions').select('status,daily_amount,current_period_end,started_at')
+      .eq('renter_id',id).in('status',['active','past_due','unpaid','trialing']).limit(1)
   ]);
   const car=(carR.data||[])[0]||null;
   const inv=invR.data||[];
-  const owed=inv.filter(i=>i.pay_status==='open'||i.pay_status==='past_due');
-  const paid=inv.filter(i=>i.pay_status==='paid');
-  const bal=owed.reduce((a,i)=>a+Number(i.amount_due||0),0);
-  const when=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const sub=(subR.data||[])[0]||null;
+
   const issues=[];
-  if(!car) issues.push('No car linked — their dashboard will show no vehicle.');
-  if(!x.portal_url) issues.push('No customer portal for this fleet — the portal button will not work.');
+  if(!car) issues.push('No car linked \u2014 their dashboard will show no vehicle.');
+  if(!sub) issues.push('No live subscription \u2014 no next charge date will show.');
   if(car && !(car.images&&car.images.length)) issues.push('That car has no photo.');
-  if(!x.has_login) issues.push('No login yet — send one before they can see any of this.');
-  else if(x.password_set===false) issues.push('Still on the temporary password we sent. They will be asked to choose their own on first sign-in.');
+  if(!x.has_login) issues.push('No login yet \u2014 send one before they can see any of this.');
+  else if(x.password_set===false) issues.push('Still on the temporary password we sent; they must change it on first sign-in.');
+  if(!x.portal_url) issues.push('No customer portal for this fleet \u2014 the Update payment card link will not work.');
+
+  const names=String(x.name||'').trim().split(/\s+/);
+  const payload={
+    renter:{ id:x.id, first:names[0]||'', last:names.slice(1).join(' '),
+             email:x.email||'', phone:x.phone||'', idVerified:true, stage:'Approved' },
+    car: car ? {
+      id:'sub-preview', carId:car.id,
+      carName:[car.make,car.model].filter(Boolean).join(' ')||car.name||'Your car',
+      type:car.type||'Sedan', color:car.color||'\u2014', plate:car.plate||'',
+      rate:Number((sub&&sub.daily_amount)||car.daily_rate)||0, deposit:0,
+      img:(car.images&&car.images[0])||'', portal:x.portal_url||'',
+      startISO:String((sub&&sub.started_at)||'').slice(0,10), days:0, usage:'personal',
+      rideshareFee:0, firstPayment:0, method:'Daily subscription',
+      pickupDate:'', pickupTime:'', renterId:x.id, idVerified:true, status:'Active',
+      subStatus:(sub&&sub.status)||'', nextChargeISO:(sub&&sub.current_period_end)||''
+    } : null,
+    invoices: inv
+  };
+
   body.innerHTML =
     '<div class="pv-head"><div><b>'+esc(x.name||x.email)+'</b>'
-      +'<div class="pv-sub">'+esc(x.email||'')+' · '+esc(x.fleet||'no fleet')+'</div></div>'
-      +'<button class="btn sm" onclick="closePreview()">Close</button></div>'
+      +'<div class="pv-sub">'+esc(x.email||'')+' \u00b7 '+esc(x.fleet||'no fleet')+'</div></div>'
+      +'<div class="pv-wbtns">'
+        +'<button class="btn sm'+(PVWIDTH===390?' pri':'')+'" onclick="setPvWidth(390)">Phone</button>'
+        +'<button class="btn sm'+(PVWIDTH!==390?' pri':'')+'" onclick="setPvWidth(900)">Desktop</button>'
+        +'<button class="btn sm" onclick="closePreview()">Close</button></div></div>'
     +(issues.length?'<div class="pv-warn"><b>Worth fixing first</b><ul>'
         +issues.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul></div>':'')
-    +'<div class="pv-note">This is what they see when they sign in.</div>'
-    +'<div class="pv-card">'
-      +(car
-        ? '<div class="pv-car">'
-            +(car.images&&car.images[0]?'<img src="'+esc(car.images[0])+'" alt="">':'<div class="pv-noimg">no photo</div>')
-            +'<div><b>'+esc([car.make,car.model].filter(Boolean).join(' ')||car.name)+'</b>'
-            +'<div class="pv-sub">'+esc([car.year,car.color,car.type].filter(Boolean).join(' · '))+'</div>'
-            +'<div class="pv-sub">Plate '+esc(car.plate||'—')+' · $'+(car.daily_rate||'—')+'/day</div></div></div>'
-        : '<div class="pv-empty">No car on their account.</div>')
-    +'</div>'
-    +'<div class="pv-card">'
-      +'<div class="pv-row"><b>Your payments</b><span class="pv-bal'+(bal>0?' owe':'')+'">$'+bal.toFixed(2)+'</span></div>'
-      +'<div class="pv-sub">'+owed.length+' unpaid'
-        +(owed.filter(i=>i.pay_status==='past_due').length?' · '+owed.filter(i=>i.pay_status==='past_due').length+' past due':'')+'</div>'
-      +(owed.length?'<div class="pv-inv">'+owed.slice(0,12).map(i=>
-          '<div class="pv-i'+(i.pay_status==='past_due'?' pd':'')+'"><span>'+esc((i.description||'Rental').slice(0,44))
-          +(i.is_late_fee?' <i>late fee</i>':'')+'</span><span>'+when(i.issued_at)+'</span><b>$'+Number(i.amount_due||0).toFixed(2)+'</b></div>').join('')
-          +'</div>':'<div class="pv-empty">Nothing outstanding.</div>')
-      +(paid.length?'<div class="pv-sub" style="margin-top:8px">'+paid.length+' paid invoice(s) in their history</div>':'')
-    +'</div>'
-    +'<div class="pv-card"><div class="pv-row"><b>How they sign in</b><span class="pv-sub">'
-      +(!x.has_login ? 'No account yet'
-        : x.password_set===true ? 'Own password — chosen by them'
-        : x.password_set===false ? 'Temporary password — must change it on first sign-in'
-        : 'Account exists, no password set yet')+'</span></div>'
-      +'<div class="pv-sub">'+esc(x.email||'')+(x.last_sign_in_at?' · last signed in '+new Date(x.last_sign_in_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):' · never signed in')+'</div></div>'
-    +'<div class="pv-card"><div class="pv-row"><b>Customer portal</b>'
-      +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Open ↗</a>':'<span class="pv-sub">none</span>')
-      +'</div><div class="pv-sub">'+esc(x.portal_url||'No portal on file for '+(x.fleet||'this fleet'))+'</div></div>';
+    +'<div class="pv-frame" style="max-width:'+PVWIDTH+'px">'
+      +'<iframe id="pvFrame" src="'+SITE+'" title="Renter dashboard preview"></iframe></div>';
+
+  /* Same origin, but postMessage anyway: it is the one channel that keeps
+     working if either app ever moves to its own domain. */
+  const f=document.getElementById('pvFrame');
+  let sent=false;
+  const send=()=>{ if(sent)return; sent=true;
+    try{ f.contentWindow.postMessage({type:'r2g-preview',payload},'*'); }catch(e){} };
+  window.addEventListener('message',function once(e){
+    if(e.data&&e.data.type==='r2g-preview-ready'){ send(); }
+  });
+  f.onload=()=>setTimeout(send,400);
 }
 function closePreview(){ document.getElementById('pvBack').classList.remove('on'); }
 async function send(ids,btn){
