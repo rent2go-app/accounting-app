@@ -298,6 +298,11 @@ Deno.serve(async (req) => {
       });
       if (v) {
         proofCheck = v;
+        // if the check flagged a mismatch and they told us the address is right
+        // anyway, that is their word and it goes on the record
+        if (body.address_attested) {
+          await sbPatch(`renters?id=eq.${enc(renter_id)}`, { address_attested: true });
+        }
         const verdict = ["accept", "review", "reject"].includes(v.verdict) ? v.verdict : "review";
         await sbPatch(`renters?id=eq.${enc(renter_id)}`, {
           proof_verdict: verdict,

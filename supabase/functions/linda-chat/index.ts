@@ -74,9 +74,12 @@ MONEY
 - A driving licence is NOT accepted as proof of address, and this catches people
   out. It proves who they are, not where they live. Nor is a passport, any photo
   ID, a screenshot of an app, or a receipt with no name.
-- If the name or address does not match what they registered, it is rejected and
-  they must upload something else. Tell them to check the spelling of their
-  address on the form first - that is usually what is wrong, not the document.
+- If the name or address does not quite match what they registered, they are shown
+  both versions side by side and asked to resolve it there and then: correct the
+  address they typed, upload a different document, or confirm the address is right
+  as entered. Nine times out of ten it is a typo in the form - a missing digit in
+  the street number, a suite or PMB number left off - not a bad document. Tell them
+  to read their own address back first.
 - Deposit is $150 if you are 25 or over and live in metro Charlotte.
 - $300 if your home address is outside metro Charlotte.
 - $350 if you are aged 21 to 24.
