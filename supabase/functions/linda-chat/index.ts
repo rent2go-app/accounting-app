@@ -44,6 +44,18 @@ RENTING
 
 MONEY
 - To start you pay a refundable security deposit plus your first day.
+- Paying for several days up front is fine. Daily billing then does not begin
+  until the day after those paid days run out - so 4 days paid up front means
+  daily billing starts on day 5. The days paid for are credited to the account of
+  the owner whose car it is.
+- 7 days or more booked up front gets 7% off the rental. The discount is on the
+  rental only, never on the deposit - the deposit is the renter's own money being
+  held and is returned.
+- Proof of address is checked automatically as soon as it is uploaded. It must
+  show the renter's own name and the address they entered: a utility bill, bank
+  statement, lease, insurance or government letter, phone bill or pay stub. A
+  photo, an ID card or a screenshot is not accepted and they will be asked to
+  upload something else.
 - Deposit is $150 if you are 25 or over and live in metro Charlotte.
 - $300 if your home address is outside metro Charlotte.
 - $350 if you are aged 21 to 24.

@@ -110,7 +110,13 @@ Deno.serve(async (req) => {
 
     // ---- the money ----
     const deposit   = Number(renter.deposit_total ?? 150);
-    const subtotal  = Math.round(rate * days * 100) / 100;
+    const gross     = Math.round(rate * days * 100) / 100;
+    /* 7% off a week or more, on the rental only. The deposit is refundable - it
+       is the renter's own money being held, so discounting it would mean holding
+       less security for the same car, not giving them anything. */
+    const LONG_STAY_PCT = 7;
+    const discount  = days >= 7 ? Math.round(gross * LONG_STAY_PCT) / 100 : 0;
+    const subtotal  = Math.round((gross - discount) * 100) / 100;
     const rideshare = usage === "rideshare" ? 10 : 0;
     const total     = Math.round((subtotal + deposit + rideshare) * 100) / 100;
     const label     = [v.year, v.make, v.model].filter(Boolean).join(" ") || v.name || "Vehicle";
@@ -119,6 +125,7 @@ Deno.serve(async (req) => {
     const created = await sbPost("bookings", [{
       renter_id: renter.id, auth_uid: uid, vehicle_id: v.id, vehicle_name: label,
       days, daily_rate: rate, subtotal, deposit, rideshare_fee: rideshare,
+      rental_gross: gross, long_stay_discount: discount,
       promo_code: renter.promo_code || null, total, usage,
       start_date: startDate, pickup_time: pickupTime,
       status: "pending_payment", stripe_account: "RENT 2 GO",
@@ -147,7 +154,11 @@ Deno.serve(async (req) => {
       if (desc) f.set(`line_items[${i}][price_data][product_data][description]`, desc);
       i++;
     };
-    line(`${label} — ${days} day${days > 1 ? "s" : ""}`, `$${rate.toFixed(2)} per day`, subtotal);
+    line(`${label} — ${days} day${days > 1 ? "s" : ""}`,
+         discount > 0
+           ? `$${rate.toFixed(2)} per day, less ${LONG_STAY_PCT}% long-stay discount ($${discount.toFixed(2)})`
+           : `$${rate.toFixed(2)} per day`,
+         subtotal);
     if (deposit > 0) {
       const why = [
         Number(renter.deposit_out_of_town) > 0 ? "includes $150 out-of-town" : "",
