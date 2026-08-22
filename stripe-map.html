@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="assets/linda-sm.png">
+<title>Stripe → Car map — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#a86a00;--shadow:0 1px 3px rgba(16,24,40,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a640}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 80px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px;line-height:1.55;max-width:720px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:9px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card .v{font-size:22px;font-weight:800;margin-top:3px}
+.card.warn .v{color:var(--warn)}.card.ok .v{color:var(--in)}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px;box-shadow:var(--shadow)}
+.row.done{border-left:4px solid var(--in)}
+.row.todo{border-left:4px solid var(--warn)}
+.row.none{border-left:4px solid var(--out);opacity:.85}
+.rh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pname{font-weight:800;font-size:15px}
+.acct{font-size:12px;color:var(--muted);background:var(--surface-2);padding:2px 8px;border-radius:99px}
+.who{font-size:12.5px;color:var(--muted)}
+.pick{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:14px;min-width:250px;max-width:100%}
+.hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+.sec{margin:26px 0 10px;font-size:15px;font-weight:800}
+.empty{color:var(--muted);font-size:14px;padding:10px 0}
+.ltoast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;z-index:60}
+.ltoast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stripe → Car map</h1>
+  <p class="sub">A Stripe subscription names its car in the product — <b>“NISSAN SENTRA 2019 - BLACK”</b> — but that
+  text is not reliable enough to match on every sync: colours disagree between the two systems, and two subscriptions
+  can otherwise land on the same vehicle. So each product is resolved to a car <b>once, here</b>, and trusted from then on.
+  Once a product is mapped, cancelling its subscription releases the car and starting a new one claims it, automatically.</p>
+  <div class="bar">
+    <button class="btn pri" id="sync">Run a sync now</button>
+    <button class="btn" id="reload">Reload</button>
+    <span class="hint" id="state"></span>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div id="out"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(m){var t=document.createElement('div');t.className='ltoast';t.textContent=m;document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2600);}
+const LIVE=['active','past_due','unpaid','trialing'];
+let MAP=[], SUBS=[], VEH=[];
+
+async function load(){
+  document.getElementById('state').textContent='Loading…';
+  const [m,s,v]=await Promise.all([
+    sb.from('stripe_product_map').select('*').limit(500),
+    sb.from('renter_subscriptions').select('account_label,product_id,status,customer_email,customer_name,daily_amount').limit(1000),
+    sb.from('vehicles').select('id,name,plate,year,color,status').limit(400)
+  ]);
+  if(m.error){document.getElementById('state').textContent='Sign in as an admin to use this page.';return;}
+  MAP=m.data||[]; SUBS=s.data||[]; VEH=(v.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  document.getElementById('state').textContent='';
+  render();
+}
+
+// which cars are already spoken for, so we never offer one twice
+function takenBy(){const t={};MAP.forEach(r=>{if(r.vehicle_id)t[r.vehicle_id]=r;});return t;}
+
+function render(){
+  const taken=takenBy();
+  const liveKey={};
+  SUBS.filter(s=>LIVE.includes(s.status)).forEach(s=>{
+    const k=s.account_label+'|'+s.product_id;
+    (liveKey[k]=liveKey[k]||[]).push(s);
+  });
+  const rows=MAP.map(r=>({...r,subs:liveKey[r.account_label+'|'+r.product_id]||[]}));
+  const live=rows.filter(r=>r.subs.length);
+  const todo=live.filter(r=>!r.vehicle_id && r.confidence!=='no_such_car');
+  const done=live.filter(r=>r.vehicle_id);
+  const none=live.filter(r=>!r.vehicle_id && r.confidence==='no_such_car');
+  const idle=rows.filter(r=>!r.subs.length);
+
+  document.getElementById('cards').innerHTML=
+     card('Live subscriptions',SUBS.filter(s=>LIVE.includes(s.status)).length,'')
+    +card('Cars mapped',done.length,'ok')
+    +card('Still to map',todo.length,todo.length?'warn':'ok')
+    +card('Not our cars',none.length,'')
+    +card('Products idle',idle.length,'');
+
+  let h='';
+  h+='<div class="sec">Needs a car ('+todo.length+')</div>';
+  h+= todo.length ? todo.map(r=>rowHTML(r,taken,'todo')).join('') : '<p class="empty">Nothing waiting — every live subscription knows its car.</p>';
+  if(done.length){ h+='<div class="sec">Mapped ('+done.length+')</div>'+done.map(r=>rowHTML(r,taken,'done')).join(''); }
+  if(none.length){ h+='<div class="sec">Marked “not one of our cars” ('+none.length+')</div>'+none.map(r=>rowHTML(r,taken,'none')).join(''); }
+  if(idle.length){ h+='<div class="sec">Products with no live subscription ('+idle.length+')</div>'
+    +'<p class="empty">Left alone — nothing is billing on these, so they do not need a car.</p>'; }
+  document.getElementById('out').innerHTML=h;
+
+  document.querySelectorAll('[data-pick]').forEach(sel=>sel.onchange=()=>save(sel.dataset.pick,sel.value,'confirmed'));
+  document.querySelectorAll('[data-none]').forEach(b=>b.onclick=()=>save(b.dataset.none,'','no_such_car'));
+  document.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>save(b.dataset.clear,'','unmatched'));
+}
+function card(l,v,cls){return '<div class="card '+(cls||'')+'"><div class="l">'+l+'</div><div class="v">'+v+'</div></div>';}
+
+function rowHTML(r,taken,cls){
+  const key=r.account_label+'|'+r.product_id;
+  const who=r.subs.map(s=>esc(s.customer_name||s.customer_email||'—')+(s.daily_amount?' · $'+s.daily_amount+'/day':'')).join(' · ');
+  const opts=['<option value="">— pick the car —</option>'].concat(
+    VEH.filter(v=>!taken[v.id]||taken[v.id].product_id===r.product_id).map(v=>
+      '<option value="'+esc(v.id)+'"'+(r.vehicle_id===v.id?' selected':'')+'>'
+      +esc(v.name||v.id)+(v.plate?' · '+esc(v.plate):'')+(v.status!=='live'?' ('+esc(v.status)+')':'')+'</option>')
+  ).join('');
+  return '<div class="row '+cls+'">'
+    +'<div class="rh"><span class="pname">'+esc(r.product_name||r.product_id)+'</span>'
+    +'<span class="acct">'+esc(r.account_label)+'</span></div>'
+    +'<div class="who">'+(who||'no live subscription')+'</div>'
+    +'<div class="pick"><select data-pick="'+esc(key)+'">'+opts+'</select>'
+    +(cls==='todo'?'<button class="btn sm" data-none="'+esc(key)+'">Not one of our cars</button>':'')
+    +(r.vehicle_id?'<button class="btn sm" data-clear="'+esc(key)+'">Unlink</button>':'')
+    +'</div>'
+    +(cls==='todo'?'<div class="hint">Until this is set, the car will not be marked rented and will not free up when the subscription ends.</div>':'')
+    +'</div>';
+}
+
+async function save(key,vehicleId,confidence){
+  const [account_label,product_id]=key.split('|');
+  const patch={vehicle_id:vehicleId||null,confidence:confidence,confirmed_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  try{const u=await sb.auth.getUser(); patch.confirmed_by=u?.data?.user?.email||null;}catch(e){}
+  const r=await sb.from('stripe_product_map').update(patch).eq('account_label',account_label).eq('product_id',product_id);
+  if(r.error){alert(r.error.message);return;}
+  toast(confidence==='no_such_car'?'Marked as not ours':confidence==='unmatched'?'Unlinked':'Car linked ✓');
+  await load();
+}
+
+document.getElementById('reload').onclick=load;
+document.getElementById('sync').onclick=async function(){
+  const b=this,o=b.textContent;b.disabled=true;b.textContent='Syncing…';
+  try{
+    const r=await sb.functions.invoke('stripe-mirror',{body:{}});
+    if(r.error)throw r.error;
+    const d=r.data||{};
+    toast('Synced '+d.accounts+' accounts · '+d.cars_linked+' linked · '+d.cars_released+' released');
+    await load();
+  }catch(e){alert('Sync failed: '+(e.message||e));}
+  b.disabled=false;b.textContent=o;
+};
+load();
+</script>
+<script defer src="assets/nav.js"></script>
+</body></html>
