@@ -265,6 +265,28 @@ Deno.serve(async (req) => {
        Idempotent: an account that already points at this URL is left alone and
        its existing secret reported, because Stripe only reveals a signing secret
        when the endpoint is created. */
+    /* What each account is actually sending us, and where. Diagnosing "the
+       webhook never fired" by guessing is how you end up creating a second
+       endpoint beside a broken one. */
+    if (body.action === "list_webhooks") {
+      const only = body.account_label ? String(body.account_label) : null;
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        if (only && a.label !== only) continue;
+        try {
+          const r = await (await fetch("https://api.stripe.com/v1/webhook_endpoints?limit=100",
+            { headers: { Authorization: `Bearer ${a.key}` } })).json();
+          for (const w of (r.data || [])) {
+            out.push({ label: a.label, id: w.id, url: w.url, status: w.status,
+                       events: w.enabled_events });
+          }
+          if (!(r.data || []).length) out.push({ label: a.label, none: true });
+        } catch (e) { out.push({ label: a.label, error: String(e).slice(0, 120) }); }
+      }
+      return json({ ok: true, endpoints: out });
+    }
+
     if (body.action === "create_webhooks") {
       const url = String(body.url || `${SB.replace(".supabase.co", ".functions.supabase.co")}/stripe-webhook`);
       const events = [

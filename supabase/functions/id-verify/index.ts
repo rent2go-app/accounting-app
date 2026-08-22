@@ -226,6 +226,18 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "status") {
+      /* A signed-in renter may refresh their OWN check and nobody else's, so we
+         ignore any session id they send and use the one on their row. This is
+         what lets the portal correct itself: Stripe clears an identity check in
+         seconds, and if the webhook does not land the renter would otherwise sit
+         on "pending verification" forever while Stripe has already said yes. */
+      if (!isAdmin && callerUid) {
+        const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=session_id&limit=1`);
+        const own = mine && mine[0] && mine[0].session_id;
+        if (!own) return json({ ok: true, status: "none" });
+        body.session_id = own;
+      }
+
       if (!body.session_id) return json({ error: "session_id required" });
       if (!isAdmin) {
         const mine = await sbGet(`renters?auth_uid=eq.${enc(callerUid)}&select=session_id`);
