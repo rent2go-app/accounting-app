@@ -175,7 +175,12 @@ Deno.serve(async (req) => {
       status: "pending_payment", stripe_account: "RENT 2 GO",
     }]);
     const booking = created && created[0];
-    if (!booking) return json({ error: "could not start the booking" }, 500);
+    if (!booking) {
+      // Say why. This message once hid a column that did not exist, and "could
+      // not start the booking" is not something anyone can act on.
+      const why = (created && (created as any).message) || (created && (created as any).error) || "";
+      return json({ error: "could not start the booking", detail: String(why).slice(0, 240) }, 500);
+    }
 
     // ---- Stripe Checkout ----
     const origin = String(body.return_origin || Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/");
