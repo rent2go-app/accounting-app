@@ -199,8 +199,12 @@ Deno.serve(async (req) => {
         });
       }
       f.set("customer", customerId);
-      f.set("customer_update[address]", "auto");
-      f.set("customer_update[name]", "auto");
+      /* Deliberately no customer_update here. "auto" would let Stripe overwrite
+         the customer's address and name with whatever the payer types at
+         checkout - usually the billing address on the card, which may be a
+         parent's or an employer's. The whole point is that the invoice carries
+         the address we verified against a document, so it must not be replaced
+         by an unverified one at the moment of payment. */
     } else if (renter.email) {
       f.set("customer_email", String(renter.email));
     }
