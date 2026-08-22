@@ -229,7 +229,13 @@ function rowHTML(x){
    the admin would drift out of step with the real one the first time either
    changed, and the whole point of checking an account before inviting someone is
    that what you are looking at is what they get. */
+/* GitHub Pages serves the customer site with cache-control: max-age=600, so an
+   iframe opened within ten minutes of a previous one gets the browser's copy -
+   which is how a preview can keep showing a fault that has already been fixed.
+   A per-open stamp forces the current page every time; the admin has to be
+   looking at what is live, not at what was live ten minutes ago. */
 const SITE = 'https://rent2go-app.github.io/Rent2Go/index.html?r2gpreview=1';
+function siteUrl(){ return SITE + '&_=' + Date.now(); }
 /* Desktop first: most of these accounts get checked at a desk, and the full
    layout is where a missing car or a wrong balance is easiest to spot. The phone
    view is a click away for checking what most renters will actually be holding. */
@@ -292,7 +298,7 @@ async function previewRenter(id){
     +(issues.length?'<div class="pv-warn"><b>Worth fixing first</b><ul>'
         +issues.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul></div>':'')
     +'<div class="pv-frame" style="max-width:'+PVWIDTH+'px">'
-      +'<iframe id="pvFrame" src="'+SITE+'" title="Renter dashboard preview"></iframe></div>';
+      +'<iframe id="pvFrame" src="'+siteUrl()+'" title="Renter dashboard preview"></iframe></div>';
 
   /* Same origin, but postMessage anyway: it is the one channel that keeps
      working if either app ever moves to its own domain. */
