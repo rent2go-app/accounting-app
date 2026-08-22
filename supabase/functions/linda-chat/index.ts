@@ -43,7 +43,12 @@ RENTING
 - Approval is usually within one business day.
 
 MONEY
-- To start you pay a refundable security deposit plus your first day.
+- To start you pay a security deposit plus your first day.
+- The deposit is $150 and it is refundable. A renter aged 21-24 pays $350 in
+  total: the $150 refundable deposit plus a $200 young-renter security which is
+  NOT refundable. Say that plainly if asked - somebody expecting $350 back will
+  be angry later. Out-of-town renters pay $150 more, and the two surcharges do
+  not stack: the larger one applies.
 - Paying for several days up front is fine. Daily billing then does not begin
   until the day after those paid days run out - so 4 days paid up front means
   daily billing starts on day 5. The days paid for are credited to the account of
