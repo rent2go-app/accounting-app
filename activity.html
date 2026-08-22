@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="assets/linda-sm.png">
+<title>Stripe Activity — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#a86a00;--gold:#c98a2b;--shadow:0 1px 3px rgba(16,24,40,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a640;--gold:#e0a640}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.topbar{display:flex;align-items:center;gap:12px;padding:11px 18px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brandlogo{height:28px}.sub{font-size:12px;color:var(--muted);font-weight:700}.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+.wrap{max-width:1360px;margin:0 auto;padding:18px 18px 90px}
+h1{font-size:23px;margin:0 0 3px}.lead{color:var(--muted);font-size:13px;margin:0 0 16px}
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 15px;box-shadow:var(--shadow);margin-bottom:16px}
+.ctl label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ctl input,.ctl select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.card .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.card .v{font-size:24px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.card .v.pos{color:var(--in)}.card .v.neg{color:var(--out)}.card .v.brand{color:var(--brand)}
+.sechd{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:22px 0 8px}
+.tblwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--surface-2);position:sticky;top:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:hover td{background:var(--surface-2)}
+tr.tot td{font-weight:800;border-top:2px solid var(--line-strong,var(--line));background:var(--surface-2)}
+.acctname{font-weight:700}
+.neg{color:var(--out)}.pos{color:var(--in)}
+.hint{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <img class="brandlogo" src="assets/logo.png" alt="Rent 2 Go">
+  <span class="sub">· Stripe Activity</span>
+  <span class="spacer"></span>
+  <button class="btn" onclick="location.href='owners.html'">👥 Owners</button>
+  <button class="btn" onclick="location.href='index.html'">← Ledger</button>
+  <button class="btn pri" id="sync">↻ Sync now</button>
+</div>
+<div class="wrap">
+  <h1>Stripe Activity</h1>
+  <p class="lead">Every Stripe account's daily income in one place — gross, fees, net and payouts across all 14 accounts. This is the full activity view; the Owners dashboard shows the same figures per owner.</p>
+
+  <div class="ctl">
+    <span><label>Month</label> <input type="month" id="ym"></span>
+    <span><label>Account</label> <select id="acct"><option value="">All accounts</option></select></span>
+    <span class="spacer"></span>
+    <span class="hint" id="state"></span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="sechd">By account · <span id="mlbl"></span></div>
+  <div class="tblwrap"><table id="acctTbl"><thead><tr><th>Account</th><th class="n">Gross</th><th class="n">Stripe fees</th><th class="n">Net</th><th class="n">Paid out</th><th class="n">Txns</th><th class="n">Days</th></tr></thead><tbody></tbody></table></div>
+
+  <div class="sechd">Daily detail</div>
+  <div class="tblwrap"><table id="dayTbl"><thead><tr><th>Date</th><th>Account</th><th class="n">Gross</th><th class="n">Fees</th><th class="n">Net</th><th class="n">Paid out</th><th class="n">Txns</th></tr></thead><tbody></tbody></table></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt=n=>'$'+(Math.round((+n||0)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const nkey=s=>String(s||'').toLowerCase().replace(/rent\s*2\s*go?/,'').replace(/[^a-z0-9]/g,'');
+let ROWS=[], NAMES={};   // NAMES: normalised label -> owner display name
+
+function curYM(){var n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');}
+function nameFor(label){return NAMES[nkey(label)]||label;}
+
+async function loadOwners(){
+  try{
+    var r=await sb.from('owners_program').select('owners').eq('id',1).single();
+    (r.data&&r.data.owners||[]).forEach(function(o){var lab=(o.stripeLabel||'').trim();if(lab)NAMES[nkey(lab)]=(o.name||o.bizName||lab).trim();});
+  }catch(e){}
+}
+async function loadRows(){
+  var out=[],from=0;
+  while(true){
+    var q=await sb.from('stripe_income').select('day,label,gross,fee,net,payout,txns').order('day',{ascending:false}).range(from,from+999);
+    if(q.error){document.getElementById('state').textContent='Sign in as an admin (via Owners or Ledger) to view Stripe activity.';return null;}
+    var d=q.data||[];out=out.concat(d);if(d.length<1000)break;from+=1000;
+  }
+  return out;
+}
+async function boot(){
+  document.getElementById('state').textContent='Loading…';
+  await loadOwners();
+  var rows=await loadRows(); if(rows===null)return;
+  ROWS=rows;
+  // account filter options (unique by normalised key, showing owner name)
+  var seen={},opts='<option value="">All accounts</option>';
+  ROWS.forEach(function(r){var k=nkey(r.label);if(!seen[k]){seen[k]=1;}});
+  Object.keys(seen).sort(function(a,b){return (NAMES[a]||a).localeCompare(NAMES[b]||b);}).forEach(function(k){
+    var disp=NAMES[k]||k; opts+='<option value="'+k+'">'+esc(disp)+'</option>';
+  });
+  document.getElementById('acct').innerHTML=opts;
+  document.getElementById('ym').value=curYM();
+  document.getElementById('state').textContent='';
+  render();
+}
+function render(){
+  var ym=document.getElementById('ym').value||curYM();
+  var acctKey=document.getElementById('acct').value;
+  document.getElementById('mlbl').textContent=new Date(ym+'-01T00:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  var rows=ROWS.filter(function(r){return String(r.day).slice(0,7)===ym && (!acctKey || nkey(r.label)===acctKey);});
+  // totals
+  var T={g:0,f:0,n:0,p:0,t:0};
+  rows.forEach(function(r){T.g+=+r.gross||0;T.f+=+r.fee||0;T.n+=+r.net||0;T.p+=+r.payout||0;T.t+=+r.txns||0;});
+  document.getElementById('cards').innerHTML=
+     card('Gross (GMV)',fmt(T.g),'')
+    +card('Stripe fees',fmt(-T.f),'neg')
+    +card('Net earnings',fmt(T.n),'pos')
+    +card('Paid out',fmt(T.p),'brand')
+    +card('Transactions',T.t,'');
+  // by account
+  var by={};
+  rows.forEach(function(r){var k=nkey(r.label);var b=by[k]=by[k]||{g:0,f:0,n:0,p:0,t:0,days:0};b.g+=+r.gross||0;b.f+=+r.fee||0;b.n+=+r.net||0;b.p+=+r.payout||0;b.t+=+r.txns||0;b.days++;});
+  var ab=Object.keys(by).sort(function(a,b){return by[b].g-by[a].g;}).map(function(k){var b=by[k];
+    return '<tr><td class="acctname">'+esc(NAMES[k]||k)+'</td><td class="n">'+fmt(b.g)+'</td><td class="n neg">'+fmt(-b.f)+'</td><td class="n pos">'+fmt(b.n)+'</td><td class="n">'+fmt(b.p)+'</td><td class="n">'+b.t+'</td><td class="n">'+b.days+'</td></tr>';
+  }).join('');
+  ab+='<tr class="tot"><td>Total · '+Object.keys(by).length+' account'+(Object.keys(by).length===1?'':'s')+'</td><td class="n">'+fmt(T.g)+'</td><td class="n neg">'+fmt(-T.f)+'</td><td class="n pos">'+fmt(T.n)+'</td><td class="n">'+fmt(T.p)+'</td><td class="n">'+T.t+'</td><td class="n"></td></tr>';
+  document.querySelector('#acctTbl tbody').innerHTML=ab||'<tr><td colspan="7" class="hint" style="padding:16px">No activity for this month.</td></tr>';
+  // daily detail
+  var db=rows.slice().sort(function(a,b){return a.day<b.day?1:(a.day>b.day?-1:0);}).map(function(r){
+    return '<tr><td>'+esc(r.day)+'</td><td class="acctname">'+esc(nameFor(r.label))+'</td><td class="n">'+fmt(r.gross)+'</td><td class="n neg">'+fmt(-(+r.fee||0))+'</td><td class="n pos">'+fmt(r.net)+'</td><td class="n">'+fmt(r.payout)+'</td><td class="n">'+(+r.txns||0)+'</td></tr>';
+  }).join('');
+  document.querySelector('#dayTbl tbody').innerHTML=db||'<tr><td colspan="7" class="hint" style="padding:16px">No rows.</td></tr>';
+}
+function card(l,v,cls){return '<div class="card"><div class="l">'+l+'</div><div class="v '+(cls||'')+'">'+v+'</div></div>';}
+
+document.getElementById('ym').addEventListener('change',render);
+document.getElementById('acct').addEventListener('change',render);
+document.getElementById('sync').addEventListener('click',async function(){
+  var b=this;b.disabled=true;b.textContent='Syncing…';
+  try{var s=await sb.auth.getSession();var tok=s.data.session?s.data.session.access_token:'';
+    var r=await fetch(window.R2G_CONFIG.SUPABASE_URL+'/functions/v1/stripe-sync',{method:'POST',headers:{'Content-Type':'application/json','apikey':window.R2G_CONFIG.SUPABASE_ANON_KEY,'Authorization':'Bearer '+tok},body:'{}'});
+    await r.json().catch(function(){});
+    b.textContent='Reloading…';var rows=await loadRows();if(rows)ROWS=rows;render();
+  }catch(e){alert('Sync failed: '+(e.message||e));}
+  b.disabled=false;b.textContent='↻ Sync now';
+});
+boot();
+</script>
+</body>
+</html>
