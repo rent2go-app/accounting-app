@@ -300,6 +300,27 @@ body.readonly .stack .rec{display:none!important}
 .txntype{font-weight:700;font-size:12px;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .txntype.income{color:var(--in,#0a7d33);background:color-mix(in srgb,var(--in,#0a7d33) 14%,transparent)}
 .txntype.expense{color:var(--out,#b3261e);background:color-mix(in srgb,var(--out,#b3261e) 14%,transparent)}
+
+/* ---- mobile readiness ----
+   Appended to this page's own stylesheet, because it does not load
+   assets/style.css and so the shared mobile rules cannot reach it. */
+@media (max-width:820px){
+  /* iOS zooms the page in when you tap a field under 16px and does not zoom back
+     out. A correctness rule about the platform, not a preference. */
+  input,select,textarea{font-size:16px!important}
+  html,body{overflow-x:clip;max-width:100%}
+  img,canvas,iframe{max-width:100%;height:auto}
+}
+/* A table of real rows does not fit in 390px. Let it scroll inside itself
+   instead of dragging the whole page sideways. */
+@media (max-width:720px){
+  table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  th,td{padding:9px 10px!important;font-size:13px!important;white-space:nowrap}
+}
+@media (hover:none),(max-width:560px){
+  .btn{min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+  .btn.sm{min-height:34px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://js.stripe.com/v3/"></script>

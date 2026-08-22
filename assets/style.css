@@ -125,7 +125,10 @@ label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted)
 /* iOS zooms the page in when you tap a field whose text is under 16px, and it
    does not zoom back out. Every input here was 14px. */
 @media (max-width: 820px) {
-  input, select, textarea { font-size: 16px; }
+  /* !important because every page carries its own <style> with more specific
+     input rules (.ctl input, input[type=text], input.search). This is a
+     correctness rule about how iOS behaves, not a look someone might prefer. */
+  input, select, textarea { font-size: 16px !important; }
 }
 
 /* A wide table is the one thing on these pages that can push the whole page
