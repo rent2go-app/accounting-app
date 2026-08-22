@@ -25,6 +25,7 @@
       { t: "Vehicles", h: "cars.html", icon: "🚙" },
       { t: "GPS Tracker", h: "gps.html", icon: "📡" },
       { t: "Stripe → Car", h: "stripe-map.html", icon: "🔗" },
+      { t: "Fleet Billing", h: "fleet-billing.html", icon: "🏦" },
       { t: "Fleet (old)", h: "fleet.html", icon: "🗂️" },
     ]},
     { g: "People", icon: "👥", items: [

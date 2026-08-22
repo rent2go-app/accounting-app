@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<link rel="icon" type="image/png" href="assets/linda-sm.png">
+<title>Fleet → Owner &amp; Billing — Rent 2 Go</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8a4d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--surface-2:#f2f5f9;--text:#131820;--muted:#5c6a7a;--line:#c9d2de;--brand:#0f8a4d;--in:#0a7d44;--out:#c22a2a;--warn:#a86a00;--shadow:0 1px 3px rgba(16,24,40,.08)}
+@media(prefers-color-scheme:dark){:root{--bg:#0c0f14;--surface:#151b23;--surface-2:#1b2330;--text:#e7ebf1;--muted:#93a0b0;--line:#2b333f;--brand:#12a35c;--in:#38d07f;--out:#f36f6f;--warn:#e0a640}}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 14px 90px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px;line-height:1.55;max-width:760px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:9px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.card .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card .v{font-size:22px;font-weight:800;margin-top:3px}
+.card.warn .v{color:var(--warn)}.card.ok .v{color:var(--in)}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:8px;box-shadow:var(--shadow);border-left:4px solid var(--in)}
+.row.gap{border-left-color:var(--warn)}
+.rh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:7px}
+.cname{font-weight:800;font-size:15px}
+.tag{font-size:11.5px;color:var(--muted);background:var(--surface-2);padding:2px 8px;border-radius:99px}
+.tag.red{color:#fff;background:var(--out)}
+.grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:13.5px;width:100%}
+.portal{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.portal a{color:var(--brand)}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px}
+.sec{margin:24px 0 10px;font-size:15px;font-weight:800}
+.empty{color:var(--muted);font-size:14px}
+.ltoast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;z-index:60}
+.ltoast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Fleet → Owner &amp; Billing</h1>
+  <p class="sub">Each live car is tied to the Stripe account that bills it, and therefore to the customer portal its
+  renter should be sent to. Most are set automatically from the subscription that holds the car — set the rest here.
+  A car with no billing account will leave its renter without a working portal link.</p>
+  <div class="bar">
+    <input class="search" id="q" placeholder="Search a car, plate, owner or account…">
+    <button class="btn" id="reload">Reload</button>
+    <span id="state" class="tag"></span>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div id="out"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.R2G_CONFIG={SUPABASE_URL:'https://fsapfxhyjbgxjydahdlx.supabase.co',SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYXBmeGh5amJneGp5ZGFoZGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTI5ODgsImV4cCI6MjEwMDQ4ODk4OH0.CHS63agKi6FAoUwmFpy_SkqCpH9UTRAzyQAUoNbEcUM'};</script>
+<script>
+const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G_CONFIG.SUPABASE_ANON_KEY);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(m){var t=document.createElement('div');t.className='ltoast';t.textContent=m;document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2500);}
+let CARS=[],OWNERS=[],FLEETS=[],Q='';
+
+async function load(){
+  document.getElementById('state').textContent='loading…';
+  const [c,o,f]=await Promise.all([
+    sb.from('vehicles').select('id,name,plate,status,available,owner_id,account_label,daily_rate').eq('status','live').limit(400),
+    sb.from('owners').select('id,name').limit(60),
+    sb.from('fleet_accounts').select('label,portal_url').limit(40)
+  ]);
+  if(c.error){document.getElementById('state').textContent='sign in as an admin';return;}
+  CARS=(c.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  OWNERS=(o.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  FLEETS=(f.data||[]).sort((a,b)=>String(a.label).localeCompare(String(b.label)));
+  document.getElementById('state').textContent='';
+  render();
+}
+
+function render(){
+  const q=Q.toLowerCase();
+  const portalFor=l=>(FLEETS.find(f=>f.label===l)||{}).portal_url||'';
+  const list=CARS.filter(c=>!q||[c.name,c.plate,c.account_label,(OWNERS.find(o=>o.id===c.owner_id)||{}).name]
+    .some(x=>String(x||'').toLowerCase().includes(q)));
+  const noAcct=CARS.filter(c=>!c.account_label);
+  const noOwner=CARS.filter(c=>!c.owner_id);
+  document.getElementById('cards').innerHTML=
+     '<div class="card"><div class="l">Live cars</div><div class="v">'+CARS.length+'</div></div>'
+    +'<div class="card '+(noAcct.length?'warn':'ok')+'"><div class="l">No billing account</div><div class="v">'+noAcct.length+'</div></div>'
+    +'<div class="card '+(noOwner.length?'warn':'ok')+'"><div class="l">No owner</div><div class="v">'+noOwner.length+'</div></div>'
+    +'<div class="card ok"><div class="l">Portal reachable</div><div class="v">'+CARS.filter(c=>portalFor(c.account_label)).length+'</div></div>';
+
+  const gaps=list.filter(c=>!c.account_label||!c.owner_id);
+  const done=list.filter(c=>c.account_label&&c.owner_id);
+  let h='';
+  if(gaps.length){h+='<div class="sec">Needs connecting ('+gaps.length+')</div>'+gaps.map(row).join('');}
+  h+='<div class="sec">Connected ('+done.length+')</div>'+(done.length?done.map(row).join(''):'<p class="empty">None yet.</p>');
+  document.getElementById('out').innerHTML=h;
+  document.querySelectorAll('[data-owner]').forEach(s=>s.onchange=()=>save(s.dataset.owner,{owner_id:s.value||null},'Owner set'));
+  document.querySelectorAll('[data-acct]').forEach(s=>s.onchange=()=>save(s.dataset.acct,{account_label:s.value||null},'Billing account set'));
+
+  function row(c){
+    const portal=portalFor(c.account_label);
+    const gap=!c.account_label||!c.owner_id;
+    return '<div class="row'+(gap?' gap':'')+'">'
+      +'<div class="rh"><span class="cname">'+esc(c.name||c.id)+'</span>'
+      +(c.plate?'<span class="tag">'+esc(c.plate)+'</span>':'')
+      +(c.daily_rate?'<span class="tag">$'+c.daily_rate+'/day</span>':'')
+      +'<span class="tag'+(c.available?'':' red')+'">'+(c.available?'available':'rented')+'</span></div>'
+      +'<div class="grid">'
+        +'<div><div class="lbl">Owner</div><select data-owner="'+esc(c.id)+'">'
+          +'<option value="">— no owner —</option>'
+          +OWNERS.map(o=>'<option value="'+esc(o.id)+'"'+(c.owner_id===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('')
+        +'</select></div>'
+        +'<div><div class="lbl">Billed through</div><select data-acct="'+esc(c.id)+'">'
+          +'<option value="">— not set —</option>'
+          +FLEETS.map(f=>'<option value="'+esc(f.label)+'"'+(c.account_label===f.label?' selected':'')+'>'+esc(f.label)+(f.portal_url?'':' (no portal)')+'</option>').join('')
+        +'</select></div>'
+        +'<div><div class="lbl">Customer portal</div><div class="portal">'
+          +(portal?'<a href="'+esc(portal)+'" target="_blank" rel="noopener">open portal ↗</a>':'—')
+        +'</div></div>'
+      +'</div></div>';
+  }
+}
+async function save(id,patch,msg){
+  const r=await sb.from('vehicles').update(patch).eq('id',id);
+  if(r.error){alert(r.error.message);return;}
+  toast(msg+' ✓'); await load();
+}
+document.getElementById('q').oninput=e=>{Q=e.target.value;render();};
+document.getElementById('reload').onclick=load;
+load();
+</script>
+<script defer src="assets/nav.js"></script>
+</body></html>
