@@ -27,17 +27,23 @@ Deno.serve(async (req) => {
     if (!okSR && bearer) { try { const p = JSON.parse(atob(bearer.split(".")[1])); if (p.role === "service_role") okSR = true; } catch (_) { /* not a jwt */ } }
     if (!okToken && !okSR) return json({ error: "unauthorized" }, 401);
 
-    // Accounts come from STRIPE_ACCOUNTS plus an additive STRIPE_ACCOUNTS_EXTRA (so new accounts can be
-    // onboarded without touching — or needing to read — the main secret). Merge by label; EXTRA wins.
-    let accounts: Array<{ label: string; key: string }> = [];
-    try { accounts = JSON.parse(Deno.env.get("STRIPE_ACCOUNTS") || "[]"); } catch (_) { return json({ error: "STRIPE_ACCOUNTS is not valid JSON" }, 500); }
-    let extra: Array<{ label: string; key: string }> = [];
-    try { extra = JSON.parse(Deno.env.get("STRIPE_ACCOUNTS_EXTRA") || "[]"); } catch (_) { return json({ error: "STRIPE_ACCOUNTS_EXTRA is not valid JSON" }, 500); }
-    if (extra.length) {
-      const byLabel: Record<string, { label: string; key: string }> = {};
-      for (const a of [...accounts, ...extra]) { if (a && a.label && a.key) byLabel[a.label] = a; }
-      accounts = Object.values(byLabel);
+    // Accounts come from STRIPE_ACCOUNTS + additive STRIPE_ACCOUNTS_EXTRA, AND — so every billed account
+    // syncs its income without re-keying — the same account list Linda uses (LINDA_ACCOUNTS +
+    // LINDA_ACCOUNTS_EXTRA). Linda bills all 14 accounts, so her config already holds every rk_live_ key.
+    // Merge by label; STRIPE_ACCOUNTS(_EXTRA) win over Linda's for any label defined in both.
+    const parseArr = (name: string) => { try { return JSON.parse(Deno.env.get(name) || "[]") as Array<{ label: string; key: string }>; } catch (_) { return []; } };
+    let stripeMain: Array<{ label: string; key: string }> = [];
+    try { stripeMain = JSON.parse(Deno.env.get("STRIPE_ACCOUNTS") || "[]"); } catch (_) { return json({ error: "STRIPE_ACCOUNTS is not valid JSON" }, 500); }
+    // Dedupe by NORMALISED label key so the same account under two spellings (e.g. "RENT 2 GO - MNzw" vs
+    // "Rent 2 Go - MNzw") is synced ONCE — otherwise its income is written twice and double-counts. Order
+    // is lowest→highest priority: Linda base, Linda extra, STRIPE_ACCOUNTS, STRIPE_ACCOUNTS_EXTRA (last wins,
+    // so an explicit STRIPE_ACCOUNTS label is the canonical spelling).
+    const nkey = (s: string) => String(s || "").toLowerCase().replace(/rent\s*2\s*go?/, "").replace(/[^a-z0-9]/g, "");
+    const byKey: Record<string, { label: string; key: string }> = {};
+    for (const a of [...parseArr("LINDA_ACCOUNTS"), ...parseArr("LINDA_ACCOUNTS_EXTRA"), ...stripeMain, ...parseArr("STRIPE_ACCOUNTS_EXTRA")]) {
+      if (a && a.label && a.key) byKey[nkey(a.label)] = { label: a.label, key: a.key };
     }
+    let accounts: Array<{ label: string; key: string }> = Object.values(byKey);
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch (_) { /* no body */ }
