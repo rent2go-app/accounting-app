@@ -156,6 +156,34 @@ Deno.serve(async (req) => {
       return json({ ok: true, count: ids.length, next: ids.length ? ids[ids.length - 1].id : null, sessions: out });
     }
 
+    // Admin-only diagnostic: what does a live subscription actually tell us?
+    // We need to know whether the car is identifiable from Stripe alone, or only
+    // from Linda's manual GPS link. Returns no keys.
+    if (body.action === "subs" && isAdmin) {
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        try {
+          const r = await fetch("https://api.stripe.com/v1/subscriptions?status=all&limit=6&expand[]=data.customer", { headers: { Authorization: `Bearer ${a.key}` } });
+          const j = await r.json();
+          if (j.error) { out.push({ label: a.label, error: j.error.message }); continue; }
+          for (const s of (j.data || [])) {
+            const it = (s.items?.data || [])[0] || {};
+            out.push({
+              label: a.label, sub: s.id, status: s.status,
+              customer: (s.customer && s.customer.email) || s.customer,
+              amount: it.price ? (it.price.unit_amount || 0) / 100 : null,
+              interval: it.price?.recurring?.interval || null,
+              price_nickname: it.price?.nickname || null,
+              product_id: it.price?.product || null,
+              sub_metadata: s.metadata || {},
+            });
+          }
+        } catch (e) { out.push({ label: a.label, error: String(e) }); }
+      }
+      return json({ ok: true, subs: out });
+    }
+
     if (body.action === "files") {
       if (!isAdmin) return json({ error: "admins only" }, 403);
       if (!body.session_id) return json({ error: "session_id required" });
