@@ -62,6 +62,10 @@ MONEY
   insurance or government letter, a pay stub, a photo of actual mail, even a
   parcel label such as an Amazon package - as long as the name and address can be
   read. A phone photo is fine.
+- Staying in a hotel? A hotel invoice works, with conditions: it must show their
+  name, the hotel's address, and the stay dates - and those dates must be current
+  or within the last 14 days. An older hotel bill does not show where they live
+  now. On a hotel invoice the address shown is the hotel's, which is expected.
 - A driving licence is NOT accepted as proof of address, and this catches people
   out. It proves who they are, not where they live. Nor is a passport, any photo
   ID, a screenshot of an app, or a receipt with no name.

@@ -107,7 +107,7 @@ Read the attached document and answer as JSON only, no other text:
 
 {
   "is_proof_of_address": true|false,
-  "doc_type": "utility bill" | "bank statement" | "lease" | "insurance letter" | "government letter" | "phone bill" | "pay stub" | "other" | "none",
+  "doc_type": "utility bill" | "bank statement" | "lease" | "insurance letter" | "government letter" | "phone bill" | "pay stub" | "mail" | "parcel label" | "hotel invoice" | "other" | "none",
   "name_on_document": "exactly as printed, or null",
   "address_on_document": "exactly as printed, or null",
   "document_date": "YYYY-MM-DD or null",
@@ -127,6 +127,14 @@ and their residential address together:
   - a photograph of actual posted mail with the name and address on it
   - a parcel or delivery label, including an Amazon package, where the name and
     address can be read
+  - a hotel invoice or folio, if the guest is currently staying there. This is the
+    one case where the address on the document is NOT theirs - it is the hotel's -
+    so do not fail it for that. It is acceptable only when ALL of these hold:
+      the guest name matches the applicant,
+      the stay dates are shown,
+      and those dates fall within the last 14 days or are ongoing.
+    An older hotel bill is not proof of where somebody lives now: mark it review,
+    not accept, and say the stay is out of date.
 
 What does not:
   - a driving licence, passport or any photo ID. These prove who somebody is, not
@@ -140,6 +148,10 @@ Matching is a judgement, not string equality. Treat as matching: middle names an
 initials, maiden or married surnames, common misspellings, "St" for "Street",
 missing or extra apartment numbers, and joint accounts where the applicant is one
 of the names shown.
+
+On a hotel invoice, set address_matches to true when the hotel's own address is
+shown clearly and the stay is current - the address is not meant to be theirs, and
+judging it against their registered address would fail every one of them.
 
 Choose the verdict this way:
 - "reject" only if it is not a proof of address at all, or the name AND the
