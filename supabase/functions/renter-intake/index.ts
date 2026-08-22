@@ -61,6 +61,104 @@ async function createSession(renter: any, renter_id: string, key: string, return
   return await stripeForm("https://api.stripe.com/v1/identity/verification_sessions", f, key);
 }
 
+/* ---- does the uploaded file actually prove where they live? ----
+   The applicant types a name and an address and uploads a document. Nobody
+   compared the two until a person opened the file by hand, which on a busy week
+   means not at all - so an application could pass review with a selfie attached.
+
+   Three verdicts, deliberately not two. A file that is not a proof of address is
+   a clear reject. A name or address that does not quite line up is not: people
+   hold bills in a spouse's name, use a maiden name, or leave the flat number off
+   the form. Auto-rejecting those turns away paying customers, so they go to a
+   human instead. */
+const AK = Deno.env.get("ANTHROPIC_API_KEY") || "";
+const VMODEL = Deno.env.get("PROOF_MODEL") || "claude-sonnet-4-6";
+
+async function verifyProof(proof: any, claim: {
+  name: string; address: string; city: string; state: string; postal: string;
+}): Promise<any | null> {
+  if (!AK || !proof?.data) return null;
+  const m = String(proof.data).match(/^data:([^;]+);base64,(.*)$/);
+  if (!m) return null;
+  const media = m[1].toLowerCase(), b64 = m[2];
+
+  // Claude reads images directly and PDFs through the document block. Anything
+  // else - a .docx, a .heic the browser did not convert - cannot be read, and
+  // guessing would be worse than saying so.
+  let block: any;
+  if (media === "application/pdf") {
+    block = { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } };
+  } else if (/^image\/(jpeg|png|webp|gif)$/.test(media)) {
+    block = { type: "image", source: { type: "base64", media_type: media, data: b64 } };
+  } else {
+    return { verdict: "review", reason: `Cannot read a ${media} file automatically - needs a person to open it.`,
+             unreadable: true };
+  }
+
+  const claimed = [claim.address, claim.city, claim.state, claim.postal].filter(Boolean).join(", ");
+  const prompt =
+`You are checking a proof of address for a car rental company in Charlotte, NC.
+
+The applicant says they are:
+  Name:    ${claim.name || "(not given)"}
+  Address: ${claimed || "(not given)"}
+
+Read the attached document and answer as JSON only, no other text:
+
+{
+  "is_proof_of_address": true|false,
+  "doc_type": "utility bill" | "bank statement" | "lease" | "insurance letter" | "government letter" | "phone bill" | "pay stub" | "other" | "none",
+  "name_on_document": "exactly as printed, or null",
+  "address_on_document": "exactly as printed, or null",
+  "document_date": "YYYY-MM-DD or null",
+  "name_matches": true|false|null,
+  "address_matches": true|false|null,
+  "verdict": "accept" | "review" | "reject",
+  "reason": "one sentence a customer could be shown"
+}
+
+What counts as a proof of address: a utility bill, bank or card statement, lease
+or tenancy agreement, insurance document, government or council letter, phone
+bill, or a pay stub - anything issued by an organisation showing the person's
+name and their residential address.
+
+What does not: a photo of a person, a driving licence or passport, a screenshot
+of an app, a blank or unreadable page, a document with no address on it, or a
+receipt with no name.
+
+Matching is a judgement, not string equality. Treat as matching: middle names and
+initials, maiden or married surnames, common misspellings, "St" for "Street",
+missing or extra apartment numbers, and joint accounts where the applicant is one
+of the names shown.
+
+Choose the verdict this way:
+- "reject" only if it is not a proof of address at all, or the name AND the
+  address both clearly belong to somebody else.
+- "review" if it is a proof of address but something does not line up, is
+  unreadable, or is more than 6 months old.
+- "accept" if it is a proof of address and both the name and the address are a
+  reasonable match.`;
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": AK, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: VMODEL, max_tokens: 700,
+        messages: [{ role: "user", content: [block, { type: "text", text: prompt }] }],
+      }),
+    });
+    const j = await r.json();
+    if (j.error) return { verdict: "review", reason: "Automatic check unavailable - needs a person.", error: String(j.error?.message || "").slice(0, 140) };
+    const text = (j.content || []).map((c: any) => c.text || "").join("");
+    const raw = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
+    return JSON.parse(raw);
+  } catch (e) {
+    // never block an application because our own check fell over
+    return { verdict: "review", reason: "Automatic check could not run - needs a person.", error: String(e).slice(0, 140) };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -74,6 +172,24 @@ Deno.serve(async (req) => {
     const phone = String(body.phone || "").trim();
     if (!email && !name) return json({ error: "name or email required" });
 
+    /* Check a document without starting an application. The form calls this the
+       moment a file is chosen, so somebody who attaches the wrong thing is told
+       immediately rather than after they have filled in the rest and submitted. */
+    if (body.action === "check_proof") {
+      const v = await verifyProof(body.proof, {
+        name: [body.first, body.last].filter(Boolean).join(" "),
+        address: String(body.home_address || ""), city: String(body.home_city || ""),
+        state: String(body.home_state || ""), postal: String(body.home_postal || ""),
+      });
+      if (!v) return json({ ok: true, checked: false, reason: "No document to check." });
+      return json({ ok: true, checked: true, verdict: v.verdict, reason: v.reason,
+                    doc_type: v.doc_type, name_on_document: v.name_on_document,
+                    address_on_document: v.address_on_document,
+                    document_date: v.document_date,
+                    name_matches: v.name_matches, address_matches: v.address_matches });
+    }
+
+
     // Compliance data from the sign-up wizard. All optional so existing
     // callers keep working, but the prototype must send these — the six
     // acknowledgements and the signed agreement are what make the rental
@@ -85,6 +201,7 @@ Deno.serve(async (req) => {
     // Anonymous visitors can't write to storage, so the upload happens here with
     // the service_role key instead.
     const proof = (body.proof && body.proof.data) ? body.proof : null;
+    let proofCheck: any = null;
     // Supabase Auth user id, so the renter can sign in and see their own row.
     // Sent by the prototype after it creates the account. RLS keys off this.
     const authUid = body.auth_uid ? String(body.auth_uid) : null;
@@ -143,6 +260,37 @@ Deno.serve(async (req) => {
     if (proof && renter_id) {
       const up = await uploadProof(renter_id, proof);
       if (up) await sbPatch(`renters?id=eq.${enc(renter_id)}`, { proof_path: up.path, proof_name: up.name });
+
+      // read it and compare it with what they typed
+      const v = await verifyProof(proof, {
+        name: [body.first, body.last].filter(Boolean).join(" "),
+        address: String(body.home_address || ""), city: String(body.home_city || ""),
+        state: String(body.home_state || ""), postal: String(body.home_postal || ""),
+      });
+      if (v) {
+        proofCheck = v;
+        const verdict = ["accept", "review", "reject"].includes(v.verdict) ? v.verdict : "review";
+        await sbPatch(`renters?id=eq.${enc(renter_id)}`, {
+          proof_verdict: verdict,
+          proof_reason: String(v.reason || "").slice(0, 400),
+          proof_doc_type: v.doc_type || null,
+          proof_doc_date: v.document_date || null,
+          proof_name_seen: v.name_on_document || null,
+          proof_addr_seen: v.address_on_document || null,
+          name_match: v.name_matches,
+          address_match: v.address_matches,
+          proof_checked_at: new Date().toISOString(),
+          // a reject stops the application; a review only flags it, because a
+          // wrongly rejected applicant is a lost customer who will not come back
+          ...(verdict === "reject"
+                ? { decision: "rejected", needs_review: true,
+                    review_reason: `Proof of address rejected: ${String(v.reason || "").slice(0, 200)}` }
+                : verdict === "review"
+                ? { needs_review: true,
+                    review_reason: `Proof of address needs a look: ${String(v.reason || "").slice(0, 200)}` }
+                : {}),
+        });
+      }
     }
 
     const s = await createSession({ name, email }, renter_id, key, body.return_url ? String(body.return_url) : undefined);
@@ -175,6 +323,9 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* signup must never fail because email did */ }
 
-    return json({ ok: true, renter_id, url: s.url, session_id: s.id, client_secret: s.client_secret, status: s.status });
+    return json({ ok: true, renter_id, url: s.url, session_id: s.id, client_secret: s.client_secret, status: s.status,
+                  // so the form can tell them there and then, rather than by email tomorrow
+                  proof: proofCheck ? { verdict: proofCheck.verdict, reason: proofCheck.reason,
+                                        doc_type: proofCheck.doc_type } : null });
   } catch (e) { return json({ error: String(e) }, 500); }
 });
