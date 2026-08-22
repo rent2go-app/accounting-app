@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
     if (!booking) return json({ error: "could not start the booking" }, 500);
 
     // ---- Stripe Checkout ----
-    const origin = String(body.return_origin || "https://rent2go-app.github.io/Rent2Go/");
+    const origin = String(body.return_origin || Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/");
     const f = new URLSearchParams();
     f.set("mode", "payment");
     f.set("success_url", `${origin}#booked`);

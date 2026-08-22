@@ -91,9 +91,10 @@ function smsTextLink(first: string, link: string) {
 const BRAND = {
   green: "#0f8a4d", greenDark: "#0a6b3a", ink: "#131820", muted: "#5c6a7a",
   line: "#e2e8e4", wash: "#f4f7f6",
-  logo: "https://rent2go-app.github.io/Rent2Go/assets/logo.png",
-  site: "https://rent2go-app.github.io/Rent2Go/",
-  plain: "rent2go-app.github.io/Rent2Go",
+  logo: SITE.replace(/\/?$/, "/") + "assets/logo.png",
+  site: SITE.replace(/\/?$/, "/"),
+  // what the text message tells someone to type, so no scheme and no trailing slash
+  plain: SITE.replace(/^https?:\/\//, "").replace(/\/+$/, ""),
   address: "9711 David Taylor Drive, Suite 111, Charlotte, NC 28262",
   phone: "980 272 8122", email: "info@rentaride2go.com", roadside: "(704) 912-0864",
 };

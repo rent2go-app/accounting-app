@@ -4,6 +4,8 @@
 // Auth: verify_jwt=false — guarded by a shared RENTER_INTAKE_TOKEN (renters are anonymous at signup).
 // Identity runs in the main account "RENT 2 GO - 1.0" (key from LINDA_ACCOUNTS). renters.html then lists/approves them.
 const SB = Deno.env.get("SUPABASE_URL")!;
+// Where the customer site lives. One secret, so moving domain is one change.
+const SITE = (Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/").replace(/\/?$/, "/");
 const SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ACCTS=(()=>{const _b=JSON.parse(Deno.env.get("LINDA_ACCOUNTS")||"[]");let _e=[];try{_e=JSON.parse(Deno.env.get("LINDA_ACCOUNTS_EXTRA")||"[]");}catch(_){}const _m={};for(const a of [..._b,..._e]){if(a&&a.label&&a.key)_m[a.label]=a;}return Object.values(_m);})(); // LINDA_ACCOUNTS + additive EXTRA
 const INTAKE_TOKEN = Deno.env.get("RENTER_INTAKE_TOKEN") || "";
@@ -165,7 +167,7 @@ Deno.serve(async (req) => {
                <li><b>Final review</b> — our team checks your licence and proof of address by hand, normally within one business day.</li>
              </ol>
              <p>We'll email you at each step. You can sign in any time to see where you are:</p>
-             <p><a href="https://rent2go-app.github.io/Rent2Go/#dashboard" style="background:#0f8a4d;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Open my dashboard</a></p>
+             <p><a href="${SITE}#dashboard" style="background:#0f8a4d;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">Open my dashboard</a></p>
              <p style="color:#5c6a7a;font-size:13px">Reminder: 7-day minimum rental, and vehicles stay within 100 miles of Charlotte, NC.</p>
              <hr style="border:none;border-top:1px solid #e2e8e4;margin:22px 0 10px">
              <div style="color:#5c6a7a;font-size:12px">Rent 2 Go · Suite 111, 9711 David Taylor Drive, Charlotte, NC 28262 · 980 272 8122</div></div>` }),

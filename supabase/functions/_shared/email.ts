@@ -15,8 +15,11 @@ export const BRAND = {
   muted: "#5c6a7a",
   line: "#e2e8e4",
   wash: "#f4f7f6",
-  logo: "https://rent2go-app.github.io/Rent2Go/assets/logo.png",
-  site: "https://rent2go-app.github.io/Rent2Go/",
+  /* Where the site lives, in one place. Set the SITE_URL secret and every
+     customer email follows it - moving to rentaride2go.com must not mean
+     hunting eleven hardcoded copies of the address through the codebase. */
+  logo: (Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/").replace(/\/?$/, "/") + "assets/logo.png",
+  site: (Deno.env.get("SITE_URL") || "https://rent2go-app.github.io/Rent2Go/").replace(/\/?$/, "/"),
   address: "9711 David Taylor Drive, Suite 111, Charlotte, NC 28262",
   phone: "980 272 8122",
   email: "info@rentaride2go.com",
