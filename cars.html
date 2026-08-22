@@ -179,9 +179,9 @@ function card(v){
        +STATUSES.map(function(s){return '<option value="'+s+'"'+(v.status===s?' selected':'')+'>'+esc(STATUS_LABEL[s]||s)+'</option>';}).join('')
      +'</select></div></div>'
    +'<div class="cf"><button class="btn sm" data-edit="'+v.id+'" style="flex:1">Edit</button>'
-   +(v.status==='live'?'<button class="btn sm" data-godown="'+v.id+'" title="Take off the platform — down for repairs/maintenance" style="color:#c22a2a;border-color:#c22a2a">🔧 Down</button>':'<button class="btn sm" data-golive="'+v.id+'" title="Put live on the platform" style="color:#0a7d44;border-color:#0a7d44">✅ Live</button>')
-   +'<button class="btn sm" data-photos="'+v.id+'">📷</button>'
-   +'<button class="btn sm" data-docs="'+v.id+'">📄</button></div></div>';
+   +(v.status==='live'?'<button class="btn sm" data-godown="'+v.id+'" title="Take off the website catalogue — down for repairs or maintenance" style="color:#c22a2a;border-color:#c22a2a">🔧 Take Down</button>':'<button class="btn sm" data-golive="'+v.id+'" title="Publish this car to the website catalogue" style="color:#0a7d44;border-color:#0a7d44">✅ Go Live</button>')
+   +'<button class="btn sm" data-photos="'+v.id+'" title="Photos shown on the car's catalogue card">📷 Add image</button>'
+   +'<button class="btn sm" data-docs="'+v.id+'" title="Registration and insurance — needed for Uber and Lyft drivers">📄 Add docs</button></div></div>';
 }
 
 /* ---------- edit ---------- */
