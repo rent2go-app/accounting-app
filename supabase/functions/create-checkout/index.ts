@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
     // subscription raised later both print it. Falls back to customer_email if
     // the customer could not be written, which is better than failing the sale.
     const label_account = String(v.account_label || renter.account_label || '');
-    const customerId = await upsertCustomer(renter, key);
+    const customerId = await upsertCustomer(renter, SK);
     if (customerId) {
       /* Keep the link on our side too. It is the same record that carries their
          verified name and address, so it is what ties this renter to their
