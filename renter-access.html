@@ -46,6 +46,29 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
 .ltoast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:#131820;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;z-index:60}
 .ltoast.show{opacity:1;transform:translateX(-50%)}
 .empty{color:var(--muted);font-size:14px}
+
+.pv-back{position:fixed;inset:0;background:rgba(9,13,18,.6);display:none;z-index:70;padding:26px 14px;overflow:auto}
+.pv-back.on{display:block}
+.pv{max-width:620px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:0 30px 70px -30px rgba(0,0,0,.6)}
+.pv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+.pv-sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.pv-note{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px}
+.pv-card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:10px;background:var(--surface-2)}
+.pv-car{display:flex;gap:13px;align-items:center}
+.pv-car img{width:104px;height:70px;object-fit:cover;border-radius:8px;background:#fff}
+.pv-noimg{width:104px;height:70px;border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--muted);border:1px dashed var(--line)}
+.pv-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pv-bal{font-size:20px;font-weight:800}
+.pv-bal.owe{color:var(--warn)}
+.pv-inv{margin-top:9px;display:flex;flex-direction:column}
+.pv-i{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.pv-i:first-child{border-top:none}
+.pv-i.pd b{color:var(--out)}
+.pv-i i{font-style:normal;font-size:10.5px;background:#fdecea;color:#b3261e;padding:1px 6px;border-radius:99px}
+.pv-empty{color:var(--muted);font-size:13px;padding:6px 0}
+.pv-warn{background:#fff6e5;border:1px solid #f4d9a0;border-radius:10px;padding:10px 13px;font-size:13px;color:#8a5a00}
+.pv-warn ul{margin:6px 0 0;padding-left:18px}
+.pv-load{padding:26px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -67,6 +90,7 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
     <span id="state" class="pill"></span>
   </div>
   <div class="cards" id="cards"></div>
+  <div class="pv-back" id="pvBack" onclick="if(event.target===this)closePreview()"><div class="pv" id="pvBody"></div></div>
   <div id="out"></div>
 </div>
 
@@ -140,6 +164,7 @@ function render(){
   }).join('') : (testBlock?'':'<p class="empty">Nobody here.</p>'))) || '<p class="empty">Nobody here.</p>';
 
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send([b.dataset.send],b));
+  document.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewRenter(b.dataset.preview));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
     const t=LINKS[b.dataset.copy]; if(!t)return;
     navigator.clipboard.writeText(b.dataset.kind==='sms'?t.sms:t.link).then(()=>toast('Copied — paste into a text or WhatsApp'));
@@ -177,6 +202,7 @@ function rowHTML(x){
       +(x.last_sign_in_at?' · last signed in '+esc(String(x.last_sign_in_at).slice(0,10)):'')+'</div></div>'
     +'<div><div class="amt">'+money(bal)+'<small>'+(pd?pd+' past due':(Number(x.open_invoices)||0)+' open')+'</small></div>'
     +'<div class="acts">'
+      +'<button class="btn sm" data-preview="'+esc(x.id)+'">👁 Preview</button>'
       +'<button class="btn sm pri" data-send="'+esc(x.id)+'">'+(x.has_login?'Re-send login':'Send login')+'</button>'
       +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Stripe portal</a>':'')
     +'</div></div>'
@@ -186,6 +212,60 @@ function rowHTML(x){
     +'</div>';
 }
 
+/* What the renter will actually see, assembled from the same rows their own
+   dashboard reads. Checked before a login goes out, so nobody is invited into a
+   dashboard with the wrong car or a balance that looks wrong. */
+async function previewRenter(id){
+  const x=ROWS.find(r=>r.id===id); if(!x) return;
+  const back=document.getElementById('pvBack'), body=document.getElementById('pvBody');
+  body.innerHTML='<div class="pv-load">Loading what they will see…</div>';
+  back.classList.add('on');
+  const [carR,invR]=await Promise.all([
+    x.vehicle_id ? sb.from('vehicles').select('name,make,model,year,color,type,plate,images,daily_rate,account_label').eq('id',x.vehicle_id).limit(1) : Promise.resolve({data:[]}),
+    sb.from('v_renter_invoices').select('number,description,amount_due,pay_status,due_date,issued_at,is_late_fee').eq('renter_id',id).order('issued_at',{ascending:false}).limit(60)
+  ]);
+  const car=(carR.data||[])[0]||null;
+  const inv=invR.data||[];
+  const owed=inv.filter(i=>i.pay_status==='open'||i.pay_status==='past_due');
+  const paid=inv.filter(i=>i.pay_status==='paid');
+  const bal=owed.reduce((a,i)=>a+Number(i.amount_due||0),0);
+  const when=d=>d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const issues=[];
+  if(!car) issues.push('No car linked — their dashboard will show no vehicle.');
+  if(!x.portal_url) issues.push('No customer portal for this fleet — the portal button will not work.');
+  if(car && !(car.images&&car.images.length)) issues.push('That car has no photo.');
+  if(!x.has_login) issues.push('No login yet — send one before they can see any of this.');
+  body.innerHTML =
+    '<div class="pv-head"><div><b>'+esc(x.name||x.email)+'</b>'
+      +'<div class="pv-sub">'+esc(x.email||'')+' · '+esc(x.fleet||'no fleet')+'</div></div>'
+      +'<button class="btn sm" onclick="closePreview()">Close</button></div>'
+    +(issues.length?'<div class="pv-warn"><b>Worth fixing first</b><ul>'
+        +issues.map(i=>'<li>'+esc(i)+'</li>').join('')+'</ul></div>':'')
+    +'<div class="pv-note">This is what they see when they sign in.</div>'
+    +'<div class="pv-card">'
+      +(car
+        ? '<div class="pv-car">'
+            +(car.images&&car.images[0]?'<img src="'+esc(car.images[0])+'" alt="">':'<div class="pv-noimg">no photo</div>')
+            +'<div><b>'+esc([car.make,car.model].filter(Boolean).join(' ')||car.name)+'</b>'
+            +'<div class="pv-sub">'+esc([car.year,car.color,car.type].filter(Boolean).join(' · '))+'</div>'
+            +'<div class="pv-sub">Plate '+esc(car.plate||'—')+' · $'+(car.daily_rate||'—')+'/day</div></div></div>'
+        : '<div class="pv-empty">No car on their account.</div>')
+    +'</div>'
+    +'<div class="pv-card">'
+      +'<div class="pv-row"><b>Your payments</b><span class="pv-bal'+(bal>0?' owe':'')+'">$'+bal.toFixed(2)+'</span></div>'
+      +'<div class="pv-sub">'+owed.length+' unpaid'
+        +(owed.filter(i=>i.pay_status==='past_due').length?' · '+owed.filter(i=>i.pay_status==='past_due').length+' past due':'')+'</div>'
+      +(owed.length?'<div class="pv-inv">'+owed.slice(0,12).map(i=>
+          '<div class="pv-i'+(i.pay_status==='past_due'?' pd':'')+'"><span>'+esc((i.description||'Rental').slice(0,44))
+          +(i.is_late_fee?' <i>late fee</i>':'')+'</span><span>'+when(i.issued_at)+'</span><b>$'+Number(i.amount_due||0).toFixed(2)+'</b></div>').join('')
+          +'</div>':'<div class="pv-empty">Nothing outstanding.</div>')
+      +(paid.length?'<div class="pv-sub" style="margin-top:8px">'+paid.length+' paid invoice(s) in their history</div>':'')
+    +'</div>'
+    +'<div class="pv-card"><div class="pv-row"><b>Customer portal</b>'
+      +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Open ↗</a>':'<span class="pv-sub">none</span>')
+      +'</div><div class="pv-sub">'+esc(x.portal_url||'No portal on file for '+(x.fleet||'this fleet'))+'</div></div>';
+}
+function closePreview(){ document.getElementById('pvBack').classList.remove('on'); }
 async function send(ids,btn){
   const o=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Sending…';}
   try{
