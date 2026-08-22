@@ -96,8 +96,15 @@ async function verifyProof(proof: any, claim: {
   }
 
   const claimed = [claim.address, claim.city, claim.state, claim.postal].filter(Boolean).join(", ");
+  /* The model has no idea what day it is, so any rule about a document being
+     recent is unusable unless we say. Without this a hotel stay happening right
+     now was read as "in the future". */
+  const today = new Date().toISOString().slice(0, 10);
   const prompt =
 `You are checking a proof of address for a car rental company in Charlotte, NC.
+
+Today's date is ${today}. Judge every date on the document against that, and never
+call a date in the recent past a future date.
 
 The applicant says they are:
   Name:    ${claim.name || "(not given)"}
