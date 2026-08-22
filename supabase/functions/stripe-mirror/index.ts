@@ -233,6 +233,50 @@ Deno.serve(async (req) => {
       return json({ ok: true, invoices: out });
     }
 
+    /* ---- register the webhook endpoints ----
+       Each Stripe account needs its own endpoint and issues its own signing
+       secret. The keys live in this function's secrets and cannot be read back
+       out of Supabase, so the registration has to happen from in here. Returns
+       the secrets so they can be stored for stripe-webhook to verify against.
+       Idempotent: an account that already points at this URL is left alone and
+       its existing secret reported, because Stripe only reveals a signing secret
+       when the endpoint is created. */
+    if (body.action === "create_webhooks") {
+      const url = String(body.url || `${SB.replace(".supabase.co", ".functions.supabase.co")}/stripe-webhook`);
+      const events = [
+        "invoice.created", "invoice.finalized", "invoice.updated", "invoice.paid",
+        "invoice.payment_failed", "invoice.voided", "invoice.marked_uncollectible",
+        "customer.subscription.created", "customer.subscription.updated",
+        "customer.subscription.deleted",
+      ];
+      const only = body.account_label ? String(body.account_label) : null;
+      const out: any[] = [];
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        if (only && a.label !== only) continue;
+        try {
+          const have = await (await fetch("https://api.stripe.com/v1/webhook_endpoints?limit=100", {
+            headers: { Authorization: `Bearer ${a.key}` },
+          })).json();
+          const dup = (have.data || []).find((w: any) => w.url === url && w.status !== "disabled");
+          if (dup) { out.push({ label: a.label, id: dup.id, existing: true, secret: dup.secret || null }); continue; }
+          const form = new URLSearchParams();
+          form.set("url", url);
+          form.set("description", "Rent 2 Go - keep the app level with Stripe");
+          events.forEach((e, i) => form.set(`enabled_events[${i}]`, e));
+          const r = await (await fetch("https://api.stripe.com/v1/webhook_endpoints", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${a.key}`, "Content-Type": "application/x-www-form-urlencoded" },
+            body: form.toString(),
+          })).json();
+          if (r.error) { out.push({ label: a.label, error: r.error.message }); continue; }
+          out.push({ label: a.label, id: r.id, created: true, secret: r.secret });
+        } catch (e) { out.push({ label: a.label, error: String(e).slice(0, 140) }); }
+      }
+      return json({ ok: true, url, events, results: out,
+                    secrets: Object.fromEntries(out.filter((o) => o.secret).map((o) => [o.label, o.secret])) });
+    }
+
     // ---- cancel it again ----
     if (body.action === "cancel_test_subscription") {
       const label = String(body.account_label || "RENT 2 GO LLC 2.0");
@@ -331,6 +375,7 @@ Deno.serve(async (req) => {
             due_date: i.due_date ? new Date(i.due_date * 1000).toISOString().slice(0, 10) : null,
             issued_at: iso(i.created), paid_at: iso(i.status_transitions?.paid_at),
             hosted_invoice_url: i.hosted_invoice_url || null,
+            invoice_pdf: i.invoice_pdf || null,
             updated_at: new Date().toISOString(),
           });
         }
