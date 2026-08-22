@@ -45,23 +45,70 @@ function smsText(first: string, link: string) {
   return `Hi ${first}, here is your Rent 2 Go account. Tap to sign in — no password needed. `
        + `You can see your car, your daily invoices and pay them here: ${link}`;
 }
+/* ---- the Rent 2 Go email shell ----
+   Table-based and inline-styled on purpose: Outlook and several Android clients
+   ignore flexbox and strip <style> blocks, and a customer email has to survive
+   all of them. Mirrors supabase/functions/_shared/email.ts. */
+const BRAND = {
+  green: "#0f8a4d", greenDark: "#0a6b3a", ink: "#131820", muted: "#5c6a7a",
+  line: "#e2e8e4", wash: "#f4f7f6",
+  logo: "https://rent2go-app.github.io/Rent2Go/assets/logo.png",
+  site: "https://rent2go-app.github.io/Rent2Go/",
+  address: "9711 David Taylor Drive, Suite 111, Charlotte, NC 28262",
+  phone: "980 272 8122", email: "info@rentaride2go.com", roadside: "(704) 912-0864",
+};
+function emailShell(o: { title: string; body: string; preheader?: string;
+                         cta?: { label: string; href: string }; footnote?: string }) {
+  const pre = o.preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;height:0;width:0">${o.preheader}</div>` : "";
+  const cta = o.cta
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 6px">
+         <tr><td bgcolor="${BRAND.green}" style="border-radius:8px">
+           <a href="${o.cta.href}" style="display:inline-block;padding:14px 30px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px">${o.cta.label}</a>
+         </td></tr></table>` : "";
+  const note = o.footnote
+    ? `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:${BRAND.muted}">${o.footnote}</p>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+<title>${o.title}</title></head><body style="margin:0;padding:0;background:${BRAND.wash}">${pre}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${BRAND.wash}">
+<tr><td align="center" style="padding:28px 14px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid ${BRAND.line};border-radius:14px">
+<tr><td align="center" style="padding:26px 30px 0"><a href="${BRAND.site}" style="text-decoration:none"><img src="${BRAND.logo}" width="176" alt="Rent 2 Go" style="display:block;width:176px;max-width:60%;height:auto;border:0"></a></td></tr>
+<tr><td style="padding:18px 30px 0"><div style="height:3px;background:${BRAND.green};border-radius:3px"></div></td></tr>
+<tr><td style="padding:22px 30px 26px;font-family:Arial,Helvetica,sans-serif;color:${BRAND.ink}">
+<h1 style="margin:0 0 14px;font-size:21px;line-height:1.3;color:${BRAND.greenDark}">${o.title}</h1>
+<div style="font-size:15px;line-height:1.6;color:${BRAND.ink}">${o.body}</div>${cta}${note}</td></tr>
+<tr><td style="padding:0 30px"><div style="border-top:1px solid ${BRAND.line}"></div></td></tr>
+<tr><td style="padding:16px 30px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.65;color:${BRAND.muted}">
+<strong style="color:${BRAND.ink}">Rent 2 Go LLC</strong><br>${BRAND.address}<br>
+${BRAND.phone} &nbsp;·&nbsp; <a href="mailto:${BRAND.email}" style="color:${BRAND.green};text-decoration:none">${BRAND.email}</a>
+<div style="margin-top:10px;color:#98a2ae">Long-term car rental in Charlotte, North Carolina.</div>
+</td></tr></table></td></tr></table></body></html>`;
+}
+
 function emailHtml(first: string, link: string, car: string | null, balance: number) {
   const owing = balance > 0
-    ? `<p style="margin:0 0 14px">Your current balance is <b>$${balance.toFixed(2)}</b>. You can settle it from your dashboard.</p>`
-    : `<p style="margin:0 0 14px">Your account is up to date. Thank you.</p>`;
-  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#131820;line-height:1.55;max-width:560px">
-  <h2 style="color:#0f8a4d;margin:0 0 12px">Your Rent 2 Go account is ready</h2>
-  <p style="margin:0 0 14px">Hi ${first},</p>
-  <p style="margin:0 0 14px">You can now manage your rental online${car ? ` — your ${car}` : ""}.
-  See your daily invoices, what is outstanding, and pay, all in one place.</p>
-  ${owing}
-  <p style="margin:0 0 20px">
-    <a href="${link}" style="background:#0f8a4d;color:#fff;padding:13px 24px;border-radius:8px;
-       text-decoration:none;font-weight:700;display:inline-block">Open my dashboard</a></p>
-  <p style="margin:0 0 14px;color:#5c6a7a;font-size:13px">No password needed — the button signs you in.
-  The link is single-use; if it stops working just ask us for another.</p>
-  <hr style="border:none;border-top:1px solid #e2e8e4;margin:22px 0 10px">
-  <div style="color:#5c6a7a;font-size:12px">Rent 2 Go · 9711 David Taylor Drive, Suite 111, Charlotte, NC 28262 · 980 272 8122</div></div>`;
+    ? `<p style="margin:0 0 14px">Your balance today is <b>$${balance.toFixed(2)}</b>. You can settle it from your dashboard in a couple of taps.</p>`
+    : `<p style="margin:0 0 14px">Your account is up to date — thank you.</p>`;
+  return emailShell({
+    title: "Your Rent 2 Go account is ready",
+    preheader: "Manage your rental, see your daily invoices and pay — all in one place.",
+    body:
+      `<p style="margin:0 0 14px">Hi ${first},</p>` +
+      `<p style="margin:0 0 14px">We have built a customer portal to make managing your daily rental easier. ` +
+      `It is new, and this is your account${car ? ` for your <b>${car}</b>` : ""}.</p>` +
+      `<p style="margin:0 0 14px">Inside you can:</p>` +
+      `<ul style="margin:0 0 14px;padding-left:20px">` +
+      `<li style="margin-bottom:5px">See every daily invoice and what is still owed</li>` +
+      `<li style="margin-bottom:5px">Pay securely through Stripe, one tap per invoice</li>` +
+      `<li style="margin-bottom:5px">Check your car, your rental and your pickup record</li>` +
+      `<li>Request maintenance or roadside help</li></ul>` +
+      owing,
+    cta: { label: "Open my dashboard", href: link },
+    footnote: "No password needed — the button signs you straight in. The link is for you alone; " +
+              "if it stops working, just ask us and we will send another.",
+  });
 }
 
 Deno.serve(async (req) => {

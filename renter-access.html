@@ -51,11 +51,13 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
 <body>
 <div class="wrap">
   <h1>Renter Access</h1>
-  <p class="sub">Everyone currently renting, grouped by the owner fleet that bills them. Issue a sign-in link and the
-  renter can see their car, their daily invoices and pay through Stripe. One link works as an email and as a text —
-  no password to remember.</p>
-  <div class="tabs">
-    <button class="tab on" data-tab="ACTIVE">Active</button>
+  <p class="sub"><b>Renter accounts</b> are people renting from us right now, grouped by the fleet that bills them.
+  <b>Applications &amp; ID checks</b> are website sign-ups who have never had a rental — they sit with Stripe Identity,
+  not with billing. <b>Archived</b> are past customers. Which list someone lands in comes from whether Stripe has ever
+  billed them, so it cannot drift.</p>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-tab="ACTIVE">Renter accounts</button>
+    <button class="tab" data-tab="APPLICANT">Applications &amp; ID checks</button>
     <button class="tab" data-tab="ARCHIVED">Archived</button>
   </div>
   <div class="bar">
@@ -88,6 +90,11 @@ async function load(){
 
 function render(){
   const q=Q.toLowerCase();
+  const n={};['ACTIVE','APPLICANT','ARCHIVED'].forEach(k=>n[k]=ROWS.filter(x=>x.bucket===k).length);
+  document.querySelectorAll('.tab').forEach(t=>{
+    const base={ACTIVE:'Renter accounts',APPLICANT:'Applications & ID checks',ARCHIVED:'Archived'}[t.dataset.tab];
+    t.textContent=base+' ('+(n[t.dataset.tab]||0)+')';
+  });
   const all=ROWS.filter(x=>x.bucket===TAB);
   const list=all.filter(x=>!q||[x.name,x.email,x.fleet,x.vehicle,x.owner_name].some(v=>String(v||'').toLowerCase().includes(q)));
   const noLogin=all.filter(x=>!x.has_login);
@@ -103,6 +110,16 @@ function render(){
     ? 'Send a login to '+noLogin.length+' renter'+(noLogin.length===1?'':'s')
     : 'Re-send a login to everyone';
 
+  if(TAB==='APPLICANT'){
+    document.getElementById('cards').innerHTML=
+       '<div class="card"><div class="l">Applications</div><div class="v">'+all.length+'</div></div>'
+      +'<div class="card '+(all.filter(x=>x.id_status!=='verified').length?'warn':'ok')+'"><div class="l">ID not verified</div><div class="v">'+all.filter(x=>x.id_status!=='verified').length+'</div></div>'
+      +'<div class="card '+(all.filter(x=>x.decision!=='approved').length?'warn':'ok')+'"><div class="l">Awaiting approval</div><div class="v">'+all.filter(x=>x.decision!=='approved').length+'</div></div>';
+    document.getElementById('out').innerHTML = list.length ? list.map(applicantHTML).join('')
+      : '<p class="empty">No applications waiting.</p>';
+    document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send([b.dataset.send],b));
+    return;
+  }
   const byFleet={};
   list.forEach(x=>{const k=x.fleet||'No fleet assigned';(byFleet[k]=byFleet[k]||[]).push(x);});
   const keys=Object.keys(byFleet).sort();
@@ -122,6 +139,22 @@ function render(){
   });
 }
 
+function applicantHTML(x){
+  const idOk = x.id_status==='verified';
+  const appr = x.decision==='approved';
+  return '<div class="row '+(idOk&&appr?'':'owing')+'">'
+    +'<div><div class="nm">'+esc(x.name||x.email)
+      +(idOk?'<span class="pill ok">ID verified</span>':'<span class="pill no">ID '+esc(x.id_status||'not started')+'</span>')
+      +(appr?'<span class="pill ok">approved</span>':'<span class="pill no">'+esc(x.decision||'awaiting review')+'</span>')
+      +(x.has_login?'<span class="pill ok">has login</span>':'')+'</div>'
+    +'<div class="meta">'+esc(x.email||'no email')+(x.phone?' · '+esc(x.phone):'')
+      +' · signed up '+esc(String(x.created_at||'').slice(0,10))
+      +' · '+esc(x.signup_source||'website')+'</div></div>'
+    +'<div><div class="acts">'
+      +(x.verify_url?'<a class="btn sm" href="'+esc(x.verify_url)+'" target="_blank" rel="noopener">Stripe ID check</a>':'')
+      +'<button class="btn sm pri" data-send="'+esc(x.id)+'">'+(x.has_login?'Re-send login':'Send login')+'</button>'
+    +'</div></div></div>';
+}
 function rowHTML(x){
   const bal=Number(x.balance||0), late=Number(x.late_fees||0), pd=Number(x.past_due_invoices||0);
   const cls = late?'late' : (bal>0?'owing':'');
@@ -160,6 +193,7 @@ async function send(ids,btn){
 }
 
 document.getElementById('sendall').onclick=async function(){
+  if(TAB==='APPLICANT'){alert('These are applications, not rentals. Send a login to an applicant individually once their ID check has passed.');return;}
   const all=ROWS.filter(x=>x.bucket===TAB);
   const targets=all.filter(x=>!x.has_login);
   const list=targets.length?targets:all;
