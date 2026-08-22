@@ -103,6 +103,7 @@ function render(){
   document.getElementById('cards').innerHTML=
      '<div class="card"><div class="l">'+TAB.toLowerCase()+' renters</div><div class="v">'+all.length+'</div></div>'
     +'<div class="card '+(noLogin.length?'warn':'ok')+'"><div class="l">Without a login</div><div class="v">'+noLogin.length+'</div></div>'
+    +'<div class="card '+(all.filter(x=>x.has_signed_in).length?'ok':'warn')+'"><div class="l">Have signed in</div><div class="v">'+all.filter(x=>x.has_signed_in).length+'<span style="font-size:12px;color:var(--muted)"> / '+all.length+'</span></div></div>'
     +'<div class="card '+(owing.length?'warn':'ok')+'"><div class="l">Owing</div><div class="v">'+owing.length+'</div></div>'
     +'<div class="card '+(late.length?'bad':'ok')+'"><div class="l">With late fees</div><div class="v">'+late.length+'</div></div>'
     +'<div class="card"><div class="l">Outstanding</div><div class="v">'+money(all.reduce((a,x)=>a+Number(x.balance||0),0))+'</div></div>';
@@ -120,17 +121,23 @@ function render(){
     document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send([b.dataset.send],b));
     return;
   }
+  const tests=list.filter(x=>x.is_test);
+  const rest=list.filter(x=>!x.is_test);
   const byFleet={};
-  list.forEach(x=>{const k=x.fleet||'No fleet assigned';(byFleet[k]=byFleet[k]||[]).push(x);});
+  rest.forEach(x=>{const k=x.fleet||'No fleet assigned';(byFleet[k]=byFleet[k]||[]).push(x);});
   const keys=Object.keys(byFleet).sort();
-  document.getElementById('out').innerHTML = keys.length ? keys.map(f=>{
+  const testBlock = tests.length
+    ? '<div class="fleet">🧪 Test accounts<span class="n">'+tests.length+' — not a real rental</span></div>'
+      + tests.map(rowHTML).join('')
+    : '';
+  document.getElementById('out').innerHTML = (testBlock + (keys.length ? keys.map(f=>{
     const g=byFleet[f];
     const owe=g.reduce((a,x)=>a+Number(x.balance||0),0);
     const owner=(g.find(x=>x.owner_name)||{}).owner_name;
     return '<div class="fleet">🏦 '+esc(f)+'<span class="n">'+g.length+' renter'+(g.length===1?'':'s')
       +(owner?' · '+esc(owner):'')+(owe?' · '+money(owe)+' outstanding':'')+'</span></div>'
       + g.map(rowHTML).join('');
-  }).join('') : '<p class="empty">Nobody here.</p>';
+  }).join('') : (testBlock?'':'<p class="empty">Nobody here.</p>'))) || '<p class="empty">Nobody here.</p>';
 
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>send([b.dataset.send],b));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
@@ -161,10 +168,13 @@ function rowHTML(x){
   const l=LINKS[x.id];
   return '<div class="row '+cls+'">'
     +'<div><div class="nm">'+esc(x.name||x.email)
-      +(x.has_login?'<span class="pill ok">has login</span>':'<span class="pill no">no login</span>')
+      +(x.has_signed_in
+          ? '<span class="pill ok" title="Signed in '+esc(String(x.last_sign_in_at||'').slice(0,16).replace('T',' '))+'">signed in</span>'
+          : (x.has_login?'<span class="pill">invited, not used</span>':'<span class="pill no">no login</span>'))
       +(late?'<span class="pill no">'+late+' late fee'+(late===1?'':'s')+'</span>':'')+'</div>'
     +'<div class="meta">'+esc(x.email||'no email')+(x.phone?' · '+esc(x.phone):'')
-      +(x.vehicle?' · '+esc(x.vehicle):' · no car linked')+'</div></div>'
+      +(x.vehicle?' · '+esc(x.vehicle):' · no car linked')
+      +(x.last_sign_in_at?' · last signed in '+esc(String(x.last_sign_in_at).slice(0,10)):'')+'</div></div>'
     +'<div><div class="amt">'+money(bal)+'<small>'+(pd?pd+' past due':(Number(x.open_invoices)||0)+' open')+'</small></div>'
     +'<div class="acts">'
       +'<button class="btn sm pri" data-send="'+esc(x.id)+'">'+(x.has_login?'Re-send login':'Send login')+'</button>'
