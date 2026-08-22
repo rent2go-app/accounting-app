@@ -46,7 +46,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
   <h1>Fleet → Owner &amp; Billing</h1>
   <p class="sub">Each live car is tied to the Stripe account that bills it, and therefore to the customer portal its
   renter should be sent to. Most are set automatically from the subscription that holds the car — set the rest here.
-  A car with no billing account will leave its renter without a working portal link.</p>
+  A car with no billing account will leave its renter without a working portal link.<br><br>The <b>integrity check</b> at the top compares what Stripe is billing against what the app believes, so a car recorded twice or a rental that quietly ended shows up rather than sitting unnoticed.</p>
   <div class="bar">
     <input class="search" id="q" placeholder="Search a car, plate, owner or account…">
     <button class="btn" id="reload">Reload</button>
@@ -63,15 +63,22 @@ const sb=window.supabase.createClient(window.R2G_CONFIG.SUPABASE_URL, window.R2G
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(m){var t=document.createElement('div');t.className='ltoast';t.textContent=m;document.body.appendChild(t);
   setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2500);}
-let CARS=[],OWNERS=[],FLEETS=[],Q='';
+let CARS=[],OWNERS=[],FLEETS=[],RENTERS=[],SUBFOR={},Q='';
 
 async function load(){
   document.getElementById('state').textContent='loading…';
-  const [c,o,f]=await Promise.all([
+  const [c,o,f,r,sub,map]=await Promise.all([
     sb.from('vehicles').select('id,name,plate,status,available,owner_id,account_label,daily_rate').eq('status','live').limit(400),
     sb.from('owners').select('id,name').limit(60),
-    sb.from('fleet_accounts').select('label,portal_url').limit(40)
+    sb.from('fleet_accounts').select('label,portal_url').limit(40),
+    sb.from('renters').select('id,name,email,current_vehicle_id').limit(500),
+    sb.from('renter_subscriptions').select('account_label,product_id,status,customer_name,customer_email')
+      .in('status',['active','past_due','unpaid','trialing']).limit(500),
+    sb.from('stripe_product_map').select('account_label,product_id,vehicle_id').limit(500)
   ]);
+  RENTERS=(r.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const pv={}; (map.data||[]).forEach(m=>{ if(m.vehicle_id) pv[m.account_label+'|'+m.product_id]=m.vehicle_id; });
+  SUBFOR={}; (sub.data||[]).forEach(s=>{ const v=pv[s.account_label+'|'+s.product_id]; if(v) SUBFOR[v]=s; });
   if(c.error){document.getElementById('state').textContent='sign in as an admin';return;}
   CARS=(c.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   OWNERS=(o.data||[]).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
@@ -93,14 +100,48 @@ function render(){
     +'<div class="card '+(noOwner.length?'warn':'ok')+'"><div class="l">No owner</div><div class="v">'+noOwner.length+'</div></div>'
     +'<div class="card ok"><div class="l">Portal reachable</div><div class="v">'+CARS.filter(c=>portalFor(c.account_label)).length+'</div></div>';
 
+  // ---- integrity: a renter should be in exactly one car ----
+  const carsOfRenter={};
+  RENTERS.forEach(r=>{ if(r.current_vehicle_id) (carsOfRenter[r.id]=carsOfRenter[r.id]||[]).push(r.current_vehicle_id); });
+  const nameCount={};
+  CARS.forEach(c=>{ const s=SUBFOR[c.id]; const n=s&&(s.customer_name||s.customer_email);
+    if(n) (nameCount[n.trim().toUpperCase()]=nameCount[n.trim().toUpperCase()]||[]).push(c); });
+  const doubled=Object.entries(nameCount).filter(([,v])=>v.length>1);
+  const rentedNobody=CARS.filter(c=>!c.available&&!SUBFOR[c.id]);
+  let warn='';
+  if(doubled.length||rentedNobody.length){
+    warn='<div class="sec">Integrity check</div>';
+    if(doubled.length){
+      warn+='<div class="row gap"><div class="rh"><span class="cname">'+doubled.length
+        +' renter(s) are billing on more than one car</span></div>'
+        +doubled.map(([n,v])=>'<div class="portal" style="max-width:none;color:var(--text)">'
+          +esc(n)+' &rarr; '+v.map(c=>esc(c.name)).join(' &nbsp;|&nbsp; ')+'</div>').join('')
+        +'<div class="lbl" style="margin-top:6px">Usually the same physical car recorded twice. Merge or retire one.</div></div>';
+    }
+    if(rentedNobody.length){
+      warn+='<div class="row gap"><div class="rh"><span class="cname">'+rentedNobody.length
+        +' car(s) marked rented with nothing billing</span></div>'
+        +'<div class="portal" style="max-width:none;color:var(--text)">'
+        +rentedNobody.map(c=>esc(c.name)+(c.plate?' ('+esc(c.plate)+')':'')).join(' &nbsp;|&nbsp; ')+'</div>'
+        +'<div class="lbl" style="margin-top:6px">Either the rental ended and the flag is stale, or somebody has a car nobody is charging.</div></div>';
+    }
+  }
   const gaps=list.filter(c=>!c.account_label||!c.owner_id);
   const done=list.filter(c=>c.account_label&&c.owner_id);
-  let h='';
+  let h=warn;
   if(gaps.length){h+='<div class="sec">Needs connecting ('+gaps.length+')</div>'+gaps.map(row).join('');}
   h+='<div class="sec">Connected ('+done.length+')</div>'+(done.length?done.map(row).join(''):'<p class="empty">None yet.</p>');
   document.getElementById('out').innerHTML=h;
   document.querySelectorAll('[data-owner]').forEach(s=>s.onchange=()=>save(s.dataset.owner,{owner_id:s.value||null},'Owner set'));
   document.querySelectorAll('[data-acct]').forEach(s=>s.onchange=()=>save(s.dataset.acct,{account_label:s.value||null},'Billing account set'));
+  document.querySelectorAll('[data-renter]').forEach(s=>s.onchange=async()=>{
+    const carId=s.dataset.renter, rid=s.value;
+    // one car per renter, and one renter per car
+    const prev=RENTERS.find(r=>r.current_vehicle_id===carId);
+    if(prev&&prev.id!==rid) await sb.from('renters').update({current_vehicle_id:null}).eq('id',prev.id);
+    if(rid) await sb.from('renters').update({current_vehicle_id:carId}).eq('id',rid);
+    toast('Renter linked ✓'); await load();
+  });
 
   function row(c){
     const portal=portalFor(c.account_label);
@@ -122,6 +163,15 @@ function render(){
         +'<div><div class="lbl">Customer portal</div><div class="portal">'
           +(portal?'<a href="'+esc(portal)+'" target="_blank" rel="noopener">open portal ↗</a>':'—')
         +'</div></div>'
+      +'</div>'
+      +'<div class="grid" style="margin-top:8px">'
+        +'<div><div class="lbl">Billing says</div><div class="portal" style="max-width:none;color:var(--text)">'
+          +(SUBFOR[c.id]?esc(SUBFOR[c.id].customer_name||SUBFOR[c.id].customer_email):'nothing billing')+'</div></div>'
+        +'<div><div class="lbl">Renter linked in the app</div><select data-renter="'+esc(c.id)+'">'
+          +'<option value="">— nobody —</option>'
+          +RENTERS.map(r=>'<option value="'+esc(r.id)+'"'+(r.current_vehicle_id===c.id?' selected':'')+'>'
+            +esc(r.name||r.email||r.id)+'</option>').join('')
+        +'</select></div><div></div>'
       +'</div></div>';
   }
 }
