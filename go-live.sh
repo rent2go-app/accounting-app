@@ -16,12 +16,19 @@ UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/12
 : "${SUPABASE_PAT:?set SUPABASE_PAT}"
 
 echo "==> checking ${DOMAIN} actually resolves"
-if ! dig +short "$DOMAIN" | grep -q .; then
-  echo "    ${DOMAIN} does not resolve yet. Add the DNS record first:"
+# Against public resolvers, not this machine's. What matters is whether renters
+# can reach it; a laptop resolver still holding a negative answer from before the
+# record existed is not a reason to refuse.
+answered=0
+for r in 1.1.1.1 8.8.8.8 9.9.9.9; do
+  if [ -n "$(dig +short "@$r" "$DOMAIN" 2>/dev/null | head -1)" ]; then answered=$((answered+1)); fi
+done
+if [ "$answered" -lt 2 ]; then
+  echo "    ${DOMAIN} is not resolving publicly yet (${answered}/3 resolvers). Add the DNS record first:"
   echo "      CNAME  ${DOMAIN%%.*}  ->  rent2go-app.github.io."
   exit 1
 fi
-echo "    resolves"
+echo "    resolves (${answered}/3 public resolvers)"
 
 echo "==> Supabase: sign-in and redirect URLs"
 python3 -c "
