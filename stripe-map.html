@@ -46,7 +46,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
   <p class="sub">A Stripe subscription names its car in the product — <b>“NISSAN SENTRA 2019 - BLACK”</b> — but that
   text is not reliable enough to match on every sync: colours disagree between the two systems, and two subscriptions
   can otherwise land on the same vehicle. So each product is resolved to a car <b>once, here</b>, and trusted from then on.
-  Once a product is mapped, cancelling its subscription releases the car and starting a new one claims it, automatically.</p>
+  Once a product is mapped, cancelling its subscription releases the car and starting a new one claims it, automatically.<br><br>Only products <b>billing now or within the last 90 days</b> are listed — older ones are historic and need no car.</p>
   <div class="bar">
     <button class="btn pri" id="sync">Run a sync now</button>
     <button class="btn" id="reload">Reload</button>
@@ -70,7 +70,7 @@ async function load(){
   document.getElementById('state').textContent='Loading…';
   const [m,s,v]=await Promise.all([
     sb.from('stripe_product_map').select('*').limit(500),
-    sb.from('renter_subscriptions').select('account_label,product_id,status,customer_email,customer_name,daily_amount').limit(1000),
+    sb.from('renter_subscriptions').select('account_label,product_id,status,customer_email,customer_name,daily_amount,canceled_at,current_period_end').limit(1000),
     sb.from('vehicles').select('id,name,plate,year,color,status').limit(400)
   ]);
   if(m.error){document.getElementById('state').textContent='Sign in as an admin to use this page.';return;}
@@ -89,12 +89,22 @@ function render(){
     const k=s.account_label+'|'+s.product_id;
     (liveKey[k]=liveKey[k]||[]).push(s);
   });
-  const rows=MAP.map(r=>({...r,subs:liveKey[r.account_label+'|'+r.product_id]||[]}));
-  const live=rows.filter(r=>r.subs.length);
+  // Only products that are actually billing, or billed within the last 90 days.
+  // Older ones are historic and do not need a car.
+  const cut=new Date(Date.now()-90*86400000).toISOString();
+  const inScope={};
+  SUBS.forEach(s=>{
+    if(!s.product_id)return;
+    const recent=(s.canceled_at||s.current_period_end||'')>=cut;
+    if(LIVE.includes(s.status)||recent) inScope[s.account_label+'|'+s.product_id]=true;
+  });
+  const rows=MAP.map(r=>({...r,subs:liveKey[r.account_label+'|'+r.product_id]||[]}))
+                .filter(r=>inScope[r.account_label+'|'+r.product_id]);
+  const live=rows;
   const todo=live.filter(r=>!r.vehicle_id && r.confidence!=='no_such_car');
   const done=live.filter(r=>r.vehicle_id);
   const none=live.filter(r=>!r.vehicle_id && r.confidence==='no_such_car');
-  const idle=rows.filter(r=>!r.subs.length);
+  const idle=[];
 
   document.getElementById('cards').innerHTML=
      card('Live subscriptions',SUBS.filter(s=>LIVE.includes(s.status)).length,'')
