@@ -268,6 +268,131 @@ Deno.serve(async (req) => {
     /* What each account is actually sending us, and where. Diagnosing "the
        webhook never fired" by guessing is how you end up creating a second
        endpoint beside a broken one. */
+    /* ---- the last step of the buying journey ----
+       The renter pays for their first days in the collection account. The daily
+       rental then has to run as a subscription in the OWNER's account, because
+       that is whose car it is and whose money it becomes.
+
+       Two things make this less obvious than it looks:
+
+       1. The card lives in the collection account and payment methods do not move
+          between Stripe accounts. That is fine here, because the fleet is billed
+          by invoice, not by stored card - every existing invoice carries a due
+          date and a hosted pay link. So the subscription is created with
+          collection_method=send_invoice and the renter pays each day's invoice.
+
+       2. Billing must not start until the days already paid for have run out. A
+          trial_end set to that date is how Stripe expresses "scheduled": the
+          subscription exists in the owner's account straight away and raises its
+          first invoice on the day daily billing actually begins. */
+    if (body.action === "create_daily_subscription") {
+      const bookingId = String(body.booking_id || "");
+      if (!bookingId) return json({ error: "booking_id required" }, 400);
+
+      const bk = (await sbGet(`bookings?id=eq.${enc(bookingId)}&select=*&limit=1`))[0];
+      if (!bk) return json({ error: "no such booking" }, 404);
+
+      const veh = (await sbGet(`vehicles?id=eq.${enc(bk.vehicle_id)}&select=*&limit=1`))[0];
+      if (!veh) return json({ error: "booking has no vehicle" }, 404);
+      const label = String(veh.account_label || "");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!acct?.key) return json({ error: `no Stripe key for owner account "${label}"` }, 400);
+
+      const renter = (await sbGet(`renters?id=eq.${enc(bk.renter_id)}&select=*&limit=1`))[0];
+      if (!renter?.email) return json({ error: "renter has no email" }, 400);
+
+      // when daily billing begins: the day after the days already paid for
+      const start = new Date(String(bk.start_date) + "T00:00:00Z");
+      const first = new Date(start);
+      first.setUTCDate(first.getUTCDate() + Number(bk.days || 1));
+      first.setUTCHours(13, 0, 0, 0);            // 9am in Charlotte
+      const anchor = Math.floor(first.getTime() / 1000);
+      const rate = Number(bk.daily_rate || veh.daily_rate || 0);
+      if (!rate) return json({ error: "no daily rate on the booking" }, 400);
+
+      const post = async (url: string, form: URLSearchParams) =>
+        await (await fetch(url, { method: "POST",
+          headers: { Authorization: `Bearer ${acct.key}`, "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString() })).json();
+      const get = async (url: string) =>
+        await (await fetch(url, { headers: { Authorization: `Bearer ${acct.key}` } })).json();
+
+      // 1. the customer, in the OWNER's account, carrying the verified address
+      let cust = ((await get(`https://api.stripe.com/v1/customers?email=${enc(renter.email)}&limit=1`)).data || [])[0];
+      const cf = new URLSearchParams();
+      cf.set("email", renter.email);
+      if (renter.name) cf.set("name", renter.name);
+      if (renter.phone) cf.set("phone", renter.phone);
+      if (renter.home_address) {
+        cf.set("address[line1]", renter.home_address);
+        if (renter.home_city) cf.set("address[city]", renter.home_city);
+        if (renter.home_state) cf.set("address[state]", renter.home_state);
+        if (renter.home_postal) cf.set("address[postal_code]", renter.home_postal);
+        cf.set("address[country]", "US");
+      }
+      cust = cust
+        ? await post(`https://api.stripe.com/v1/customers/${cust.id}`, cf)
+        : await post("https://api.stripe.com/v1/customers", cf);
+      if (cust.error) return json({ error: "customer: " + cust.error.message }, 400);
+
+      // 2. the product and a daily price, reusing the mapped one if it exists
+      const carName = String(veh.name || "").split("·")[0].trim() || veh.id;
+      let productId = (await sbGet(
+        `stripe_product_map?account_label=eq.${enc(label)}&vehicle_id=eq.${enc(veh.id)}&select=product_id&limit=1`))[0]?.product_id;
+      if (!productId) {
+        const pf = new URLSearchParams();
+        pf.set("name", carName);
+        const prod = await post("https://api.stripe.com/v1/products", pf);
+        if (prod.error) return json({ error: "product: " + prod.error.message }, 400);
+        productId = prod.id;
+      }
+      const priceForm = new URLSearchParams();
+      priceForm.set("currency", "usd");
+      priceForm.set("unit_amount", String(Math.round(rate * 100)));
+      priceForm.set("recurring[interval]", "day");
+      priceForm.set("product", productId);
+      const price = await post("https://api.stripe.com/v1/prices", priceForm);
+      if (price.error) return json({ error: "price: " + price.error.message }, 400);
+
+      // 3. the subscription itself, scheduled to begin when the paid days end
+      const sf = new URLSearchParams();
+      sf.set("customer", cust.id);
+      sf.set("items[0][price]", price.id);
+      sf.set("collection_method", "send_invoice");
+      sf.set("days_until_due", "0");                 // due the same day, by 11:59 PM
+      sf.set("trial_end", String(anchor));
+      sf.set("proration_behavior", "none");
+      sf.set("metadata[booking_id]", bookingId);
+      sf.set("metadata[renter_id]", String(bk.renter_id));
+      sf.set("metadata[vehicle_id]", String(veh.id));
+      sf.set("description", `${carName} - daily rental`);
+      const sub = await post("https://api.stripe.com/v1/subscriptions", sf);
+      if (sub.error) return json({ error: "subscription: " + sub.error.message }, 400);
+
+      // 4. write it down on our side so the dashboard and the sync agree
+      await sbUpsert("stripe_product_map", [{
+        account_label: label, product_id: productId, product_name: carName,
+        vehicle_id: veh.id, confidence: "confirmed",
+      }], "account_label,product_id");
+      await sbUpsert("renter_subscriptions", [{
+        id: sub.id, account_label: label, customer_id: cust.id,
+        customer_email: renter.email, customer_name: renter.name || null,
+        status: sub.status, product_id: productId, product_name: carName,
+        daily_amount: rate, current_period_end: iso(sub.trial_end ?? sub.current_period_end),
+        started_at: iso(sub.start_date), renter_id: bk.renter_id, vehicle_id: veh.id,
+        updated_at: new Date().toISOString(),
+      }], "id");
+      await sbPatch(`bookings?id=eq.${enc(bookingId)}`, { subscription_id: sub.id });
+      await note("subscription", `daily billing scheduled from ${first.toISOString().slice(0,10)} for ${renter.email}`,
+                 { account_label: label, subscription_id: sub.id, renter_id: bk.renter_id, vehicle_id: veh.id });
+
+      return json({ ok: true, account: label, subscription_id: sub.id, status: sub.status,
+                    customer_id: cust.id, product_id: productId, price_id: price.id,
+                    daily_amount: rate, paid_days: bk.days,
+                    rental_starts: bk.start_date,
+                    first_billing_date: first.toISOString().slice(0, 10) });
+    }
+
     if (body.action === "list_webhooks") {
       const only = body.account_label ? String(body.account_label) : null;
       const out: any[] = [];

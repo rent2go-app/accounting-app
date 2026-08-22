@@ -182,5 +182,29 @@ Deno.serve(async (req) => {
       <p>${b.vehicle_name} · ${b.days} day(s) · deposit ${usd(b.deposit)}${b.promo_code ? " · promo " + b.promo_code : ""}</p>
       <p>The car has been marked unavailable. Prepare it for handover.</p>`));
 
-  return json({ ok: true, booking: bookingId, status: "confirmed" });
+  /* ---- the last step of the buying journey ----
+     Payment lands in the collection account; the daily rental has to run in the
+     owner's. Doing that by hand is a step somebody eventually forgets, and the
+     renter's car then bills nowhere. It is scheduled to begin the day after the
+     days already paid for, so nobody is charged twice for the same day.
+
+     Deliberately after the booking is confirmed and never allowed to undo it: if
+     this fails the rental is still paid for and still valid, and the log says
+     what went wrong so it can be created by hand. */
+  let subscription: any = null;
+  try {
+    const r = await fetch(`${SB.replace(".supabase.co", ".functions.supabase.co")}/stripe-mirror`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SR}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create_daily_subscription", booking_id: bookingId }),
+    });
+    subscription = await r.json().catch(() => null);
+    if (subscription?.error) console.error("daily subscription failed", bookingId, subscription.error);
+  } catch (e) {
+    console.error("daily subscription threw", bookingId, String(e));
+  }
+
+  return json({ ok: true, booking: bookingId, status: "confirmed",
+                subscription: subscription?.subscription_id || null,
+                first_billing_date: subscription?.first_billing_date || null });
 });
