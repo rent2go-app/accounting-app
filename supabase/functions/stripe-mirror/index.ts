@@ -146,8 +146,14 @@ Deno.serve(async (req) => {
     const productNames: Record<string, string> = {};
     let accountsDone = 0, accountErrors: any[] = [];
 
+    // A full sweep of 14 accounts plus 90 days of invoices exceeds the 150s edge
+    // function limit. Callers run it one account at a time, and can skip invoices
+    // for a fast subscriptions-only pass - that is what moves the cars.
+    const only = body.account_label ? String(body.account_label) : null;
+    const skipInvoices = body.skip_invoices === true;
     for (const a of ACCTS) {
       if (!a.key) continue;
+      if (only && a.label !== only) continue;
       try {
         const subs = await stripeAll("https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.customer", a.key);
 
@@ -190,6 +196,7 @@ Deno.serve(async (req) => {
         }
 
         // invoices — last 90 days is plenty for a daily-billing dashboard
+        if (skipInvoices) { accountsDone++; continue; }
         const since = Math.floor(Date.now() / 1000) - 90 * 86400;
         const invs = await stripeAll(`https://api.stripe.com/v1/invoices?limit=100&created[gte]=${since}`, a.key);
         for (const i of invs) {
@@ -242,7 +249,36 @@ Deno.serve(async (req) => {
     }
 
     // a subscription that has ended releases its car and clears the renter's link
-    const ended = subsOut.filter((s) => !LIVE.includes(s.status) && s.vehicle_id && !shouldBeRented.has(s.vehicle_id));
+    // Releasing a car has to be judged against EVERY live subscription in the
+    // mirror, not just the ones this pass happened to read. A single-account run
+    // otherwise frees a car that is live on a different fleet - which put six
+    // rented cars back on the market the first time this ran per account.
+    const allLive = await sbGet(
+      "renter_subscriptions?select=account_label,product_id&status=in.(active,past_due,unpaid,trialing)&limit=1000");
+    const mapRows2 = await sbGet(
+      "stripe_product_map?select=account_label,product_id,vehicle_id,confidence&limit=1000");
+    const carOf2: Record<string, string> = {};
+    for (const m of mapRows2) {
+      if (m.vehicle_id && (m.confidence === "auto" || m.confidence === "confirmed")) {
+        carOf2[m.account_label + "|" + m.product_id] = m.vehicle_id;
+      }
+    }
+    const rentedAnywhere = new Set<string>();
+    for (const s of allLive) {
+      const v = carOf2[s.account_label + "|" + s.product_id];
+      if (v) rentedAnywhere.add(v);
+    }
+    for (const v of shouldBeRented) rentedAnywhere.add(v);
+
+    // one release per CAR, not per cancelled subscription
+    const seenEnded = new Set<string>();
+    const ended = subsOut.filter((s) => {
+      if (LIVE.includes(s.status) || !s.vehicle_id) return false;
+      if (rentedAnywhere.has(s.vehicle_id)) return false;
+      if (seenEnded.has(s.vehicle_id)) return false;
+      seenEnded.add(s.vehicle_id);
+      return true;
+    });
     for (const s of ended) {
       await sbPatch(`vehicles?id=eq.${enc(s.vehicle_id)}&available=is.false`, { available: true });
       if (s.renter_id) {
@@ -260,7 +296,7 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      ok: true, accounts: accountsDone, account_errors: accountErrors,
+      ok: true, accounts: accountsDone, account_errors: accountErrors, swept: only || "all", invoices_skipped: skipInvoices,
       subscriptions: subsOut.length, live_subscriptions: subsOut.filter((s) => LIVE.includes(s.status)).length,
       invoices: invOut.length, new_products_found: newProducts.length,
       cars_linked: LOG.filter((l) => l.kind === "linked").length,
