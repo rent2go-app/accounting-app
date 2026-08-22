@@ -28,6 +28,41 @@ function tooMany(ip: string) {
   return win.length > 12;
 }
 
+
+/* Say it the way a person would.
+   Linda's replies are written to be read on screen - "$69.95/day ($489.65 for 7
+   days)" is clear to the eye and a mess out loud: the slash is read as the word
+   "slash", the brackets flatten the sentence, and a bare "$489.65" comes out as
+   digits rather than money. Only the spoken copy is changed; what the renter
+   reads in the chat stays exactly as written. */
+function sayable(t: string): string {
+  const spell = (d: string) => d.replace(/,/g, "");
+  return String(t)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s*\/\s*day\b/gi, " per day")
+    .replace(/\s*\/\s*(wk|week)\b/gi, " per week")
+    .replace(/\s*\/\s*(mo|month)\b/gi, " per month")
+    .replace(/\s*\/\s*(yr|year)\b/gi, " per year")
+    // money with cents, then whole dollars
+    .replace(/\$\s?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})/g, (_m, d, c) => {
+      const cents = Number(c);
+      return cents ? `${spell(d)} dollars and ${cents} cents` : `${spell(d)} dollars`;
+    })
+    .replace(/\$\s?(\d{1,3}(?:,\d{3})*|\d+)/g, (_m, d) => `${spell(d)} dollars`)
+    .replace(/(\d)\s*%/g, "$1 percent")
+    // a range said as a range, not as a subtraction
+    .replace(/\b(\d{1,4})\s*[-\u2013]\s*(\d{1,4})\b/g, "$1 to $2")
+    // brackets stop the sentence dead; a comma keeps it moving
+    .replace(/[()\[\]]/g, ", ")
+    .replace(/\s*[\u2022\u00b7]\s*/g, ", ")
+    .replace(/\s*,\s*,+/g, ", ")
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/,\s*([.!?])/g, "$1")   // a bracket at the end of a sentence left ", ."
+    .replace(/,\s*$/g, ".")          // ...or a comma hanging off the end
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") {
@@ -44,7 +79,14 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({} as any));
     // 700 characters is about 45 seconds of speech — plenty for a chat reply,
     // and a ceiling on what any one request can cost.
-    const text = String(body.text || "").replace(/\s+/g, " ").trim().slice(0, 700);
+    const text = sayable(String(body.text || "")).slice(0, 700);
+    // dry:true returns what would be spoken, for checking the wording without
+    // spending a generation on it
+    if (body.dry) {
+      return new Response(JSON.stringify({ spoken: text }), {
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
     if (!text) {
       return new Response(JSON.stringify({ error: "no text" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
     }
