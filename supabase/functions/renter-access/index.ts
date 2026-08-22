@@ -1,8 +1,17 @@
 // renter-access — give a renter a way into their own dashboard.
 //
-// Creates the Supabase Auth account if they do not have one, mints a magic
-// sign-in link, emails it, and hands the same link back so it can be pasted into
-// a text or WhatsApp. One link works in both places.
+// Creates the Supabase Auth account if they do not have one and sets a temporary
+// password on it, then sends both ways in: a one-tap magic-link button in the
+// email, and the email/password underneath for every login after that.
+//
+// The password is what the text message carries. A magic link is ~150 characters
+// of query string and fragment, and SMS and WhatsApp truncate it at the & or the
+// # when they auto-link — which is exactly how the first round of invites failed.
+// A password has nothing in it for a phone to mangle, does not expire in an hour,
+// and is not spent by the first email scanner that follows the link.
+//
+// It is temporary: must_set_password is stamped on the account, and the app makes
+// them choose their own before it shows them anything.
 //
 // Auth: verify_jwt = true (service_role, or an admin email).
 // Secrets: SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, RESEND_FROM, SITE_URL.
@@ -39,12 +48,42 @@ async function auth(path: string, method = "GET", body?: unknown) {
   return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
 }
 
-/* One message, written to work as an email and as a text. Kept short: a text
-   that runs past a couple of screens does not get read. */
-function smsText(first: string, link: string) {
-  return `Hi ${first}, here is your Rent 2 Go account. Tap to sign in — no password needed. `
-       + `You can see your car, your daily invoices and pay them here: ${link}`;
+/* A first password the renter can read off a text message and type without
+   asking which character that is. Two plain words and four digits: no 0/O or
+   1/l, nothing that needs explaining over the phone, and short enough to survive
+   any SMS client. It only has to hold until they pick their own on first login. */
+const WORDS = [
+  "Maple", "Ridge", "Cedar", "River", "Stone", "Cove", "Harbor", "Meadow",
+  "Summit", "Willow", "Amber", "Copper", "Aspen", "Birch", "Canyon", "Falcon",
+  "Garnet", "Juniper", "Laurel", "Marble", "Nectar", "Orchard", "Prairie", "Quarry",
+  "Rapids", "Sierra", "Timber", "Valley", "Walnut", "Yonder", "Anchor", "Beacon",
+  "Compass", "Dune", "Ember", "Forest", "Granite", "Hollow", "Indigo", "Jasper",
+  "Kettle", "Lantern", "Mesa", "Nimbus", "Onyx", "Pebble", "Quill", "Ripple",
+  "Saddle", "Thistle", "Umber", "Verona", "Wander", "Yarrow", "Zenith", "Arbor",
+];
+function tempPassword() {
+  const r = new Uint32Array(3);
+  crypto.getRandomValues(r);
+  return WORDS[r[0] % WORDS.length] + WORDS[r[1] % WORDS.length] +
+         String(1000 + (r[2] % 9000));
 }
+
+/* One message, written to be read on a phone. No link with a query string in it —
+   that is what broke last time. Just the bare site, their email and the password. */
+function smsText(first: string, email: string, pw: string) {
+  return `Hi ${first}, your Rent 2 Go account is ready. Sign in at ${BRAND.plain}\n\n`
+       + `Email: ${email}\nPassword: ${pw}\n\n`
+       + `You will be asked to pick your own password. See your car, your daily `
+       + `invoices and pay them all in one place.`;
+}
+/* Only for someone who already chose their own password — nothing to send them
+   but a way back in, so the link goes on its own line where a phone is least
+   likely to clip it. */
+function smsTextLink(first: string, link: string) {
+  return `Hi ${first}, here is a one-tap sign-in for your Rent 2 Go account. `
+       + `It works once and expires in an hour.\n\n${link}`;
+}
+
 /* ---- the Rent 2 Go email shell ----
    Table-based and inline-styled on purpose: Outlook and several Android clients
    ignore flexbox and strip <style> blocks, and a customer email has to survive
@@ -54,6 +93,7 @@ const BRAND = {
   line: "#e2e8e4", wash: "#f4f7f6",
   logo: "https://rent2go-app.github.io/Rent2Go/assets/logo.png",
   site: "https://rent2go-app.github.io/Rent2Go/",
+  plain: "rent2go-app.github.io/Rent2Go",
   address: "9711 David Taylor Drive, Suite 111, Charlotte, NC 28262",
   phone: "980 272 8122", email: "info@rentaride2go.com", roadside: "(704) 912-0864",
 };
@@ -87,10 +127,24 @@ ${BRAND.phone} &nbsp;·&nbsp; <a href="mailto:${BRAND.email}" style="color:${BRA
 </td></tr></table></td></tr></table></body></html>`;
 }
 
-function emailHtml(first: string, link: string, car: string | null, balance: number) {
+function emailHtml(first: string, link: string, car: string | null, balance: number,
+                   email: string, pw: string | null) {
   const owing = balance > 0
     ? `<p style="margin:0 0 14px">Your balance today is <b>$${balance.toFixed(2)}</b>. You can settle it from your dashboard in a couple of taps.</p>`
     : `<p style="margin:0 0 14px">Your account is up to date — thank you.</p>`;
+  /* Spelled out in a box rather than a sentence, because this is the part people
+     screenshot. Monospace so an I and an l cannot be confused when they type it. */
+  const creds = pw
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 4px">
+         <tr><td style="background:${BRAND.wash};border:1px solid ${BRAND.line};border-radius:10px;padding:16px 18px">
+           <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:${BRAND.muted};padding-bottom:8px">Your sign-in details</div>
+           <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};padding-bottom:2px">Email</div>
+           <div style="font-family:'Courier New',Courier,monospace;font-size:16px;color:${BRAND.ink};padding-bottom:10px"><b>${email}</b></div>
+           <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND.muted};padding-bottom:2px">Temporary password</div>
+           <div style="font-family:'Courier New',Courier,monospace;font-size:20px;letter-spacing:1px;color:${BRAND.greenDark};padding-bottom:8px"><b>${pw}</b></div>
+           <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:${BRAND.muted}">We will ask you to choose your own password the first time you sign in.</div>
+         </td></tr></table>`
+    : "";
   return emailShell({
     title: "Your Rent 2 Go account is ready",
     preheader: "Manage your rental, see your daily invoices and pay — all in one place.",
@@ -104,10 +158,14 @@ function emailHtml(first: string, link: string, car: string | null, balance: num
       `<li style="margin-bottom:5px">Pay securely through Stripe, one tap per invoice</li>` +
       `<li style="margin-bottom:5px">Check your car, your rental and your pickup record</li>` +
       `<li>Request maintenance or roadside help</li></ul>` +
-      owing,
+      owing + creds,
     cta: { label: "Open my dashboard", href: link },
-    footnote: "No password needed — the button signs you straight in. The link is for you alone; " +
-              "if it stops working, just ask us and we will send another.",
+    footnote: creds
+      ? "The button above signs you in without typing anything, but it only works once and " +
+        "expires after an hour. Use your email and password any time after that — and if you " +
+        "ever forget it, there is a <b>Forgot password</b> link on the sign-in page."
+      : "The button above signs you in without typing anything. It only works once; " +
+        "if it stops working, just ask us and we will send another.",
   });
 }
 
@@ -147,10 +205,12 @@ Deno.serve(async (req) => {
 
       // 1. the account — create it if this is their first time
       let created = false;
+      let pw: string | null = tempPassword();
       if (!t.has_login) {
         const mk = await auth("admin/users", "POST", {
-          email, email_confirm: true,
-          user_metadata: { name: t.name, renter_id: t.id, source: "admin invite" },
+          email, email_confirm: true, password: pw,
+          user_metadata: { name: t.name, renter_id: t.id, source: "admin invite",
+                           must_set_password: true },
         });
         if (mk.ok && mk.data?.id) created = true;
         else if (mk.status !== 422 && !String(JSON.stringify(mk.data)).includes("already")) {
@@ -161,9 +221,27 @@ Deno.serve(async (req) => {
 
       // 2. tie the login to the renter record, so RLS lets them see their own bills
       const users = await auth(`admin/users?filter=${enc(email)}`);
-      const uid = (users.data?.users || []).find((u: any) =>
-        String(u.email || "").toLowerCase() === email)?.id;
+      const who = (users.data?.users || []).find((u: any) =>
+        String(u.email || "").toLowerCase() === email);
+      const uid = who?.id;
       if (uid) await sbPatch(`renters?id=eq.${enc(t.id)}`, { auth_uid: uid });
+
+      // 2b. a temporary password on any account still waiting for its first sign-in.
+      //     Someone who has already chosen their own keeps it — re-sending an invite
+      //     must never quietly lock a renter out of the password they are using.
+      if (uid && !created) {
+        const chosen = who?.user_metadata?.must_set_password === false;
+        if (chosen && body.reset_password !== true) {
+          pw = null;                    // they have their own; send the link only
+        } else {
+          const up = await auth(`admin/users/${enc(uid)}`, "PUT", {
+            password: pw,
+            user_metadata: { ...(who?.user_metadata || {}), name: t.name,
+                             renter_id: t.id, must_set_password: true },
+          });
+          if (!up.ok) pw = null;
+        }
+      }
 
       // 3. the sign-in link
       const gl = await auth("admin/generate_link", "POST", {
@@ -176,7 +254,8 @@ Deno.serve(async (req) => {
       const row: any = {
         renter_id: t.id, renter: t.name, email, phone: t.phone || null,
         fleet: t.fleet, car: t.vehicle, balance: Number(t.balance || 0),
-        created_account: created, link, sms: smsText(nice, link),
+        created_account: created, link, temp_password: pw,
+        sms: pw ? smsText(nice, email, pw) : smsTextLink(nice, link),
       };
 
       // 4. send it, unless the caller only wants the link back
@@ -191,7 +270,7 @@ Deno.serve(async (req) => {
               body: JSON.stringify({
                 from, to: [email],
                 subject: "Your Rent 2 Go account — sign in to manage your rental",
-                html: emailHtml(nice, link, t.vehicle, Number(t.balance || 0)),
+                html: emailHtml(nice, link, t.vehicle, Number(t.balance || 0), email, pw),
               }),
             });
             row.emailed = er.ok;
@@ -206,6 +285,7 @@ Deno.serve(async (req) => {
       ok: true,
       count: out.length,
       accounts_created: out.filter((r) => r.created_account).length,
+      passwords_set: out.filter((r) => r.temp_password).length,
       emailed: out.filter((r) => r.emailed).length,
       failed: out.filter((r) => r.error).length,
       results: out,

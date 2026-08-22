@@ -69,6 +69,9 @@ input.search{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line
 .pv-warn{background:#fff6e5;border:1px solid #f4d9a0;border-radius:10px;padding:10px 13px;font-size:13px;color:#8a5a00}
 .pv-warn ul{margin:6px 0 0;padding-left:18px}
 .pv-load{padding:26px;text-align:center;color:var(--muted)}
+.pwchip{margin:6px 0 8px;padding:7px 11px;background:var(--surface);border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--muted)}
+.pwchip b{display:inline;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;letter-spacing:.5px;color:var(--ok,#0f8a4d);text-transform:none;margin:0}
+.smsbody{white-space:pre-wrap;line-height:1.5}
 </style>
 </head>
 <body>
@@ -167,7 +170,8 @@ function render(){
   document.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewRenter(b.dataset.preview));
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
     const t=LINKS[b.dataset.copy]; if(!t)return;
-    navigator.clipboard.writeText(b.dataset.kind==='sms'?t.sms:t.link).then(()=>toast('Copied — paste into a text or WhatsApp'));
+    const pick={sms:t.sms,link:t.link,pw:t.pw||''}[b.dataset.kind];
+    navigator.clipboard.writeText(pick).then(()=>toast('Copied — paste into a text or WhatsApp'));
   });
 }
 
@@ -206,8 +210,11 @@ function rowHTML(x){
       +'<button class="btn sm pri" data-send="'+esc(x.id)+'">'+(x.has_login?'Re-send login':'Send login')+'</button>'
       +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Stripe portal</a>':'')
     +'</div></div>'
-    +(l?('<div class="linkbox"><b>Link ready — paste into a text or WhatsApp</b>'+esc(l.sms)
-        +'<div class="acts"><button class="btn sm" data-copy="'+esc(x.id)+'" data-kind="sms">Copy message</button>'
+    +(l?('<div class="linkbox"><b>Ready to send — paste into a text or WhatsApp</b>'
+        +(l.pw?'<div class="pwchip">Temporary password <b>'+esc(l.pw)+'</b></div>':'')
+        +'<div class="smsbody">'+esc(l.sms)+'</div>'
+        +'<div class="acts"><button class="btn sm pri" data-copy="'+esc(x.id)+'" data-kind="sms">Copy message</button>'
+        +(l.pw?'<button class="btn sm" data-copy="'+esc(x.id)+'" data-kind="pw">Copy password</button>':'')
         +'<button class="btn sm" data-copy="'+esc(x.id)+'" data-kind="link">Copy link only</button></div></div>'):'')
     +'</div>';
 }
@@ -235,6 +242,7 @@ async function previewRenter(id){
   if(!x.portal_url) issues.push('No customer portal for this fleet — the portal button will not work.');
   if(car && !(car.images&&car.images.length)) issues.push('That car has no photo.');
   if(!x.has_login) issues.push('No login yet — send one before they can see any of this.');
+  else if(x.password_set===false) issues.push('Still on the temporary password we sent. They will be asked to choose their own on first sign-in.');
   body.innerHTML =
     '<div class="pv-head"><div><b>'+esc(x.name||x.email)+'</b>'
       +'<div class="pv-sub">'+esc(x.email||'')+' · '+esc(x.fleet||'no fleet')+'</div></div>'
@@ -261,6 +269,12 @@ async function previewRenter(id){
           +'</div>':'<div class="pv-empty">Nothing outstanding.</div>')
       +(paid.length?'<div class="pv-sub" style="margin-top:8px">'+paid.length+' paid invoice(s) in their history</div>':'')
     +'</div>'
+    +'<div class="pv-card"><div class="pv-row"><b>How they sign in</b><span class="pv-sub">'
+      +(!x.has_login ? 'No account yet'
+        : x.password_set===true ? 'Own password — chosen by them'
+        : x.password_set===false ? 'Temporary password — must change it on first sign-in'
+        : 'Account exists, no password set yet')+'</span></div>'
+      +'<div class="pv-sub">'+esc(x.email||'')+(x.last_sign_in_at?' · last signed in '+new Date(x.last_sign_in_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):' · never signed in')+'</div></div>'
     +'<div class="pv-card"><div class="pv-row"><b>Customer portal</b>'
       +(x.portal_url?'<a class="btn sm" href="'+esc(x.portal_url)+'" target="_blank" rel="noopener">Open ↗</a>':'<span class="pv-sub">none</span>')
       +'</div><div class="pv-sub">'+esc(x.portal_url||'No portal on file for '+(x.fleet||'this fleet'))+'</div></div>';
@@ -272,7 +286,7 @@ async function send(ids,btn){
     const r=await sb.functions.invoke('renter-access',{body:{renter_ids:ids,send:true,force:true}});
     if(r.error)throw r.error;
     const d=r.data||{};
-    (d.results||[]).forEach(x=>{ if(x.link) LINKS[x.renter_id]={link:x.link,sms:x.sms}; });
+    (d.results||[]).forEach(x=>{ if(x.link) LINKS[x.renter_id]={link:x.link,sms:x.sms,pw:x.temp_password}; });
     const okN=(d.results||[]).filter(x=>x.emailed).length;
     const bad=(d.results||[]).filter(x=>x.error||x.email_error);
     toast(okN+' email'+(okN===1?'':'s')+' sent'+(bad.length?' · '+bad.length+' failed':''));
@@ -287,7 +301,7 @@ document.getElementById('sendall').onclick=async function(){
   const all=ROWS.filter(x=>x.bucket===TAB);
   const targets=all.filter(x=>!x.has_login);
   const list=targets.length?targets:all;
-  if(!confirm('Email a sign-in link to '+list.length+' renter'+(list.length===1?'':'s')+'?\n\nThey will each get a link that signs them straight in.'))return;
+  if(!confirm('Send sign-in details to '+list.length+' renter'+(list.length===1?'':'s')+'?\n\nEach gets a one-tap link plus a temporary password they must change on first sign-in. Anyone who has already chosen their own password keeps it.'))return;
   await send(list.map(x=>x.id),this);
 };
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{

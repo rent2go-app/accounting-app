@@ -176,11 +176,28 @@ Deno.serve(async (req) => {
               interval: it.price?.recurring?.interval || null,
               price_nickname: it.price?.nickname || null,
               product_id: it.price?.product || null,
+              product_name: null as any,
               sub_metadata: s.metadata || {},
             });
           }
         } catch (e) { out.push({ label: a.label, error: String(e) }); }
       }
+      // The car lives in the PRODUCT name ("2018 Sonata - 685054"), which sits one
+      // level too deep to expand inline. Resolve the ids in a second pass.
+      const pcache: Record<string, string> = {};
+      for (const a of ACCTS) {
+        if (!a.key) continue;
+        const ids = Array.from(new Set(out.filter((x: any) => x.label === a.label && x.product_id).map((x: any) => x.product_id)));
+        for (const pid of ids) {
+          if (pcache[a.label + "|" + pid]) continue;
+          try {
+            const pr = await fetch(`https://api.stripe.com/v1/products/${pid}`, { headers: { Authorization: `Bearer ${a.key}` } });
+            const pj = await pr.json();
+            if (pj && pj.name) pcache[a.label + "|" + pid] = pj.name;
+          } catch (_) { /* */ }
+        }
+      }
+      for (const x of out) if (x.product_id) x.product_name = pcache[x.label + "|" + x.product_id] || null;
       return json({ ok: true, subs: out });
     }
 

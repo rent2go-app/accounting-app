@@ -129,6 +129,125 @@ Deno.serve(async (req) => {
       return json({ ok: true, dry_run: !!body.dry_run, renamed: out.length, changes: out });
     }
 
+    // ---- create a test subscription (admin only, deliberate) ----
+    // Bills like a real rental does: a daily recurring price, collected by
+    // invoice rather than auto-charge, so the whole pay-now path can be walked.
+    if (body.action === "create_test_subscription") {
+      const label = String(body.account_label || "RENT 2 GO LLC 2.0");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!acct || !acct.key) return json({ error: "no Stripe key for " + label }, 400);
+      const key = acct.key;
+      const email = String(body.email || "").trim().toLowerCase();
+      const name = String(body.name || "").trim();
+      const phone = String(body.phone || "").trim();
+      const vehicleId = String(body.vehicle_id || "");
+      const amount = Math.round(Number(body.daily_amount || 1) * 100);
+      if (!email || !vehicleId) return json({ error: "email and vehicle_id are required" }, 400);
+
+      const veh = (await sbGet(`vehicles?id=eq.${enc(vehicleId)}&select=id,name,make,model,year,color`))[0];
+      if (!veh) return json({ error: "no such vehicle" }, 404);
+      const productName = [[veh.make, veh.model].filter(Boolean).join(" "), veh.year, veh.color]
+        .filter(Boolean).join(" - ").toUpperCase() || String(veh.name || "TEST VEHICLE").toUpperCase();
+
+      const form = (o: Record<string, string>) => new URLSearchParams(o);
+      const post = async (url: string, f: URLSearchParams) => {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded" },
+          body: f,
+        });
+        return await r.json();
+      };
+
+      // customer — reuse if they already exist in this account
+      const found = await (await fetch(
+        `https://api.stripe.com/v1/customers?email=${enc(email)}&limit=1`,
+        { headers: { Authorization: `Bearer ${key}` } })).json();
+      let customer = (found.data && found.data[0]) || null;
+      if (!customer) {
+        customer = await post("https://api.stripe.com/v1/customers",
+          form({ email, name, phone, "metadata[r2g_test]": "true" }));
+        if (customer.error) return json({ error: "customer: " + customer.error.message }, 400);
+      }
+
+      // product + a daily price
+      const product = await post("https://api.stripe.com/v1/products",
+        form({ name: productName, "metadata[r2g_vehicle_id]": vehicleId, "metadata[r2g_test]": "true" }));
+      if (product.error) return json({ error: "product: " + product.error.message }, 400);
+      const price = await post("https://api.stripe.com/v1/prices", form({
+        product: product.id, currency: "usd", unit_amount: String(amount),
+        "recurring[interval]": "day",
+      }));
+      if (price.error) return json({ error: "price: " + price.error.message }, 400);
+
+      // the subscription — invoiced daily, never auto-charged
+      const sub = await post("https://api.stripe.com/v1/subscriptions", form({
+        customer: customer.id, "items[0][price]": price.id,
+        collection_method: "send_invoice", days_until_due: "1",
+        "metadata[r2g_vehicle_id]": vehicleId,
+        "metadata[r2g_renter_email]": email,
+        "metadata[r2g_test]": "true",
+      }));
+      if (sub.error) return json({ error: "subscription: " + sub.error.message }, 400);
+
+      // teach the map about it, so the sync claims the car straight away
+      await sbUpsert("stripe_product_map", [{
+        account_label: label, product_id: product.id, product_name: productName,
+        vehicle_id: vehicleId, confidence: "confirmed", note: "test subscription",
+      }], "account_label,product_id");
+
+      return json({
+        ok: true, account_label: label, customer_id: customer.id,
+        product_id: product.id, product_name: productName, price_id: price.id,
+        subscription_id: sub.id, status: sub.status,
+        daily_amount: amount / 100,
+        cancel_hint: "cancel it in Stripe, or call this function with action=cancel_test_subscription",
+      });
+    }
+
+    // ---- push the first invoice out now ----
+    // A send_invoice subscription leaves its first invoice as a draft for up to
+    // an hour. For a test we want something payable immediately.
+    if (body.action === "finalize_invoices") {
+      const label = String(body.account_label || "RENT 2 GO LLC 2.0");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!acct || !acct.key) return json({ error: "no Stripe key for " + label }, 400);
+      const cust = String(body.customer_id || "");
+      if (!cust) return json({ error: "customer_id required" }, 400);
+      const list = await (await fetch(
+        `https://api.stripe.com/v1/invoices?customer=${enc(cust)}&limit=20`,
+        { headers: { Authorization: `Bearer ${acct.key}` } })).json();
+      const out: any[] = [];
+      for (const inv of (list.data || [])) {
+        if (inv.status !== "draft") { out.push({ id: inv.id, status: inv.status, hosted: inv.hosted_invoice_url }); continue; }
+        const fin = await (await fetch(`https://api.stripe.com/v1/invoices/${inv.id}/finalize`, {
+          method: "POST", headers: { Authorization: `Bearer ${acct.key}` },
+        })).json();
+        if (fin.error) { out.push({ id: inv.id, error: fin.error.message }); continue; }
+        await fetch(`https://api.stripe.com/v1/invoices/${inv.id}/send`, {
+          method: "POST", headers: { Authorization: `Bearer ${acct.key}` },
+        }).catch(() => {});
+        out.push({ id: fin.id, number: fin.number, status: fin.status,
+                   amount_due: (fin.amount_due || 0) / 100, hosted: fin.hosted_invoice_url });
+      }
+      return json({ ok: true, invoices: out });
+    }
+
+    // ---- cancel it again ----
+    if (body.action === "cancel_test_subscription") {
+      const label = String(body.account_label || "RENT 2 GO LLC 2.0");
+      const acct = ACCTS.find((a: any) => a.label === label);
+      if (!acct || !acct.key) return json({ error: "no Stripe key for " + label }, 400);
+      const id = String(body.subscription_id || "");
+      if (!id) return json({ error: "subscription_id required" }, 400);
+      const r = await fetch(`https://api.stripe.com/v1/subscriptions/${id}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${acct.key}` },
+      });
+      const j = await r.json();
+      if (j.error) return json({ error: j.error.message }, 400);
+      return json({ ok: true, subscription_id: id, status: j.status });
+    }
+
     // ---- who we already know ----
     const renters = await sbGet("renters?select=id,email,name,auth_uid,current_vehicle_id&limit=1000");
     const byEmail: Record<string, any> = {};
