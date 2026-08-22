@@ -105,7 +105,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;backgroun
 .ffrule{font-size:11.5px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:7px 10px;margin-bottom:10px;line-height:1.4}
 .fstrip{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:8px}
 .fday{width:13px;height:13px;border-radius:3px;background:var(--surface-2);display:inline-block;vertical-align:middle}
-.fday.p{background:#2ea36a}.fday.u{background:#e05555}.fday.n{background:var(--surface-2);border:1px solid var(--line)}
+.fday.p{background:#2ea36a}.fday.b{background:#f4a6c0}.fday.u{background:#e05555}.fday.n{background:#c3c9d2;border:1px solid var(--line)}
 .fday.cx{background:#8b5cf6;border:none}.fday.rp{background:#eab308;border:none}
 .fday.lf{box-shadow:inset 0 0 0 2px #eab54e}
 .ffnote{display:flex;gap:6px;flex-wrap:wrap}
@@ -481,7 +481,12 @@ function fleetStrip(days,ym,reason){
   // rent, yellow = down for repairs / maintenance. Paid days stay green, billed-unpaid stay red.
   var gapCls=/cancel|off rent|off-rent/.test(R)?' cx':(/repair|mainten|off-fleet|accident/.test(R)?' rp':'');
   var gapLbl=/cancel|off rent|off-rent/.test(R)?' · subscription cancelled (off rent)':(/repair|mainten|off-fleet|accident/.test(R)?' · down for repairs':'');
-  for(var d=1;d<=n;d++){var k=ym+'-'+pad(d);var c=days[k];var cls=c?(c.p?'p':'u'):('n'+gapCls);if(c&&c.lf>0)cls+=' lf';var t=k+(c?(c.p?' · paid $'+(c.a||0):' · billed, unpaid'):(' · no rental'+gapLbl))+(c&&c.lf>0?' · +$'+c.lf+' late fee':'');out+='<span class="fday '+cls+'" title="'+t+'"></span>';}
+  for(var d=1;d<=n;d++){var k=ym+'-'+pad(d);var c=days[k];
+    // paid=green, billed-awaiting=pink (b), billed & NOT paid/overdue (late fee)=red (u), not rented=silver (n)
+    var cls=c?(c.p?'p':(c.lf>0?'u':'b')):('n'+gapCls);
+    if(c&&c.p&&c.lf>0)cls+=' lf';   // paid but had a late fee → gold ring
+    var t=k+(c?(c.p?' · paid $'+(c.a||0):(c.lf>0?' · billed · NOT paid (overdue)':' · billed · awaiting payment')):(' · not rented'+gapLbl))+(c&&c.lf>0?' · +$'+c.lf+' late fee':'');
+    out+='<span class="fday '+cls+'" title="'+t+'"></span>';}
   return out;
 }
 // trailing consecutive no-payment days ending at today (current month) or month-end (past months)
@@ -529,7 +534,7 @@ function fleetHTML(o){
   var totInc=cars.reduce(function(s,v){return s+v.income+v.lf_income;},0);
   var reviewN=cars.filter(function(v){return noPayGap(v.days,YM)>3;}).length;
   return '<div class="fleetfin"><div class="ffh">🚗 Fleet Financials · '+fmtYM(YM)+' <span class="hint">'+cars.length+' car'+(cars.length===1?'':'s')+' · '+fmt(r2(totInc))+' collected'+(reviewN?' · <b style="color:#c22a2a">'+reviewN+' to review</b>':'')+'</span></div>'
-    +'<div class="fflegend"><span class="fday p"></span> paid &nbsp; <span class="fday u"></span> unpaid &nbsp; <span class="fday n"></span> not rented &nbsp; <span class="fday cx"></span> subscription cancelled &nbsp; <span class="fday rp"></span> down for repairs &nbsp; <span class="fday p lf"></span> late fee paid</div>'
+    +'<div class="fflegend"><span class="fday p"></span> paid &nbsp; <span class="fday b"></span> billed &nbsp; <span class="fday u"></span> billed &amp; not paid &nbsp; <span class="fday n"></span> not rented &nbsp; <span class="fday cx"></span> subscription cancelled &nbsp; <span class="fday rp"></span> down for repairs &nbsp; <span class="fday p lf"></span> late fee paid</div>'
     +'<div class="ffrule">One block per car — if a car changes hands mid-month the renters are overlapped (e.g. <i>Sondra → Nathaniel</i>). Prorate an owner only when a car is <b>down for maintenance/repair</b> or <b>unrented for 5+ days</b>.</div>'+body+'</div>';
 }
 function saveFleetNote(key,patch){
@@ -720,9 +725,9 @@ function carName(o,id){var c=(o.cars||[]).find(function(cc){return cc.id===id;})
 function fleetStripInline(days,ym){
   var n=dim(ym),out='';
   for(var d=1;d<=n;d++){var k=ym+'-'+pad(d);var c=days[k];
-    var bg=c?(c.p?'#0f8a4d':'#d94b4b'):'#e6ebf1';
-    var bd=(c&&c.lf>0)?'border:1.5px solid #d9a300;':'border:1px solid rgba(0,0,0,.05);';
-    var t=k+(c?(c.p?' · paid $'+(c.a||0):' · billed, unpaid'):' · no rental')+(c&&c.lf>0?' · +$'+c.lf+' late fee':'');
+    var bg=c?(c.p?'#0f8a4d':(c.lf>0?'#d94b4b':'#f4a6c0')):'#c3c9d2';   // paid=green, overdue=red, billed=pink, not rented=silver
+    var bd=(c&&c.p&&c.lf>0)?'border:1.5px solid #d9a300;':'border:1px solid rgba(0,0,0,.05);';
+    var t=k+(c?(c.p?' · paid $'+(c.a||0):(c.lf>0?' · billed · NOT paid (overdue)':' · billed · awaiting payment')):' · not rented')+(c&&c.lf>0?' · +$'+c.lf+' late fee':'');
     out+='<span title="'+t+'" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+bg+';'+bd+'margin:1px;vertical-align:middle"></span>';
   }
   return out;
