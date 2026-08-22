@@ -519,6 +519,19 @@ Deno.serve(async (req) => {
         subscription: x.subscription })) });
     }
 
+    /* Cancel a schedule that has not started. A schedule is not a subscription,
+       so it needs its own cancel endpoint - deleting the booking alone would
+       leave it quietly waiting to bill. */
+    if (body.action === "cancel_schedule") {
+      const acct = ACCTS.find((a: any) => a.label === String(body.account_label || ""));
+      const id = String(body.schedule_id || "");
+      if (!acct?.key || !id) return json({ error: "schedule_id and a known account_label required" }, 400);
+      const r = await (await fetch(`https://api.stripe.com/v1/subscription_schedules/${id}/cancel`,
+        { method: "POST", headers: { Authorization: `Bearer ${acct.key}` } })).json();
+      if (r.error) return json({ error: r.error.message }, 400);
+      return json({ ok: true, schedule_id: r.id, status: r.status });
+    }
+
     if (body.action === "list_webhooks") {
       const only = body.account_label ? String(body.account_label) : null;
       const out: any[] = [];

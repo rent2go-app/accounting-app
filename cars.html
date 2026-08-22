@@ -200,6 +200,7 @@ function card(v){
        +STATUSES.map(function(s){return '<option value="'+s+'"'+(v.status===s?' selected':'')+'>'+esc(STATUS_LABEL[s]||s)+'</option>';}).join('')
      +'</select></div></div>'
    +'<div class="cf"><button class="btn sm" data-edit="'+v.id+'" style="flex:1">Edit</button>'
+   +(v.available===false?'<button class="btn sm" data-mileage="'+v.id+'" title="Email and text this renter for an odometer reading">📸 Ask mileage</button>':'')
    +(v.status==='live'?'<button class="btn sm" data-godown="'+v.id+'" title="Take off the website catalogue — down for repairs or maintenance" style="color:#c22a2a;border-color:#c22a2a">🔧 Take Down</button>':'<button class="btn sm" data-golive="'+v.id+'" title="Publish this car to the website catalogue" style="color:#0a7d44;border-color:#0a7d44">✅ Go Live</button>')
    +'<button class="btn sm" data-photos="'+v.id+'" title="Photos shown on the car's catalogue card">📷 Add image</button>'
    +'<button class="btn sm" data-docs="'+v.id+'" title="Registration and insurance — needed for Uber and Lyft drivers">📄 Add docs</button></div></div>';
@@ -368,12 +369,43 @@ async function viewDoc(id,key){
   window.open(u.data.signedUrl,'_blank','noopener');
 }
 
+
+/* Ask whoever is in this car for an odometer reading. Only offered on a car that
+   is actually out - there is nobody to ask about one sitting on the lot. The
+   renter gets an email and a text, and the prompt appears on their dashboard
+   until they answer it. */
+async function askMileage(vehicleId, btn){
+  const note = prompt('Anything to add to the message? (optional)\n\nLeave blank for the standard request.', '');
+  if (note === null) return;
+  const old = btn.textContent; btn.disabled = true; btn.textContent = 'Sending…';
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const r = await fetch(window.R2G_CONFIG.SUPABASE_URL + '/functions/v1/request-mileage', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey: window.R2G_CONFIG.SUPABASE_ANON_KEY,
+                Authorization: 'Bearer ' + (session ? session.access_token : window.R2G_CONFIG.SUPABASE_ANON_KEY) },
+      body: JSON.stringify({ vehicle_id: vehicleId, note: note || '' })
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.reason === 'no_renter' ? 'Nobody is renting that car' : d.error); }
+    else {
+      const bits = [];
+      if (d.sent_email) bits.push('emailed ' + d.email);
+      if (d.sent_sms)   bits.push('texted ' + d.phone);
+      toast(bits.length ? ('Asked ' + d.renter + ' — ' + bits.join(' and ')) 
+                        : ('Request logged, but nothing could be sent to ' + d.renter));
+    }
+  }catch(e){ toast('Could not send: ' + (e.message || e)); }
+  btn.disabled = false; btn.textContent = old;
+}
+
 function wire(){
   $('q').oninput=e=>{FILTER=e.target.value;const p=e.target.selectionStart;render();const n=$('q');n.focus();n.setSelectionRange(p,p);};
   $('show').onchange=e=>{SHOW=e.target.value;render();};
   $('refresh').onclick=async()=>{toast('Refreshing…');await load();render();};
   $('addcar').onclick=()=>openCar(null);
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openCar(b.dataset.edit));
+  document.querySelectorAll('[data-mileage]').forEach(b=>b.onclick=()=>askMileage(b.dataset.mileage,b));
   document.querySelectorAll('[data-photos]').forEach(b=>b.onclick=()=>openPhotos(b.dataset.photos));
   document.querySelectorAll('[data-docs]').forEach(b=>b.onclick=()=>openDocs(b.dataset.docs));
   document.querySelectorAll('[data-golive]').forEach(b=>b.onclick=()=>setCarStatus(b.dataset.golive,'live'));
